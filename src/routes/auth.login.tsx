@@ -17,7 +17,8 @@ function LoginPage() {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [email, setEmail] = useState('')
+
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +27,7 @@ function LoginPage() {
 
     try {
       const formData = new URLSearchParams()
-      formData.append("username", email)
+      formData.append("username", username)
       formData.append("password", password)
 
       const res = await fetch("http://localhost:8000/auth/login", {
@@ -54,7 +55,7 @@ function LoginPage() {
 
     } catch (error) {
       toast.error('ورود ناموفق', {
-        description: 'ایمیل یا رمز عبور اشتباه است'
+        description: 'نام کاربری یا رمز عبور اشتباه است'
       })
     } finally {
       setIsLoading(false)
@@ -83,15 +84,15 @@ function LoginPage() {
           <CardContent className="space-y-4">
 
             <div className="space-y-2">
-              <Label htmlFor="email">ایمیل</Label>
+              <Label htmlFor="username">نام کاربری</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="admin@school.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="ali123"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
 

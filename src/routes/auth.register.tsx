@@ -18,10 +18,10 @@ function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const [formData, setFormData] = useState({
+    username: '',
     full_name: '',
     email: '',
-    phone: '',
-    personnel_code: '',
+    phone_number: '',
     password: '',
   })
 
@@ -37,12 +37,43 @@ function RegisterPage() {
     setIsLoading(true)
 
     try {
+      if (!formData.username.trim()) {
+        throw new Error('نام کاربری الزامی است')
+      }
+
+      if (!formData.full_name.trim()) {
+        throw new Error('نام و نام خانوادگی الزامی است')
+      }
+
+      if (!formData.phone_number.trim()) {
+        throw new Error('شماره تلفن الزامی است')
+      }
+
+      if (!formData.password.trim()) {
+        throw new Error('رمز عبور الزامی است')
+      }
+
+      if (formData.email.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(formData.email.trim())) {
+          throw new Error('فرمت ایمیل معتبر نیست')
+        }
+      }
+
+      const payload = {
+        username: formData.username.trim(),
+        full_name: formData.full_name.trim(),
+        phone_number: formData.phone_number.trim(),
+        email: formData.email.trim() || null,
+        password: formData.password,
+      }
+
       const res = await fetch('http://localhost:8000/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -101,6 +132,20 @@ function RegisterPage() {
           <CardContent className="space-y-4">
 
             <div className="space-y-2">
+              <Label htmlFor="username">نام کاربری</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="ali123"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                autoComplete="username"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="full_name">نام و نام خانوادگی</Label>
               <Input
                 id="full_name"
@@ -115,27 +160,13 @@ function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">ایمیل</Label>
+              <Label htmlFor="phone_number">شماره تلفن</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="ali@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">شماره تلفن</Label>
-              <Input
-                id="phone"
-                name="phone"
+                id="phone_number"
+                name="phone_number"
                 type="tel"
                 placeholder="09123456789"
-                value={formData.phone}
+                value={formData.phone_number}
                 onChange={handleChange}
                 required
                 autoComplete="tel"
@@ -143,15 +174,15 @@ function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="personnel_code">کد پرسنلی</Label>
+              <Label htmlFor="email">ایمیل (اختیاری)</Label>
               <Input
-                id="personnel_code"
-                name="personnel_code"
-                type="text"
-                placeholder="ABC1234"
-                value={formData.personnel_code}
+                id="email"
+                name="email"
+                type="email"
+                placeholder="ali@example.com"
+                value={formData.email}
                 onChange={handleChange}
-                required
+                autoComplete="email"
               />
             </div>
 

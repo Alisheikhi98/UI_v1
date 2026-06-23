@@ -1,8 +1,8 @@
 const API_URL = "http://localhost:8000"
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(username: string, password: string) {
   const form = new URLSearchParams()
-  form.append("username", email)
+  form.append("username", username)
   form.append("password", password)
 
   const res = await fetch(`${API_URL}/auth/login`, {
@@ -21,10 +21,10 @@ export async function loginUser(email: string, password: string) {
 }
 
 export async function registerUser(data: {
+  username: string
   full_name: string
-  email: string
-  phone: string
-  personnel_code: string
+  phone_number: string
+  email?: string | null
   password: string
 }) {
   const res = await fetch(`${API_URL}/auth/register`, {
@@ -32,7 +32,13 @@ export async function registerUser(data: {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      username: data.username,
+      full_name: data.full_name,
+      phone_number: data.phone_number,
+      email: data.email ?? null,
+      password: data.password,
+    }),
   })
 
   if (!res.ok) {
