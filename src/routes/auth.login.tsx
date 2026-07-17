@@ -25,41 +25,16 @@ function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    try {
-      const formData = new URLSearchParams()
-      formData.append("username", username)
-      formData.append("password", password)
-
-      const res = await fetch("http://localhost:8000/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData,
-      })
-
-      if (!res.ok) {
-        throw new Error("Invalid credentials")
-      }
-
-      const data = await res.json()
-
-      // ذخیره توکن
-      localStorage.setItem("access_token", data.access_token)
+    setTimeout(() => {
+      localStorage.setItem('access_token', 'fake-token')
 
       toast.success('خوش آمدید!', {
         description: 'با موفقیت وارد شدید.'
       })
 
-      navigate({ to: '/dashboard' })
-
-    } catch (error) {
-      toast.error('ورود ناموفق', {
-        description: 'نام کاربری یا رمز عبور اشتباه است'
-      })
-    } finally {
       setIsLoading(false)
-    }
+      navigate({ to: '/dashboard' })
+    }, 1000)
   }
 
   return (
@@ -82,7 +57,6 @@ function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-
             <div className="space-y-2">
               <Label htmlFor="username">نام کاربری</Label>
               <Input
@@ -125,9 +99,11 @@ function LoginPage() {
                   className="absolute left-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword
-                    ? <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -138,7 +114,6 @@ function LoginPage() {
                 مرا برای ۳۰ روز به خاطر بسپار
               </Label>
             </div>
-
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
@@ -160,7 +135,6 @@ function LoginPage() {
               </Link>
             </p>
           </CardFooter>
-
         </form>
       </Card>
     </div>

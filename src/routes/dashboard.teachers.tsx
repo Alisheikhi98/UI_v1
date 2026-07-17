@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
@@ -6,18 +6,59 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { mockTeachers } from '@/lib/data'
 import type { Teacher } from '@/lib/types'
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Mail, Phone, Filter, Users, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Phone,
+  Filter,
+  Users,
+  Loader2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/dashboard/teachers')({
-  head: () => ({ meta: [{ title: 'معلمان - آموزش‌یار' }, { name: 'description', content: 'مدیریت معلمان مدرسه' }] }),
+  head: () => ({
+    meta: [
+      { title: 'معلمان - آموزش‌یار' },
+      { name: 'description', content: 'مدیریت معلمان مدرسه' },
+    ],
+  }),
   component: TeachersPage,
 })
 
@@ -28,11 +69,11 @@ function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
         <Users className="h-8 w-8 text-primary" />
       </div>
       <h3 className="mt-4 text-lg font-semibold">هنوز معلمی ثبت نشده</h3>
-      <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
         با افزودن اولین معلم شروع کنید. معلمان می‌توانند به دروس و کلاس‌ها تخصیص داده شوند.
       </p>
       <Button className="mt-6" onClick={onAddTeacher}>
-        <Plus className="ms-2 h-4 w-4" />
+        <Plus className="ml-2 h-4 w-4" />
         افزودن معلم
       </Button>
     </Card>
@@ -51,14 +92,42 @@ function TeacherDialog({
   onSave: (data: Partial<Teacher>) => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState<Partial<Teacher>>(
-    teacher || { name: '', email: '', phone: '', subjects: [], status: 'active' }
-  )
+  const [formData, setFormData] = useState<Partial<Teacher>>({
+    name: '',
+    personnel_code: '',
+    phone: '',
+    subjects: [],
+    status: 'active',
+  })
+
+  useEffect(() => {
+    if (!open) return
+
+    if (teacher) {
+      setFormData({
+        name: teacher.name || '',
+        personnel_code: teacher.personnel_code || '',
+        phone: teacher.phone || '',
+        subjects: teacher.subjects || [],
+        status: teacher.status || 'active',
+      })
+    } else {
+      setFormData({
+        name: '',
+        personnel_code: '',
+        phone: '',
+        subjects: [],
+        status: 'active',
+      })
+    }
+  }, [teacher, open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
     onSave(formData)
     setIsLoading(false)
     onOpenChange(false)
@@ -66,13 +135,18 @@ function TeacherDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{teacher ? 'ویرایش معلم' : 'افزودن معلم جدید'}</DialogTitle>
+      <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogHeader className="text-right">
+          <DialogTitle>
+            {teacher ? 'ویرایش معلم' : 'افزودن معلم جدید'}
+          </DialogTitle>
           <DialogDescription>
-            {teacher ? 'اطلاعات معلم را به‌روز کنید.' : 'یک معلم جدید به مدرسه اضافه کنید.'}
+            {teacher
+              ? 'اطلاعات معلم را به‌روز کنید.'
+              : 'یک معلم جدید به مدرسه اضافه کنید.'}
           </DialogDescription>
         </DialogHeader>
+
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -80,61 +154,62 @@ function TeacherDialog({
               <Input
                 id="name"
                 value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="نام معلم را وارد کنید"
                 required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="email">ایمیل</Label>
+              <Label htmlFor="personnel_code">کد پرسنلی</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email || ''}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="teacher@school.edu"
+                id="personnel_code"
+                value={formData.personnel_code || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, personnel_code: e.target.value })
+                }
+                placeholder="مثلاً 10245"
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="phone">شماره تماس</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={formData.phone || ''}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="۰۲۱-۱۲۳۴۵۶۷"
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">وضعیت</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: 'active' | 'inactive') =>
-                  setFormData({ ...formData, status: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="وضعیت را انتخاب کنید" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">فعال</SelectItem>
-                  <SelectItem value="inactive">غیرفعال</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              انصراف
-            </Button>
+
+          <DialogFooter className="flex-row-reverse justify-start gap-2">
             <Button type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   در حال ذخیره...
                 </>
-              ) : teacher ? 'به‌روزرسانی' : 'افزودن معلم'}
+              ) : teacher ? (
+                'به‌روزرسانی'
+              ) : (
+                'افزودن معلم'
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              انصراف
             </Button>
           </DialogFooter>
         </form>
@@ -149,37 +224,51 @@ function TeachersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
 
   const filteredTeachers = teachers.filter((teacher) => {
+    const normalizedSearch = search.toLowerCase()
+
     const matchesSearch =
-      teacher.name.toLowerCase().includes(search.toLowerCase()) ||
-      teacher.email.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || teacher.status === statusFilter
+      teacher.name.toLowerCase().includes(normalizedSearch) ||
+      (teacher.personnel_code || '').toLowerCase().includes(normalizedSearch)
+
+    const matchesStatus =
+      statusFilter === 'all' || teacher.status === statusFilter
+
     return matchesSearch && matchesStatus
   })
 
   const handleSave = (data: Partial<Teacher>) => {
     if (editingTeacher) {
-      setTeachers(teachers.map((t) => (t.id === editingTeacher.id ? { ...t, ...data } : t)))
-      toast.success('معلم با موفقیت به‌روز شد')
+      setTeachers((prev) =>
+        prev.map((teacher) =>
+          teacher.id === editingTeacher.id ? { ...teacher, ...data } : teacher,
+        ),
+      )
+
+      toast.success('اطلاعات معلم به‌روز شد', {
+        description: `${data.name || editingTeacher.name} با موفقیت ویرایش شد.`,
+      })
     } else {
       const newTeacher: Teacher = {
         id: String(Date.now()),
         name: data.name || '',
-        email: data.email || '',
+        personnel_code: data.personnel_code || '',
         phone: data.phone || '',
         subjects: data.subjects || [],
-        status: data.status || 'active',
+        status: 'active',
       }
-      setTeachers([...teachers, newTeacher])
-      toast.success('معلم با موفقیت اضافه شد')
-    }
-    setEditingTeacher(null)
-  }
 
-  const handleDelete = (teacher: Teacher) => {
-    setTeachers(teachers.filter((t) => t.id !== teacher.id))
-    toast.success('معلم با موفقیت حذف شد')
+      setTeachers((prev) => [...prev, newTeacher])
+
+      toast.success('معلم جدید اضافه شد', {
+        description: `${data.name || 'معلم'} با موفقیت به لیست معلمان اضافه شد.`,
+      })
+    }
+
+    setEditingTeacher(null)
   }
 
   const openAddDialog = () => {
@@ -192,24 +281,46 @@ function TeachersPage() {
     setDialogOpen(true)
   }
 
+  const openDeleteDialog = (teacher: Teacher) => {
+    setTeacherToDelete(teacher)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (!teacherToDelete) return
+
+    setTeachers((prev) =>
+      prev.filter((teacher) => teacher.id !== teacherToDelete.id),
+    )
+
+    toast.success('معلم با موفقیت حذف شد', {
+      description: `${teacherToDelete.name} از لیست معلمان حذف شد.`,
+    })
+
+    setTeacherToDelete(null)
+    setDeleteDialogOpen(false)
+  }
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" dir="rtl">
       <Header title="معلمان" description="مدیریت کادر آموزشی مدرسه" />
-      <div className="p-6 space-y-6">
+
+      <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative max-w-sm flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="جستجوی معلمان..."
+                placeholder="جستجوی معلمان یا کد پرسنلی..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pr-9"
               />
             </div>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-36">
-                <Filter className="me-2 h-4 w-4" />
+                <Filter className="ml-2 h-4 w-4" />
                 <SelectValue placeholder="وضعیت" />
               </SelectTrigger>
               <SelectContent>
@@ -219,8 +330,9 @@ function TeachersPage() {
               </SelectContent>
             </Select>
           </div>
+
           <Button onClick={openAddDialog}>
-            <Plus className="me-2 h-4 w-4" />
+            <Plus className="ml-2 h-4 w-4" />
             افزودن معلم
           </Button>
         </div>
@@ -233,17 +345,22 @@ function TeachersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>معلم</TableHead>
-                    <TableHead>اطلاعات تماس</TableHead>
-                    <TableHead>دروس</TableHead>
-                    <TableHead>وضعیت</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="text-right">معلم</TableHead>
+                    <TableHead className="text-right">کد پرسنلی</TableHead>
+                    <TableHead className="text-right">شماره تماس</TableHead>
+                    <TableHead className="text-right">دروس</TableHead>
+                    <TableHead className="text-right">وضعیت</TableHead>
+                    <TableHead className="w-12 text-left" />
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {filteredTeachers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-muted-foreground"
+                      >
                         معلمی یافت نشد
                       </TableCell>
                     </TableRow>
@@ -254,58 +371,99 @@ function TeachersPage() {
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9">
                               <AvatarFallback className="bg-primary/10 text-primary">
-                                {teacher.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                                {teacher.name
+                                  .split(' ')
+                                  .map((n) => n[0])
+                                  .join('')
+                                  .slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
                             <p className="font-medium">{teacher.name}</p>
                           </div>
                         </TableCell>
+
                         <TableCell>
-                          <div className="space-y-1">
+                          {teacher.personnel_code ? (
+                            <Badge variant="outline">{teacher.personnel_code}</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              ثبت نشده
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
+                          {teacher.phone ? (
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Mail className="h-3 w-3" />
-                              {teacher.email}
+                              <Phone className="h-3 w-3" />
+                              {teacher.phone}
                             </div>
-                            {teacher.phone && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {teacher.phone}
-                              </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              ثبت نشده
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {teacher.subjects && teacher.subjects.length > 0 ? (
+                              teacher.subjects.map((subject) => (
+                                <Badge
+                                  key={subject}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {subject}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                بدون درس
+                              </span>
                             )}
                           </div>
                         </TableCell>
+
                         <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {teacher.subjects.map((subject) => (
-                              <Badge key={subject} variant="secondary" className="text-xs">
-                                {subject}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={teacher.status === 'active' ? 'default' : 'secondary'}>
+                          <Badge
+                            variant={
+                              teacher.status === 'active'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
                             {teacher.status === 'active' ? 'فعال' : 'غیرفعال'}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+
+                        <TableCell className="text-left">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
-                                <Edit className="me-2 h-4 w-4" />
+
+                            <DropdownMenuContent align="end" className="text-right">
+                              <DropdownMenuItem
+                                onClick={() => openEditDialog(teacher)}
+                              >
+                                <Edit className="ml-2 h-4 w-4" />
                                 ویرایش
                               </DropdownMenuItem>
+
                               <DropdownMenuSeparator />
+
                               <DropdownMenuItem
                                 className="text-destructive"
-                                onClick={() => handleDelete(teacher)}
+                                onClick={() => openDeleteDialog(teacher)}
                               >
-                                <Trash2 className="me-2 h-4 w-4" />
+                                <Trash2 className="ml-2 h-4 w-4" />
                                 حذف
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -327,6 +485,39 @@ function TeachersPage() {
         teacher={editingTeacher}
         onSave={handleSave}
       />
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) setTeacherToDelete(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle>تأیید حذف معلم</DialogTitle>
+            <DialogDescription>
+              آیا مطمئن هستید که می‌خواهید{' '}
+              <span className="font-medium text-foreground">
+                {teacherToDelete?.name}
+              </span>{' '}
+              را حذف کنید؟ این عملیات قابل بازگشت نیست.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex-row-reverse justify-start gap-2">
+            <Button variant="destructive" onClick={confirmDelete}>
+              حذف معلم
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              انصراف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
