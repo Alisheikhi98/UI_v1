@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
@@ -39,8 +40,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  useSchools,
-  School,
+  createSchool,
+  deleteSchool,
+  getSchools,
+  updateSchool,
+  type School,
+  type SchoolFormData,
   WEEK_DAYS,
   DEFAULT_WORKING_DAYS,
   calculatePeriods,
@@ -84,7 +89,35 @@ const defaultForm = (): FormState => {
 }
 
 function SchoolsPage() {
-  const { schools, hydrated, create, update, remove } = useSchools()
+  const queryClient = useQueryClient()
+  const schoolsQuery = useQuery({
+    queryKey: ['schools'],
+    queryFn: getSchools,
+    enabled: typeof window !== 'undefined',
+  })
+  const schools = schoolsQuery.data ?? []
+  const createMutation = useMutation({
+    mutationFn: createSchool,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['schools'] })
+      toast.success('مدرسه جدید با موفقیت اضافه شد')
+      setDialogOpen(false)
+    },
+    onError: (error) => toast.error('خطا در ایجاد مدرسه', { description: error.message }),
+  })
+  const updateMutation = useMutation({
+    mutationFn: updateSchool,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['schools'] })
+      toast.success('مدرسه با موفقیت به‌روزرسانی شد')
+      setDialogOpen(false)
+    },
+    onError: (error) => toast.error('خطا در ویرایش مدرسه', { description: error.message }),
+  })
+  const deleteMutation = useMutation({
+    mutationFn: deleteSchool,
+    onError: (error) => toast.error('حذف مدرسه امکان‌پذیر نیست', { description: error.message }),
+  })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<School | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null)
@@ -152,8 +185,15 @@ function SchoolsPage() {
       </div>
 
       {/* List / Empty */}
-      {!hydrated ? (
+      {schoolsQuery.isPending ? (
         <div className="text-center text-muted-foreground py-12">در حال بارگذاری…</div>
+      ) : schoolsQuery.isError ? (
+        <div className="space-y-3 py-12 text-center">
+          <p className="text-sm text-destructive">{schoolsQuery.error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => schoolsQuery.refetch()}>
+            تلاش مجدد
+          </Button>
+        </div>
       ) : schools.length === 0 ? (
         <EmptyState onCreate={openCreate} />
       ) : (
@@ -173,15 +213,12 @@ function SchoolsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         editing={editing}
-        onSubmit={(data) => {
+        onSubmit={async (data) => {
           if (editing) {
-            update(editing.id, data)
-            toast.success('مدرسه با موفقیت به‌روزرسانی شد')
+            await updateMutation.mutateAsync({ id: editing.id, data })
           } else {
-            create(data)
-            toast.success('مدرسه جدید با موفقیت اضافه شد')
+            await createMutation.mutateAsync(data)
           }
-          setDialogOpen(false)
         }}
       />
 
@@ -201,8 +238,7 @@ function SchoolsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget) {
-                  remove(deleteTarget.id)
-                  toast.success('مدرسه حذف شد')
+                  deleteMutation.mutate()
                   setDeleteTarget(null)
                 }
               }}
@@ -337,7 +373,7 @@ function SchoolDialog({
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: School | null
-  onSubmit: (data: Omit<School, 'id' | 'createdAt'>) => void
+  onSubmit: (data: SchoolFormData) => Promise<void>
 }) {
   const [form, setForm] = useState<FormState>(defaultForm())
   const [submitting, setSubmitting] = useState(false)
@@ -414,21 +450,27 @@ function SchoolDialog({
       toast.error('شناسه مدرسه الزامی است')
       return
     }
+    if (!/^[a-z0-9-]+$/.test(form.slug.trim())) {
+      toast.error('شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد')
+      return
+    }
     if (form.workingDays.length === 0) {
       toast.error('حداقل یک روز کاری انتخاب کنید')
       return
     }
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 300))
-    onSubmit({
-      name: form.name.trim(),
-      slug: form.slug.trim(),
-      status: form.status,
-      workingDays: form.workingDays,
-      timing: form.timing,
-      periods: form.periods,
-    })
-    setSubmitting(false)
+    try {
+      await onSubmit({
+        name: form.name.trim(),
+        slug: form.slug.trim(),
+        status: form.status,
+        workingDays: form.workingDays,
+        timing: form.timing,
+        periods: form.periods,
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -530,12 +572,15 @@ function SchoolDialog({
                 <Input
                   type="number"
                   min={1}
-                  max={12}
+                  max={7}
                   value={form.timing.periodsCount}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      timing: { ...form.timing, periodsCount: Math.max(1, Number(e.target.value) || 1) },
+                      timing: {
+                        ...form.timing,
+                        periodsCount: Math.min(7, Math.max(1, Number(e.target.value) || 1)),
+                      },
                     })
                   }
                 />
