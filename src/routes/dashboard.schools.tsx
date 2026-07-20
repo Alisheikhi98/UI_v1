@@ -464,14 +464,24 @@ function SchoolDialog({
                   dir="ltr"
                 />
               </Field>
-              <div className="sm:col-span-2 flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <Label className="text-sm">وضعیت فعال</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+              <div
+                className="sm:col-span-2 flex items-start justify-between gap-4 rounded-lg border bg-muted/20 p-4"
+                dir="rtl"
+              >
+                <div className="min-w-0 flex-1 space-y-1 text-right">
+                  <Label htmlFor="school-status" className="block cursor-pointer text-sm font-medium leading-none">
+                    وضعیت فعال
+                  </Label>
+                  <p id="school-status-description" className="text-xs leading-5 text-muted-foreground">
                     مدارس غیرفعال در انتخاب‌گرها نمایش داده نمی‌شوند
                   </p>
                 </div>
                 <Switch
+                  id="school-status"
+                  aria-describedby="school-status-description"
+                  aria-label="وضعیت فعال مدرسه"
+                  className="mt-0.5 shrink-0"
+                  dir="ltr"
                   checked={form.status === 'active'}
                   onCheckedChange={(c) => setForm({ ...form, status: c ? 'active' : 'inactive' })}
                 />
