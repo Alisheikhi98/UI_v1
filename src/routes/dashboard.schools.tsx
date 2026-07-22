@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState, useEffect } from 'react'
-import { toast } from 'sonner'
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Building2,
   Calendar,
@@ -13,14 +13,14 @@ import {
   Sparkles,
   RotateCcw,
   CheckCircle2,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+} from "@/components/ui/alert-dialog";
 import {
   createSchool,
   deleteSchool,
@@ -50,101 +50,105 @@ import {
   DEFAULT_WORKING_DAYS,
   calculatePeriods,
   PeriodTime,
-} from '@/lib/api/schools-store'
-import { cn } from '@/lib/utils'
+} from "@/lib/api/schools-store";
+import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute('/dashboard/schools')({
+export const Route = createFileRoute("/dashboard/schools")({
   component: SchoolsPage,
-})
+});
 
 interface FormState {
-  name: string
-  slug: string
-  status: 'active' | 'inactive'
-  workingDays: string[]
+  name: string;
+  slug: string;
+  status: "active" | "inactive";
+  workingDays: string[];
   timing: {
-    periodsCount: number
-    dayStart: string
-    classDuration: number
-    breakDuration: number
-  }
-  periods: PeriodTime[]
+    periodsCount: number;
+    dayStart: string;
+    classDuration: number;
+    breakDuration: number;
+  };
+  periods: PeriodTime[];
 }
 
 const defaultForm = (): FormState => {
-  const timing = { periodsCount: 4, dayStart: '08:00', classDuration: 75, breakDuration: 15 }
+  const timing = { periodsCount: 4, dayStart: "08:00", classDuration: 75, breakDuration: 15 };
   return {
-    name: '',
-    slug: '',
-    status: 'active',
+    name: "",
+    slug: "",
+    status: "active",
     workingDays: [...DEFAULT_WORKING_DAYS],
     timing,
     periods: calculatePeriods(
       timing.periodsCount,
       timing.dayStart,
       timing.classDuration,
-      timing.breakDuration
+      timing.breakDuration,
     ),
-  }
-}
+  };
+};
 
 function SchoolsPage() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   const schoolsQuery = useQuery({
-    queryKey: ['schools'],
+    queryKey: ["schools"],
     queryFn: getSchools,
-    enabled: typeof window !== 'undefined',
-  })
-  const schools = schoolsQuery.data ?? []
+    enabled: typeof window !== "undefined",
+  });
+  const schools = useMemo(() => schoolsQuery.data ?? [], [schoolsQuery.data]);
   const createMutation = useMutation({
     mutationFn: createSchool,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['schools'] })
-      toast.success('مدرسه جدید با موفقیت اضافه شد')
-      setDialogOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
+      toast.success("مدرسه جدید با موفقیت اضافه شد");
+      setDialogOpen(false);
     },
-    onError: (error) => toast.error('خطا در ایجاد مدرسه', { description: error.message }),
-  })
+    onError: (error) => toast.error("خطا در ایجاد مدرسه", { description: error.message }),
+  });
   const updateMutation = useMutation({
     mutationFn: updateSchool,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['schools'] })
-      toast.success('مدرسه با موفقیت به‌روزرسانی شد')
-      setDialogOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
+      toast.success("مدرسه با موفقیت به‌روزرسانی شد");
+      setDialogOpen(false);
     },
-    onError: (error) => toast.error('خطا در ویرایش مدرسه', { description: error.message }),
-  })
+    onError: (error) => toast.error("خطا در ویرایش مدرسه", { description: error.message }),
+  });
   const deleteMutation = useMutation({
     mutationFn: deleteSchool,
-    onError: (error) => toast.error('حذف مدرسه امکان‌پذیر نیست', { description: error.message }),
-  })
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<School | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<School | null>(null)
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
+      toast.success("مدرسه با موفقیت حذف شد");
+    },
+    onError: (error) => toast.error("حذف مدرسه امکان‌پذیر نیست", { description: error.message }),
+  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<School | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
 
   const stats = useMemo(() => {
-    const totalSchools = schools.length
-    const activeDaysSet = new Set<string>()
-    let totalPeriods = 0
+    const totalSchools = schools.length;
+    const activeDaysSet = new Set<string>();
+    let totalPeriods = 0;
     schools.forEach((s) => {
-      s.workingDays.forEach((d) => activeDaysSet.add(d))
-      totalPeriods += s.timing.periodsCount
-    })
+      s.workingDays.forEach((d) => activeDaysSet.add(d));
+      totalPeriods += s.timing.periodsCount;
+    });
     return {
       totalSchools,
       activeDays: activeDaysSet.size,
       dailyPeriods: totalSchools ? Math.round(totalPeriods / totalSchools) : 0,
-    }
-  }, [schools])
+    };
+  }, [schools]);
 
   const openCreate = () => {
-    setEditing(null)
-    setDialogOpen(true)
-  }
+    setEditing(null);
+    setDialogOpen(true);
+  };
   const openEdit = (s: School) => {
-    setEditing(s)
-    setDialogOpen(true)
-  }
+    setEditing(s);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -164,12 +168,7 @@ function SchoolsPage() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          icon={Building2}
-          label="مجموع مدارس"
-          value={stats.totalSchools}
-          tone="primary"
-        />
+        <StatCard icon={Building2} label="مجموع مدارس" value={stats.totalSchools} tone="primary" />
         <StatCard
           icon={Calendar}
           label="روزهای کاری فعال"
@@ -215,9 +214,9 @@ function SchoolsPage() {
         editing={editing}
         onSubmit={async (data) => {
           if (editing) {
-            await updateMutation.mutateAsync({ id: editing.id, data })
+            await updateMutation.mutateAsync({ id: editing.id, data });
           } else {
-            await createMutation.mutateAsync(data)
+            await createMutation.mutateAsync(data);
           }
         }}
       />
@@ -227,9 +226,9 @@ function SchoolsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>حذف مدرسه</AlertDialogTitle>
             <AlertDialogDescription>
-              آیا مطمئن هستید که می‌خواهید مدرسه «{deleteTarget?.name}» را حذف کنید؟ تمام
-              داده‌های وابسته شامل کلاس‌ها، معلمان و برنامه‌های هفتگی این مدرسه ممکن است تحت
-              تاثیر قرار گیرند. این عمل قابل بازگشت نیست.
+              آیا مطمئن هستید که می‌خواهید مدرسه «{deleteTarget?.name}» را حذف کنید؟ تمام داده‌های
+              وابسته شامل کلاس‌ها، معلمان و برنامه‌های هفتگی این مدرسه ممکن است تحت تاثیر قرار
+              گیرند. این عمل قابل بازگشت نیست.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -238,8 +237,8 @@ function SchoolsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget) {
-                  deleteMutation.mutate()
-                  setDeleteTarget(null)
+                  deleteMutation.mutate(deleteTarget.id);
+                  setDeleteTarget(null);
                 }
               }}
             >
@@ -249,7 +248,7 @@ function SchoolsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }
 
 function StatCard({
@@ -258,29 +257,29 @@ function StatCard({
   value,
   tone,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: number
-  tone: 'primary' | 'success' | 'warning'
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  tone: "primary" | "success" | "warning";
 }) {
   const tones = {
-    primary: 'bg-primary/10 text-primary',
-    success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  }
+    primary: "bg-primary/10 text-primary",
+    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  };
   return (
     <Card className="relative overflow-hidden">
       <CardContent className="p-6 flex items-center gap-4">
-        <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center', tones[tone])}>
+        <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", tones[tone])}>
           <Icon className="h-6 w-6" />
         </div>
         <div>
           <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold mt-0.5">{value.toLocaleString('fa-IR')}</p>
+          <p className="text-2xl font-bold mt-0.5">{value.toLocaleString("fa-IR")}</p>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
@@ -303,7 +302,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function SchoolCard({
@@ -311,9 +310,9 @@ function SchoolCard({
   onEdit,
   onDelete,
 }: {
-  school: School
-  onEdit: () => void
-  onDelete: () => void
+  school: School;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Card className="group hover:shadow-md transition-shadow">
@@ -328,8 +327,8 @@ function SchoolCard({
               <CardDescription className="text-xs mt-0.5">شناسه: {school.slug}</CardDescription>
             </div>
           </div>
-          <Badge variant={school.status === 'active' ? 'default' : 'secondary'}>
-            {school.status === 'active' ? 'فعال' : 'غیرفعال'}
+          <Badge variant={school.status === "active" ? "default" : "secondary"}>
+            {school.status === "active" ? "فعال" : "غیرفعال"}
           </Badge>
         </div>
       </CardHeader>
@@ -361,7 +360,7 @@ function SchoolCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function SchoolDialog({
@@ -370,14 +369,14 @@ function SchoolDialog({
   editing,
   onSubmit,
 }: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  editing: School | null
-  onSubmit: (data: SchoolFormData) => Promise<void>
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  editing: School | null;
+  onSubmit: (data: SchoolFormData) => Promise<void>;
 }) {
-  const [form, setForm] = useState<FormState>(defaultForm())
-  const [submitting, setSubmitting] = useState(false)
-  const [periodsDirty, setPeriodsDirty] = useState(false)
+  const [form, setForm] = useState<FormState>(defaultForm());
+  const [submitting, setSubmitting] = useState(false);
+  const [periodsDirty, setPeriodsDirty] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -391,11 +390,11 @@ function SchoolDialog({
               timing: { ...editing.timing },
               periods: [...editing.periods],
             }
-          : defaultForm()
-      )
-      setPeriodsDirty(false)
+          : defaultForm(),
+      );
+      setPeriodsDirty(false);
     }
-  }, [open, editing])
+  }, [open, editing]);
 
   // Auto-generate periods when timing changes (unless user manually edited)
   useEffect(() => {
@@ -406,9 +405,9 @@ function SchoolDialog({
           f.timing.periodsCount,
           f.timing.dayStart,
           f.timing.classDuration,
-          f.timing.breakDuration
+          f.timing.breakDuration,
         ),
-      }))
+      }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -416,7 +415,7 @@ function SchoolDialog({
     form.timing.dayStart,
     form.timing.classDuration,
     form.timing.breakDuration,
-  ])
+  ]);
 
   const toggleDay = (day: string) => {
     setForm((f) => ({
@@ -424,8 +423,8 @@ function SchoolDialog({
       workingDays: f.workingDays.includes(day)
         ? f.workingDays.filter((d) => d !== day)
         : [...f.workingDays, day],
-    }))
-  }
+    }));
+  };
 
   const regenerate = () => {
     setForm((f) => ({
@@ -434,31 +433,31 @@ function SchoolDialog({
         f.timing.periodsCount,
         f.timing.dayStart,
         f.timing.classDuration,
-        f.timing.breakDuration
+        f.timing.breakDuration,
       ),
-    }))
-    setPeriodsDirty(false)
-    toast.success('جدول زنگ‌ها بازسازی شد')
-  }
+    }));
+    setPeriodsDirty(false);
+    toast.success("جدول زنگ‌ها بازسازی شد");
+  };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
-      toast.error('نام مدرسه الزامی است')
-      return
+      toast.error("نام مدرسه الزامی است");
+      return;
     }
     if (!form.slug.trim()) {
-      toast.error('شناسه مدرسه الزامی است')
-      return
+      toast.error("شناسه مدرسه الزامی است");
+      return;
     }
     if (!/^[a-z0-9-]+$/.test(form.slug.trim())) {
-      toast.error('شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد')
-      return
+      toast.error("شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد");
+      return;
     }
     if (form.workingDays.length === 0) {
-      toast.error('حداقل یک روز کاری انتخاب کنید')
-      return
+      toast.error("حداقل یک روز کاری انتخاب کنید");
+      return;
     }
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       await onSubmit({
         name: form.name.trim(),
@@ -467,11 +466,11 @@ function SchoolDialog({
         workingDays: form.workingDays,
         timing: form.timing,
         periods: form.periods,
-      })
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -479,7 +478,7 @@ function SchoolDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            {editing ? 'ویرایش مدرسه' : 'ایجاد مدرسه جدید'}
+            {editing ? "ویرایش مدرسه" : "ایجاد مدرسه جدید"}
           </DialogTitle>
           <DialogDescription>
             مشخصات مدرسه، روزهای کاری و برنامه زمانی زنگ‌ها را تنظیم کنید.
@@ -511,10 +510,16 @@ function SchoolDialog({
                 dir="rtl"
               >
                 <div className="min-w-0 flex-1 space-y-1 text-right">
-                  <Label htmlFor="school-status" className="block cursor-pointer text-sm font-medium leading-none">
+                  <Label
+                    htmlFor="school-status"
+                    className="block cursor-pointer text-sm font-medium leading-none"
+                  >
                     وضعیت فعال
                   </Label>
-                  <p id="school-status-description" className="text-xs leading-5 text-muted-foreground">
+                  <p
+                    id="school-status-description"
+                    className="text-xs leading-5 text-muted-foreground"
+                  >
                     مدارس غیرفعال در انتخاب‌گرها نمایش داده نمی‌شوند
                   </p>
                 </div>
@@ -524,8 +529,8 @@ function SchoolDialog({
                   aria-label="وضعیت فعال مدرسه"
                   className="mt-0.5 shrink-0"
                   dir="ltr"
-                  checked={form.status === 'active'}
-                  onCheckedChange={(c) => setForm({ ...form, status: c ? 'active' : 'inactive' })}
+                  checked={form.status === "active"}
+                  onCheckedChange={(c) => setForm({ ...form, status: c ? "active" : "inactive" })}
                 />
               </div>
             </div>
@@ -541,23 +546,23 @@ function SchoolDialog({
             </p>
             <div className="flex flex-wrap gap-2">
               {WEEK_DAYS.map((day) => {
-                const active = form.workingDays.includes(day)
+                const active = form.workingDays.includes(day);
                 return (
                   <button
                     key={day}
                     type="button"
                     onClick={() => toggleDay(day)}
                     className={cn(
-                      'px-4 py-2 rounded-full text-sm font-medium border transition-all',
+                      "px-4 py-2 rounded-full text-sm font-medium border transition-all",
                       active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-background border-border hover:bg-muted'
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background border-border hover:bg-muted",
                     )}
                   >
                     {active && <CheckCircle2 className="h-3.5 w-3.5 inline-block ml-1" />}
                     {day}
                   </button>
-                )
+                );
               })}
             </div>
           </section>
@@ -602,7 +607,10 @@ function SchoolDialog({
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      timing: { ...form.timing, classDuration: Math.max(5, Number(e.target.value) || 5) },
+                      timing: {
+                        ...form.timing,
+                        classDuration: Math.max(5, Number(e.target.value) || 5),
+                      },
                     })
                   }
                 />
@@ -615,7 +623,10 @@ function SchoolDialog({
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      timing: { ...form.timing, breakDuration: Math.max(0, Number(e.target.value) || 0) },
+                      timing: {
+                        ...form.timing,
+                        breakDuration: Math.max(0, Number(e.target.value) || 0),
+                      },
                     })
                   }
                 />
@@ -628,7 +639,13 @@ function SchoolDialog({
                   <Sparkles className="h-4 w-4 text-primary" />
                   <h4 className="text-sm font-semibold">پیش‌نمایش زنده جدول زنگ‌ها</h4>
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={regenerate} className="gap-1 text-xs">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={regenerate}
+                  className="gap-1 text-xs"
+                >
                   <RotateCcw className="h-3.5 w-3.5" />
                   بازسازی خودکار
                 </Button>
@@ -637,16 +654,16 @@ function SchoolDialog({
                 {form.periods.map((p, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <Badge variant="outline" className="w-16 justify-center shrink-0">
-                      زنگ {p.index.toLocaleString('fa-IR')}
+                      زنگ {p.index.toLocaleString("fa-IR")}
                     </Badge>
                     <Input
                       type="time"
                       value={p.start}
                       onChange={(e) => {
-                        const periods = [...form.periods]
-                        periods[idx] = { ...periods[idx], start: e.target.value }
-                        setForm({ ...form, periods })
-                        setPeriodsDirty(true)
+                        const periods = [...form.periods];
+                        periods[idx] = { ...periods[idx], start: e.target.value };
+                        setForm({ ...form, periods });
+                        setPeriodsDirty(true);
                       }}
                       className="max-w-[120px]"
                     />
@@ -655,16 +672,16 @@ function SchoolDialog({
                       type="time"
                       value={p.end}
                       onChange={(e) => {
-                        const periods = [...form.periods]
-                        periods[idx] = { ...periods[idx], end: e.target.value }
-                        setForm({ ...form, periods })
-                        setPeriodsDirty(true)
+                        const periods = [...form.periods];
+                        periods[idx] = { ...periods[idx], end: e.target.value };
+                        setForm({ ...form, periods });
+                        setPeriodsDirty(true);
                       }}
                       className="max-w-[120px]"
                     />
                     {idx < form.periods.length - 1 && (
                       <Badge variant="secondary" className="text-xs mr-auto">
-                        استراحت {form.timing.breakDuration.toLocaleString('fa-IR')} دقیقه
+                        استراحت {form.timing.breakDuration.toLocaleString("fa-IR")} دقیقه
                       </Badge>
                     )}
                   </div>
@@ -672,7 +689,8 @@ function SchoolDialog({
               </div>
               {periodsDirty && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  ⚠ زمان‌ها به‌صورت دستی ویرایش شده‌اند. برای بازگرداندن به مقادیر خودکار، دکمه «بازسازی خودکار» را بزنید.
+                  ⚠ زمان‌ها به‌صورت دستی ویرایش شده‌اند. برای بازگرداندن به مقادیر خودکار، دکمه
+                  «بازسازی خودکار» را بزنید.
                 </p>
               )}
             </div>
@@ -684,27 +702,27 @@ function SchoolDialog({
             انصراف
           </Button>
           <Button onClick={handleSubmit} disabled={submitting} className="gap-2">
-            {submitting ? 'در حال ذخیره…' : editing ? 'ذخیره تغییرات' : 'ایجاد مدرسه'}
+            {submitting ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "ایجاد مدرسه"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function SectionTitle({
   icon: Icon,
   title,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
 }) {
   return (
     <div className="flex items-center gap-2">
       <Icon className="h-4 w-4 text-primary" />
       <h3 className="text-sm font-semibold">{title}</h3>
     </div>
-  )
+  );
 }
 
 function Field({
@@ -712,9 +730,9 @@ function Field({
   icon: Icon,
   children,
 }: {
-  label: string
-  icon?: React.ComponentType<{ className?: string }>
-  children: React.ReactNode
+  label: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
@@ -724,5 +742,5 @@ function Field({
       </Label>
       {children}
     </div>
-  )
+  );
 }

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -21,46 +21,36 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { mockTeachers } from '@/lib/data'
-import type { Teacher } from '@/lib/types'
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Phone,
-  Filter,
-  Users,
-  Loader2,
-} from 'lucide-react'
-import { toast } from 'sonner'
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { mockTeachers } from "@/lib/data";
+import type { Teacher } from "@/lib/types";
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Phone, Filter, Users } from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/dashboard/teachers')({
+export const Route = createFileRoute("/dashboard/teachers")({
   head: () => ({
     meta: [
-      { title: 'معلمان - آموزش‌یار' },
-      { name: 'description', content: 'مدیریت معلمان مدرسه' },
+      { title: "معلمان - آموزش‌یار" },
+      { name: "description", content: "مدیریت معلمان مدرسه" },
     ],
   }),
   component: TeachersPage,
-})
+});
 
 function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
   return (
@@ -77,7 +67,7 @@ function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
         افزودن معلم
       </Button>
     </Card>
-  )
+  );
 }
 
 function TeacherDialog({
@@ -86,159 +76,128 @@ function TeacherDialog({
   teacher,
   onSave,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  teacher?: Teacher | null
-  onSave: (data: Partial<Teacher>) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  teacher?: Teacher | null;
+  onSave: (data: Partial<Teacher>) => void;
 }) {
-  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState<Partial<Teacher>>({
-    name: '',
-    personnel_code: '',
-    phone: '',
+    name: "",
+    personnel_code: "",
+    phone: "",
     subjects: [],
-    status: 'active',
-  })
+    status: "active",
+  });
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
     if (teacher) {
       setFormData({
-        name: teacher.name || '',
-        personnel_code: teacher.personnel_code || '',
-        phone: teacher.phone || '',
+        name: teacher.name || "",
+        personnel_code: teacher.personnel_code || "",
+        phone: teacher.phone || "",
         subjects: teacher.subjects || [],
-        status: teacher.status || 'active',
-      })
+        status: teacher.status || "active",
+      });
     } else {
       setFormData({
-        name: '',
-        personnel_code: '',
-        phone: '',
+        name: "",
+        personnel_code: "",
+        phone: "",
         subjects: [],
-        status: 'active',
-      })
+        status: "active",
+      });
     }
-  }, [teacher, open])
+  }, [teacher, open]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    onSave(formData)
-    setIsLoading(false)
-    onOpenChange(false)
-  }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name?.trim()) return;
+    onSave(formData);
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader className="text-right">
-          <DialogTitle>
-            {teacher ? 'ویرایش معلم' : 'افزودن معلم جدید'}
-          </DialogTitle>
+          <DialogTitle>{teacher ? "ویرایش معلم" : "افزودن معلم جدید"}</DialogTitle>
           <DialogDescription>
-            {teacher
-              ? 'اطلاعات معلم را به‌روز کنید.'
-              : 'یک معلم جدید به مدرسه اضافه کنید.'}
+            {teacher ? "اطلاعات معلم را به‌روز کنید." : "یک معلم جدید به مدرسه اضافه کنید."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">نام و نام خانوادگی</Label>
+              <Label htmlFor="name">نام معلم</Label>
               <Input
                 id="name"
-                value={formData.name || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                value={formData.name || ""}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="نام معلم را وارد کنید"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="personnel_code">کد پرسنلی</Label>
+              <Label htmlFor="personnel_code">کد پرسنلی (اختیاری)</Label>
               <Input
                 id="personnel_code"
-                value={formData.personnel_code || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, personnel_code: e.target.value })
-                }
+                value={formData.personnel_code || ""}
+                onChange={(e) => setFormData({ ...formData, personnel_code: e.target.value })}
                 placeholder="مثلاً 10245"
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">شماره تماس</Label>
+              <Label htmlFor="phone">شماره موبایل (اختیاری)</Label>
               <Input
                 id="phone"
                 type="tel"
-                value={formData.phone || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
+                value={formData.phone || ""}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                required
               />
             </div>
           </div>
 
           <DialogFooter className="flex-row-reverse justify-start gap-2">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  در حال ذخیره...
-                </>
-              ) : teacher ? (
-                'به‌روزرسانی'
-              ) : (
-                'افزودن معلم'
-              )}
+            <Button type="submit" disabled={!formData.name?.trim()}>
+              {teacher ? "به‌روزرسانی" : "افزودن معلم"}
             </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               انصراف
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function TeachersPage() {
-  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
+  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
   const filteredTeachers = teachers.filter((teacher) => {
-    const normalizedSearch = search.toLowerCase()
+    const normalizedSearch = search.toLowerCase();
 
     const matchesSearch =
       teacher.name.toLowerCase().includes(normalizedSearch) ||
-      (teacher.personnel_code || '').toLowerCase().includes(normalizedSearch)
+      (teacher.personnel_code || "").toLowerCase().includes(normalizedSearch);
 
-    const matchesStatus =
-      statusFilter === 'all' || teacher.status === statusFilter
+    const matchesStatus = statusFilter === "all" || teacher.status === statusFilter;
 
-    return matchesSearch && matchesStatus
-  })
+    return matchesSearch && matchesStatus;
+  });
 
   const handleSave = (data: Partial<Teacher>) => {
     if (editingTeacher) {
@@ -246,60 +205,59 @@ function TeachersPage() {
         prev.map((teacher) =>
           teacher.id === editingTeacher.id ? { ...teacher, ...data } : teacher,
         ),
-      )
+      );
 
-      toast.success('اطلاعات معلم به‌روز شد', {
+      toast.success("اطلاعات معلم به‌روز شد", {
         description: `${data.name || editingTeacher.name} با موفقیت ویرایش شد.`,
-      })
+      });
     } else {
       const newTeacher: Teacher = {
-        id: String(Date.now()),
-        name: data.name || '',
-        personnel_code: data.personnel_code || '',
-        phone: data.phone || '',
+        id: crypto.randomUUID(),
+        name: data.name || "",
+        personnel_code: data.personnel_code || "",
+        email: "",
+        phone: data.phone || "",
         subjects: data.subjects || [],
-        status: 'active',
-      }
+        status: "active",
+      };
 
-      setTeachers((prev) => [...prev, newTeacher])
+      setTeachers((prev) => [...prev, newTeacher]);
 
-      toast.success('معلم جدید اضافه شد', {
-        description: `${data.name || 'معلم'} با موفقیت به لیست معلمان اضافه شد.`,
-      })
+      toast.success("معلم جدید اضافه شد", {
+        description: `${data.name || "معلم"} با موفقیت به لیست معلمان اضافه شد.`,
+      });
     }
 
-    setEditingTeacher(null)
-  }
+    setEditingTeacher(null);
+  };
 
   const openAddDialog = () => {
-    setEditingTeacher(null)
-    setDialogOpen(true)
-  }
+    setEditingTeacher(null);
+    setDialogOpen(true);
+  };
 
   const openEditDialog = (teacher: Teacher) => {
-    setEditingTeacher(teacher)
-    setDialogOpen(true)
-  }
+    setEditingTeacher(teacher);
+    setDialogOpen(true);
+  };
 
   const openDeleteDialog = (teacher: Teacher) => {
-    setTeacherToDelete(teacher)
-    setDeleteDialogOpen(true)
-  }
+    setTeacherToDelete(teacher);
+    setDeleteDialogOpen(true);
+  };
 
   const confirmDelete = () => {
-    if (!teacherToDelete) return
+    if (!teacherToDelete) return;
 
-    setTeachers((prev) =>
-      prev.filter((teacher) => teacher.id !== teacherToDelete.id),
-    )
+    setTeachers((prev) => prev.filter((teacher) => teacher.id !== teacherToDelete.id));
 
-    toast.success('معلم با موفقیت حذف شد', {
+    toast.success("معلم با موفقیت حذف شد", {
       description: `${teacherToDelete.name} از لیست معلمان حذف شد.`,
-    })
+    });
 
-    setTeacherToDelete(null)
-    setDeleteDialogOpen(false)
-  }
+    setTeacherToDelete(null);
+    setDeleteDialogOpen(false);
+  };
 
   return (
     <div className="flex flex-col" dir="rtl">
@@ -337,7 +295,7 @@ function TeachersPage() {
           </Button>
         </div>
 
-        {filteredTeachers.length === 0 && search === '' && statusFilter === 'all' ? (
+        {filteredTeachers.length === 0 && search === "" && statusFilter === "all" ? (
           <EmptyState onAddTeacher={openAddDialog} />
         ) : (
           <Card>
@@ -357,10 +315,7 @@ function TeachersPage() {
                 <TableBody>
                   {filteredTeachers.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-8 text-center text-muted-foreground"
-                      >
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         معلمی یافت نشد
                       </TableCell>
                     </TableRow>
@@ -372,9 +327,9 @@ function TeachersPage() {
                             <Avatar className="h-9 w-9">
                               <AvatarFallback className="bg-primary/10 text-primary">
                                 {teacher.name
-                                  .split(' ')
+                                  .split(" ")
                                   .map((n) => n[0])
-                                  .join('')
+                                  .join("")
                                   .slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
@@ -386,9 +341,7 @@ function TeachersPage() {
                           {teacher.personnel_code ? (
                             <Badge variant="outline">{teacher.personnel_code}</Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground">
-                              ثبت نشده
-                            </span>
+                            <span className="text-xs text-muted-foreground">ثبت نشده</span>
                           )}
                         </TableCell>
 
@@ -399,9 +352,7 @@ function TeachersPage() {
                               {teacher.phone}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">
-                              ثبت نشده
-                            </span>
+                            <span className="text-xs text-muted-foreground">ثبت نشده</span>
                           )}
                         </TableCell>
 
@@ -409,50 +360,32 @@ function TeachersPage() {
                           <div className="flex flex-wrap gap-1">
                             {teacher.subjects && teacher.subjects.length > 0 ? (
                               teacher.subjects.map((subject) => (
-                                <Badge
-                                  key={subject}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
+                                <Badge key={subject} variant="secondary" className="text-xs">
                                   {subject}
                                 </Badge>
                               ))
                             ) : (
-                              <span className="text-xs text-muted-foreground">
-                                بدون درس
-                              </span>
+                              <span className="text-xs text-muted-foreground">بدون درس</span>
                             )}
                           </div>
                         </TableCell>
 
                         <TableCell>
-                          <Badge
-                            variant={
-                              teacher.status === 'active'
-                                ? 'default'
-                                : 'secondary'
-                            }
-                          >
-                            {teacher.status === 'active' ? 'فعال' : 'غیرفعال'}
+                          <Badge variant={teacher.status === "active" ? "default" : "secondary"}>
+                            {teacher.status === "active" ? "فعال" : "غیرفعال"}
                           </Badge>
                         </TableCell>
 
                         <TableCell className="text-left">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
 
                             <DropdownMenuContent align="end" className="text-right">
-                              <DropdownMenuItem
-                                onClick={() => openEditDialog(teacher)}
-                              >
+                              <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
                                 <Edit className="ml-2 h-4 w-4" />
                                 ویرایش
                               </DropdownMenuItem>
@@ -489,19 +422,17 @@ function TeachersPage() {
       <Dialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
-          setDeleteDialogOpen(open)
-          if (!open) setTeacherToDelete(null)
+          setDeleteDialogOpen(open);
+          if (!open) setTeacherToDelete(null);
         }}
       >
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader className="text-right">
             <DialogTitle>تأیید حذف معلم</DialogTitle>
             <DialogDescription>
-              آیا مطمئن هستید که می‌خواهید{' '}
-              <span className="font-medium text-foreground">
-                {teacherToDelete?.name}
-              </span>{' '}
-              را حذف کنید؟ این عملیات قابل بازگشت نیست.
+              آیا مطمئن هستید که می‌خواهید{" "}
+              <span className="font-medium text-foreground">{teacherToDelete?.name}</span> را حذف
+              کنید؟ این عملیات قابل بازگشت نیست.
             </DialogDescription>
           </DialogHeader>
 
@@ -509,15 +440,12 @@ function TeachersPage() {
             <Button variant="destructive" onClick={confirmDelete}>
               حذف معلم
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               انصراف
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

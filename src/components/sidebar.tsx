@@ -1,34 +1,33 @@
-import { Link, useRouterState } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
+import { Link, useRouterState } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
   GraduationCap,
-  BookOpen,
   Sparkles,
   CalendarDays,
   Settings,
   LogOut,
   Menu,
   X,
-} from 'lucide-react'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+} from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 const navigation = [
-  { name: 'داشبورد', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'معلمان', href: '/dashboard/teachers', icon: Users },
-  { name: 'کلاس‌ها', href: '/dashboard/classes', icon: GraduationCap },
-  { name: 'دروس', href: '/dashboard/subjects', icon: BookOpen },
-  { name: 'تولید برنامه', href: '/dashboard/generator', icon: Sparkles },
-  { name: 'برنامه هفتگی', href: '/dashboard/timetable', icon: CalendarDays },
-  { name: 'تنظیمات', href: '/dashboard/settings', icon: Settings },
-]
+  { name: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
+  { name: "مدارس", href: "/dashboard/schools", icon: LayoutDashboard },
+  { name: "معلمان", href: "/dashboard/teachers", icon: Users },
+  { name: "کلاس‌ها", href: "/dashboard/classes", icon: GraduationCap },
+  { name: "تولید برنامه", href: "/dashboard/generator", icon: Sparkles },
+  { name: "برنامه هفتگی", href: "/dashboard/timetable", icon: CalendarDays },
+  { name: "تنظیمات", href: "/dashboard/settings", icon: Settings },
+];
 
 export function Sidebar() {
-  const routerState = useRouterState()
-  const pathname = routerState.location.pathname
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const routerState = useRouterState();
+  const pathname = routerState.location.pathname;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <>
@@ -55,8 +54,8 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed right-0 top-0 z-40 h-screen w-64 border-l border-sidebar-border bg-sidebar transition-transform lg:translate-x-0',
-          mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+          "fixed right-0 top-0 z-40 h-screen w-64 border-l border-sidebar-border bg-sidebar transition-transform lg:translate-x-0",
+          mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
         <div className="flex h-full flex-col">
@@ -71,24 +70,25 @@ export function Sidebar() {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4">
             {navigation.map((item) => {
-              const isActive = pathname === item.href ||
-                (item.href !== '/dashboard' && pathname.startsWith(item.href))
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                   )}
                 >
-                  <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                  <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
                   {item.name}
                 </Link>
-              )
+              );
             })}
           </nav>
 
@@ -114,5 +114,5 @@ export function Sidebar() {
         </div>
       </aside>
     </>
-  )
+  );
 }
