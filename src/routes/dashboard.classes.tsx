@@ -53,7 +53,6 @@ import {
   Search,
   Trash2,
   GraduationCap,
-  BookOpen,
   CalendarClock,
   Check,
   Filter,
@@ -338,7 +337,6 @@ function ClassesPage() {
     return matchesSearch && matchesGrade && matchesMajor;
   });
 
-  const uniqueGrades = [...new Set(classes.map((c) => c.grade))].sort();
   const activeFilterCount = Number(gradeFilter !== "all") + Number(majorFilter !== "all");
 
   const handleSave = (data: ClassFormData) => {
@@ -384,27 +382,6 @@ function ClassesPage() {
     <div className="flex flex-col">
       <Header title="کلاس‌ها" description="مدیریت کلاس‌ها و بخش‌های مدرسه" />
       <div className="p-6 space-y-6">
-        <div className="grid w-full grid-cols-2 overflow-hidden rounded-xl border bg-card shadow-sm sm:w-fit">
-          <div className="flex min-w-0 items-center gap-3 px-4 py-3 sm:min-w-48">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <GraduationCap className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs text-muted-foreground">مجموع کلاس‌ها</p>
-              <p className="text-xl font-bold leading-tight">{classes.length}</p>
-            </div>
-          </div>
-          <div className="flex min-w-0 items-center gap-3 border-s px-4 py-3 sm:min-w-48">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
-              <BookOpen className="h-4 w-4 text-secondary-foreground" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs text-muted-foreground">پایه‌های تحصیلی</p>
-              <p className="text-xl font-bold leading-tight">{uniqueGrades.length}</p>
-            </div>
-          </div>
-        </div>
-
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full flex-1 sm:max-w-sm">
@@ -500,21 +477,27 @@ function ClassesPage() {
                   <Table dir="rtl">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-center">نام کلاس</TableHead>
+                        <TableHead className="w-14 text-center">ردیف</TableHead>
+                        <TableHead className="w-px whitespace-nowrap text-center">
+                          نام کلاس
+                        </TableHead>
                         <TableHead className="text-center">پایه</TableHead>
                         <TableHead className="text-center">رشته</TableHead>
-                        <TableHead className="text-center">انتخاب معلم</TableHead>
+                        <TableHead className="text-center">مدیریت کلاس</TableHead>
                         <TableHead className="w-28 text-center">مشاهده برنامه</TableHead>
                         <TableHead className="w-20 text-center">حذف</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredClasses.map((classItem) => {
-                        const totalCourses = assignmentCount(classItem.id);
+                      {filteredClasses.map((classItem, index) => {
+                        const hasAssignments = assignmentCount(classItem.id) > 0;
                         const incompleteCourses = incompleteCourseCount(classItem.id);
                         return (
                           <TableRow key={classItem.id}>
-                            <TableCell className="text-center">
+                            <TableCell className="text-center font-medium text-muted-foreground">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="w-px whitespace-nowrap text-center">
                               <Button
                                 type="button"
                                 variant="link"
@@ -529,19 +512,20 @@ function ClassesPage() {
                             <TableCell className="text-center">
                               <Button
                                 type="button"
-                                variant={totalCourses ? "outline" : "default"}
+                                variant={hasAssignments ? "outline" : "default"}
                                 size="sm"
                                 onClick={() => setAssignmentClass(classItem)}
                               >
-                                <UserRoundCheck className="me-2 h-4 w-4" />
-                                {totalCourses ? "تنظیم دروس" : "تنظیم نشده"}
+                                <UserRoundCheck
+                                  className={
+                                    hasAssignments ? "me-2 h-4 w-4 text-primary" : "me-2 h-4 w-4"
+                                  }
+                                />
+                                تنظیم دروس
                                 {incompleteCourses > 0 && (
                                   <span className="ms-2 text-xs text-destructive">
                                     {incompleteCourses.toLocaleString("fa-IR")} درس ناقص
                                   </span>
-                                )}
-                                {totalCourses > 0 && incompleteCourses === 0 && (
-                                  <span className="ms-2 text-xs text-primary">کامل</span>
                                 )}
                               </Button>
                             </TableCell>
@@ -596,7 +580,7 @@ function ClassesPage() {
                 </div>
               ) : (
                 filteredClasses.map((classItem) => {
-                  const totalCourses = assignmentCount(classItem.id);
+                  const hasAssignments = assignmentCount(classItem.id) > 0;
                   const incompleteCourses = incompleteCourseCount(classItem.id);
                   return (
                     <Card
@@ -633,11 +617,14 @@ function ClassesPage() {
                         </div>
                         <div className="mt-4 grid gap-2 border-t pt-4">
                           <Button type="button" onClick={() => setAssignmentClass(classItem)}>
-                            <UserRoundCheck className="me-2 h-4 w-4" />
-                            {totalCourses ? "تنظیم دروس" : "تنظیم نشده"}
+                            <UserRoundCheck
+                              className={
+                                hasAssignments ? "me-2 h-4 w-4 text-primary" : "me-2 h-4 w-4"
+                              }
+                            />
+                            تنظیم دروس
                             {incompleteCourses > 0 &&
                               ` • ${incompleteCourses.toLocaleString("fa-IR")} درس ناقص`}
-                            {totalCourses > 0 && incompleteCourses === 0 && " • کامل"}
                           </Button>
                           <div className="grid grid-cols-2 gap-2">
                             <Button
@@ -723,7 +710,17 @@ function ClassesPage() {
           setAssignments((current) => current.filter((item) => item.id !== id))
         }
         onCreateCourse={(course) => setCourses((current) => [...current, course])}
+        onUpdateCourse={(updatedCourse) =>
+          setCourses((current) =>
+            current.map((course) => (course.id === updatedCourse.id ? updatedCourse : course)),
+          )
+        }
         onCreateTeacher={(teacher) => setTeachers((current) => [...current, teacher])}
+        onUpdateTeacher={(updatedTeacher) =>
+          setTeachers((current) =>
+            current.map((teacher) => (teacher.id === updatedTeacher.id ? updatedTeacher : teacher)),
+          )
+        }
         onUpdateTeacherAvailability={(teacherId, availableDays) =>
           setTeachers((current) =>
             current.map((teacher) =>

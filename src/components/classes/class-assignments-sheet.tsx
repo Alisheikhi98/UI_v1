@@ -3,15 +3,11 @@ import {
   BookOpen,
   Check,
   ChevronsUpDown,
-  CircleAlert,
-  CircleCheck,
   GraduationCap,
-  Minus,
+  Pencil,
   Plus,
   Search,
   Trash2,
-  UserPlus,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -24,17 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -43,27 +29,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Progress } from "@/components/ui/progress";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
-  MAX_WEEKLY_PERIODS,
-  isAssignmentComplete,
-  type ClassAssignment,
-  type CourseOption,
-  type TeacherOption,
-  type Weekday,
+  TeacherDetailsDialog,
+  type TeacherDetailsInput,
+} from "@/components/teachers/teacher-details-dialog";
+import type {
+  ClassAssignment,
+  CourseOption,
+  TeacherOption,
+  Weekday,
 } from "@/lib/class-configuration";
+import { cn } from "@/lib/utils";
 
 export interface AssignmentClass {
   id: string;
@@ -73,15 +65,6 @@ export interface AssignmentClass {
   gradeId?: string;
   majorId?: string;
 }
-
-const WEEKDAY_OPTIONS: Array<{ value: Weekday; label: string }> = [
-  { value: "saturday", label: "شنبه" },
-  { value: "sunday", label: "یکشنبه" },
-  { value: "monday", label: "دوشنبه" },
-  { value: "tuesday", label: "سه‌شنبه" },
-  { value: "wednesday", label: "چهارشنبه" },
-  { value: "thursday", label: "پنج‌شنبه" },
-];
 
 interface Props {
   open: boolean;
@@ -93,7 +76,9 @@ interface Props {
   onSaveAssignment: (assignment: ClassAssignment) => void;
   onDeleteAssignment: (id: string) => void;
   onCreateCourse: (course: CourseOption) => void;
+  onUpdateCourse: (course: CourseOption) => void;
   onCreateTeacher: (teacher: TeacherOption) => void;
+  onUpdateTeacher: (teacher: TeacherOption) => void;
   onUpdateTeacherAvailability: (teacherId: string, availableDays: Weekday[]) => void;
 }
 
@@ -110,6 +95,18 @@ const serializeDraft = (items: ClassAssignment[]) =>
       })),
   );
 
+const isPositiveInteger = (value: number) => Number.isInteger(value) && value > 0;
+
+const isDraftValid = (items: ClassAssignment[]) => {
+  const selectedCourseIds = items.map((item) => item.courseId).filter(Boolean);
+  return (
+    selectedCourseIds.length === new Set(selectedCourseIds).size &&
+    items.every(
+      (item) => Boolean(item.courseId && item.teacherId) && isPositiveInteger(item.slotsPerWeek),
+    )
+  );
+};
+
 export function ClassAssignmentsSheet({
   open,
   onOpenChange,
@@ -120,66 +117,31 @@ export function ClassAssignmentsSheet({
   onSaveAssignment,
   onDeleteAssignment,
   onCreateCourse,
+  onUpdateCourse,
   onCreateTeacher,
-  onUpdateTeacherAvailability,
+  onUpdateTeacher,
 }: Props) {
   const [draft, setDraft] = useState<ClassAssignment[]>([]);
   const [initialDraft, setInitialDraft] = useState<ClassAssignment[]>([]);
-  const [search, setSearch] = useState("");
-  const [courseToAdd, setCourseToAdd] = useState("");
-  const [courseDialogOpen, setCourseDialogOpen] = useState(false);
-  const [teacherDialogOpen, setTeacherDialogOpen] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
-  const [availabilityTeacherId, setAvailabilityTeacherId] = useState<string | null>(null);
+  const [createCourseOpen, setCreateCourseOpen] = useState(false);
+  const [courseToRename, setCourseToRename] = useState<CourseOption | null>(null);
+  const [createTeacherOpen, setCreateTeacherOpen] = useState(false);
+  const [teacherToEdit, setTeacherToEdit] = useState<TeacherOption | null>(null);
 
   useEffect(() => {
     if (!open || !classItem) return;
     const current = assignments.filter((assignment) => assignment.classId === classItem.id);
     setDraft(current);
     setInitialDraft(current);
-    setSearch("");
-    setCourseToAdd("");
   }, [assignments, classItem, open]);
-
-  const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
-  const assignedCourseIds = new Set(draft.map((assignment) => assignment.courseId));
-  const activeTeachers = teachers.filter((teacher) => teacher.active);
-  const compatibleCourses = courses.filter(
-    (course) =>
-      course.active &&
-      course.grade === classItem?.grade &&
-      (course.category === "general" || course.major === classItem?.major),
-  );
-  const availableCourses = compatibleCourses.filter((course) => !assignedCourseIds.has(course.id));
-  const visibleDraft = draft.filter((assignment) => {
-    const course = courses.find((item) => item.id === assignment.courseId);
-    return course?.name.toLowerCase().includes(search.trim().toLowerCase());
-  });
-  const configuredCount = draft.filter((assignment) =>
-    isAssignmentComplete(assignment, teachers),
-  ).length;
-  const missingTeacherCount = draft.filter((assignment) => !assignment.teacherId).length;
-  const missingAvailabilityCount = draft.filter((assignment) => {
-    const teacher = teachers.find((item) => item.id === assignment.teacherId);
-    return Boolean(teacher && teacher.availableDays.length === 0);
-  }).length;
-  const totalWeeklyPeriods = draft.reduce(
-    (total, assignment) => total + assignment.slotsPerWeek,
-    0,
-  );
-  const completionPercent = draft.length ? Math.round((configuredCount / draft.length) * 100) : 0;
-  const attentionCourses = visibleDraft.filter(
-    (assignment) => !isAssignmentComplete(assignment, teachers),
-  );
-  const configuredCourses = visibleDraft.filter((assignment) =>
-    isAssignmentComplete(assignment, teachers),
-  );
-  const hasIncompleteRows = configuredCount !== draft.length;
 
   if (!classItem) return null;
 
-  const courseName = (id: string) =>
-    courses.find((course) => course.id === id)?.name ?? "درس نامشخص";
+  const activeTeachers = teachers.filter((teacher) => teacher.active);
+  const activeCourses = courses.filter((course) => course.active);
+  const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
+  const draftIsValid = isDraftValid(draft);
 
   const requestClose = () => {
     if (isDirty) {
@@ -189,32 +151,33 @@ export function ClassAssignmentsSheet({
     onOpenChange(false);
   };
 
-  const addCourse = (courseId: string) => {
-    if (!courseId || assignedCourseIds.has(courseId)) return;
+  const addEmptyRow = () => {
     setDraft((current) => [
       ...current,
       {
         id: crypto.randomUUID(),
         classId: classItem.id,
-        courseId,
+        courseId: "",
         teacherId: "",
         slotsPerWeek: 1,
       },
     ]);
-    setCourseToAdd("");
   };
 
-  const updateTeacher = (assignmentId: string, teacherId: string) => {
+  const updateAssignment = (
+    assignmentId: string,
+    changes: Partial<Pick<ClassAssignment, "courseId" | "teacherId" | "slotsPerWeek">>,
+  ) => {
     setDraft((current) =>
       current.map((assignment) =>
-        assignment.id === assignmentId ? { ...assignment, teacherId } : assignment,
+        assignment.id === assignmentId ? { ...assignment, ...changes } : assignment,
       ),
     );
   };
 
   const saveChanges = () => {
-    if (hasIncompleteRows) {
-      toast.error("برای ذخیره، اطلاعات همه درس‌ها را کامل کنید");
+    if (!draftIsValid) {
+      toast.error("برای ذخیره، اطلاعات همه ردیف‌ها را به‌درستی تکمیل کنید");
       return;
     }
     const draftIds = new Set(draft.map((assignment) => assignment.id));
@@ -223,7 +186,7 @@ export function ClassAssignmentsSheet({
     });
     draft.forEach(onSaveAssignment);
     setInitialDraft(draft);
-    toast.success("انتخاب معلمان ذخیره شد");
+    toast.success("تنظیمات دروس کلاس ذخیره شد");
     onOpenChange(false);
   };
 
@@ -232,207 +195,194 @@ export function ClassAssignmentsSheet({
       <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[94vh] w-[calc(100%-1rem)] max-w-[1120px] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)] sm:max-w-[1120px]"
+          className="flex max-h-[92vh] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)] sm:max-w-5xl"
         >
-          <DialogHeader className="shrink-0 bg-muted/30 px-5 py-5 pe-12 text-right sm:px-7 sm:py-6">
-            <div className="flex items-center gap-3">
-              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex">
-                <GraduationCap className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <DialogTitle className="truncate text-lg">
-                  تنظیم دروس و معلمان - {classItem.name}
-                </DialogTitle>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  پایه {classItem.grade} • رشته {classItem.major}
-                </div>
-              </div>
+          <DialogHeader className="relative shrink-0 items-center border-b bg-muted/20 px-12 py-5 text-center sm:px-14">
+            <div className="absolute right-5 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
+              <GraduationCap className="h-5 w-5" />
             </div>
-            <DialogDescription>
-              برای هر درس، معلم و تعداد زنگ هفتگی را مشخص کنید. روزهای حضور هر معلم در تمام کلاس‌ها
-              مشترک است و برای تولید برنامه هفتگی استفاده می‌شود.
-            </DialogDescription>
+            <div className="flex w-full flex-col items-center px-2 text-center">
+              <DialogTitle className="w-full truncate text-center text-lg">مدیریت کلاس</DialogTitle>
+              <p className="mt-1 w-full text-center text-sm text-muted-foreground">
+                پایه {classItem.grade} • رشته {classItem.major}
+              </p>
+              <DialogDescription className="mt-2 w-full text-center">
+                درس، معلم و تعداد زنگ هفتگی هر ردیف را مشخص کنید.
+              </DialogDescription>
+            </div>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="grid min-h-full lg:grid-cols-[230px_minmax(0,1fr)]">
-              <aside className="border-b bg-muted/15 p-4 sm:p-5 lg:border-b-0 lg:border-l">
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
-                  <div className="rounded-xl bg-background p-3 shadow-sm ring-1 ring-border/60">
-                    <p className="text-xs text-muted-foreground">همه درس‌ها</p>
-                    <p className="mt-1 text-xl font-bold">{draft.length.toLocaleString("fa-IR")}</p>
-                  </div>
-                  <div className="rounded-xl bg-background p-3 shadow-sm ring-1 ring-border/60">
-                    <p className="text-xs text-muted-foreground">کاملاً تنظیم‌شده</p>
-                    <p className="mt-1 text-xl font-bold text-primary">
-                      {configuredCount.toLocaleString("fa-IR")}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-background p-3 shadow-sm ring-1 ring-border/60">
-                    <p className="text-xs text-muted-foreground">بدون معلم</p>
-                    <p className="mt-1 text-xl font-bold text-destructive">
-                      {missingTeacherCount.toLocaleString("fa-IR")}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-background p-3 shadow-sm ring-1 ring-border/60">
-                    <p className="text-xs text-muted-foreground">بدون روز حضور</p>
-                    <p className="mt-1 text-xl font-bold text-amber-600 dark:text-amber-400">
-                      {missingAvailabilityCount.toLocaleString("fa-IR")}
-                    </p>
-                  </div>
-                  <div className="col-span-2 rounded-xl bg-background p-3 shadow-sm ring-1 ring-border/60 lg:col-span-1">
-                    <p className="text-xs text-muted-foreground">مجموع زنگ هفتگی</p>
-                    <p className="mt-1 text-xl font-bold">
-                      {totalWeeklyPeriods.toLocaleString("fa-IR")}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">پیشرفت تکمیل</span>
-                    <span className="font-medium">
-                      ٪{completionPercent.toLocaleString("fa-IR")}
-                    </span>
-                  </div>
-                  <Progress value={completionPercent} className="h-2" />
-                </div>
-                <div className="mt-5 hidden space-y-2 lg:block">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => setTeacherDialogOpen(true)}
-                  >
-                    <UserPlus className="me-2 h-4 w-4" /> معلم جدید
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => setCourseDialogOpen(true)}
-                  >
-                    <Plus className="me-2 h-4 w-4" /> درس جدید
-                  </Button>
-                </div>
-              </aside>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">دروس این کلاس</h2>
+                <p className="text-xs text-muted-foreground">
+                  هر ردیف یک درس و معلم آن را مشخص می‌کند.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={addEmptyRow}
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                <Plus className="me-2 h-4 w-4" />
+                افزودن
+              </Button>
+            </div>
 
-              <main className="min-w-0 space-y-5 p-4 sm:p-6">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(250px,310px)]">
-                  <div className="relative">
-                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="جستجو در درس‌های کلاس..."
-                      className="bg-background pr-9"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Select value={courseToAdd} onValueChange={setCourseToAdd}>
-                      <SelectTrigger className="min-w-0 flex-1 bg-background">
-                        <SelectValue placeholder="افزودن درس موجود" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCourses.map((course) => (
-                          <SelectItem key={course.id} value={course.id}>
-                            {course.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      disabled={!courseToAdd}
-                      aria-label="افزودن درس موجود"
-                      onClick={() => addCourse(courseToAdd)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+            <div className="overflow-x-auto rounded-lg border">
+              <Table className="min-w-[720px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="w-14 text-center">ردیف</TableHead>
+                    <TableHead className="w-[38%] text-center">درس</TableHead>
+                    <TableHead className="w-[34%] text-center">معلم</TableHead>
+                    <TableHead className="w-40 text-center">زنگ هفتگی</TableHead>
+                    <TableHead className="w-20 text-center">عملیات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {draft.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-56 text-center">
+                        <div className="flex flex-col items-center">
+                          <BookOpen className="mb-3 h-8 w-8 text-muted-foreground" />
+                          <p className="font-medium">هنوز درسی برای این کلاس ثبت نشده است.</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            برای شروع یک ردیف درس اضافه کنید.
+                          </p>
+                          <Button className="mt-4" variant="outline" onClick={addEmptyRow}>
+                            <Plus className="me-2 h-4 w-4" />
+                            افزودن اولین درس
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    draft.map((assignment, index) => {
+                      const selectedByOtherRows = new Set(
+                        draft
+                          .filter((item) => item.id !== assignment.id)
+                          .map((item) => item.courseId)
+                          .filter(Boolean),
+                      );
+                      const courseInvalid = !assignment.courseId;
+                      const teacherInvalid = !assignment.teacherId;
+                      const periodsInvalid = !isPositiveInteger(assignment.slotsPerWeek);
 
-                {draft.length === 0 ? (
-                  <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-muted/25 p-6 text-center">
-                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <BookOpen className="h-6 w-6 text-primary" />
-                    </div>
-                    <p className="font-medium">هنوز درسی برای این کلاس ثبت نشده است.</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      یک درس موجود را اضافه کنید یا درس جدید بسازید.
-                    </p>
-                    <Button
-                      className="mt-4"
-                      variant="secondary"
-                      onClick={() => setCourseDialogOpen(true)}
-                    >
-                      <Plus className="me-2 h-4 w-4" /> درس جدید
-                    </Button>
-                  </div>
-                ) : visibleDraft.length === 0 ? (
-                  <div className="rounded-2xl bg-muted/25 p-10 text-center text-sm text-muted-foreground">
-                    درسی با این عبارت پیدا نشد.
-                  </div>
-                ) : (
-                  <div className="space-y-7">
-                    {attentionCourses.length > 0 && (
-                      <CourseGroup
-                        title="نیازمند تکمیل"
-                        description="این درس‌ها برای تولید برنامه آماده نیستند."
-                        icon={<CircleAlert className="h-4 w-4 text-destructive" />}
-                        assignments={attentionCourses}
-                        courses={courses}
-                        teachers={activeTeachers}
-                        onTeacherChange={updateTeacher}
-                        onWeeklyPeriodsChange={(id, value) =>
-                          setDraft((current) =>
-                            current.map((item) =>
-                              item.id === id
-                                ? {
-                                    ...item,
-                                    slotsPerWeek: Math.min(MAX_WEEKLY_PERIODS, Math.max(1, value)),
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        onRemove={(id) =>
-                          setDraft((current) => current.filter((item) => item.id !== id))
-                        }
-                        onEditAvailability={setAvailabilityTeacherId}
-                      />
-                    )}
-                    {configuredCourses.length > 0 && (
-                      <CourseGroup
-                        title="آماده برای برنامه‌ریزی"
-                        description="اطلاعات این درس‌ها کامل است."
-                        icon={<CircleCheck className="h-4 w-4 text-primary" />}
-                        assignments={configuredCourses}
-                        courses={courses}
-                        teachers={activeTeachers}
-                        onTeacherChange={updateTeacher}
-                        onWeeklyPeriodsChange={(id, value) =>
-                          setDraft((current) =>
-                            current.map((item) =>
-                              item.id === id
-                                ? {
-                                    ...item,
-                                    slotsPerWeek: Math.min(MAX_WEEKLY_PERIODS, Math.max(1, value)),
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        onRemove={(id) =>
-                          setDraft((current) => current.filter((item) => item.id !== id))
-                        }
-                        onEditAvailability={setAvailabilityTeacherId}
-                      />
-                    )}
-                  </div>
-                )}
-              </main>
+                      return (
+                        <TableRow key={assignment.id}>
+                          <TableCell className="text-center align-top font-medium text-muted-foreground">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <ManagedEntityPicker
+                              value={assignment.courseId}
+                              placeholder="انتخاب درس"
+                              createLabel="درس جدید"
+                              searchPlaceholder="جستجوی درس..."
+                              emptyText="درسی یافت نشد"
+                              options={activeCourses.map((course) => ({
+                                id: course.id,
+                                label: course.name,
+                                disabled: selectedByOtherRows.has(course.id),
+                              }))}
+                              onChange={(courseId) => updateAssignment(assignment.id, { courseId })}
+                              onCreate={() => setCreateCourseOpen(true)}
+                              onEdit={(courseId) =>
+                                setCourseToRename(
+                                  courses.find((course) => course.id === courseId) ?? null,
+                                )
+                              }
+                              invalid={courseInvalid}
+                            />
+                            {courseInvalid && (
+                              <p className="mt-1 text-xs text-destructive">
+                                انتخاب درس الزامی است.
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <ManagedEntityPicker
+                              value={assignment.teacherId}
+                              placeholder="انتخاب معلم"
+                              createLabel="معلم جدید"
+                              searchPlaceholder="جستجوی معلم..."
+                              emptyText="معلمی یافت نشد"
+                              options={activeTeachers.map((teacher) => ({
+                                id: teacher.id,
+                                label: teacher.name,
+                              }))}
+                              onChange={(teacherId) =>
+                                updateAssignment(assignment.id, { teacherId })
+                              }
+                              onCreate={() => setCreateTeacherOpen(true)}
+                              onEdit={(teacherId) =>
+                                setTeacherToEdit(
+                                  teachers.find((teacher) => teacher.id === teacherId) ?? null,
+                                )
+                              }
+                              invalid={teacherInvalid}
+                            />
+                            {teacherInvalid && (
+                              <p className="mt-1 text-xs text-destructive">
+                                انتخاب معلم الزامی است.
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              step={1}
+                              value={
+                                Number.isFinite(assignment.slotsPerWeek)
+                                  ? assignment.slotsPerWeek
+                                  : ""
+                              }
+                              aria-invalid={periodsInvalid}
+                              className={cn(
+                                "mx-auto w-24 text-center",
+                                periodsInvalid && "border-destructive",
+                              )}
+                              onChange={(event) =>
+                                updateAssignment(assignment.id, {
+                                  slotsPerWeek:
+                                    event.target.value === ""
+                                      ? Number.NaN
+                                      : Number(event.target.value),
+                                })
+                              }
+                            />
+                            {periodsInvalid && (
+                              <p className="mt-1 text-center text-xs text-destructive">
+                                عدد صحیح مثبت وارد کنید.
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center align-top">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              aria-label="حذف ردیف درس"
+                              onClick={() =>
+                                setDraft((current) =>
+                                  current.filter((item) => item.id !== assignment.id),
+                                )
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
 
@@ -440,59 +390,104 @@ export function ClassAssignmentsSheet({
             <Button type="button" variant="ghost" onClick={requestClose}>
               بستن
             </Button>
-            <div className="flex gap-2 lg:hidden">
-              <Button type="button" variant="outline" onClick={() => setCourseDialogOpen(true)}>
-                <Plus className="me-2 h-4 w-4" /> درس جدید
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setTeacherDialogOpen(true)}>
-                <UserPlus className="me-2 h-4 w-4" /> معلم جدید
-              </Button>
-            </div>
-            <div className="hidden flex-1 items-center text-xs text-muted-foreground sm:flex">
-              {hasIncompleteRows
-                ? `${(draft.length - configuredCount).toLocaleString("fa-IR")} درس باید تکمیل شود.`
+            <div className="hidden flex-1 text-xs text-muted-foreground sm:block">
+              {!draftIsValid && draft.length > 0
+                ? "برای ذخیره، همه ردیف‌ها را کامل کنید."
                 : isDirty
-                  ? "تغییرات شما هنوز ذخیره نشده است."
-                  : "همه تنظیمات کامل و ذخیره شده‌اند."}
+                  ? "تغییرات هنوز ذخیره نشده‌اند."
+                  : "همه تغییرات ذخیره شده‌اند."}
             </div>
             <Button
               type="button"
               className="min-w-40"
-              disabled={!isDirty || hasIncompleteRows}
+              disabled={!isDirty || !draftIsValid}
               onClick={saveChanges}
             >
-              <Check className="me-2 h-4 w-4" /> ذخیره تنظیمات کلاس
+              <Check className="me-2 h-4 w-4" />
+              ذخیره تنظیمات کلاس
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <QuickCreateCourseDialog
-        open={courseDialogOpen}
-        onOpenChange={setCourseDialogOpen}
-        classItem={classItem}
-        onCreate={(course) => {
-          onCreateCourse(course);
-          addCourse(course.id);
-        }}
-      />
-      <QuickCreateTeacherDialog
-        open={teacherDialogOpen}
-        onOpenChange={setTeacherDialogOpen}
-        onCreate={(teacher) => {
-          onCreateTeacher(teacher);
-          const firstMissing = draft.find((assignment) => !assignment.teacherId);
-          if (firstMissing) updateTeacher(firstMissing.id, teacher.id);
+      <CourseNameDialog
+        open={createCourseOpen}
+        onOpenChange={setCreateCourseOpen}
+        title="ایجاد درس جدید"
+        courses={courses}
+        onSave={(name) => {
+          onCreateCourse({
+            id: crypto.randomUUID(),
+            name,
+            code: "",
+            grade: classItem.grade,
+            major: classItem.major,
+            category: "specialized",
+            active: true,
+            gradeId: classItem.gradeId ?? classItem.grade,
+            majorId: classItem.majorId ?? classItem.major,
+          });
+          toast.success("درس جدید ایجاد شد");
         }}
       />
 
-      <TeacherAvailabilityDialog
-        open={Boolean(availabilityTeacherId)}
-        onOpenChange={(next) => !next && setAvailabilityTeacherId(null)}
-        teacher={teachers.find((teacher) => teacher.id === availabilityTeacherId) ?? null}
-        onSave={(teacherId, availableDays) => {
-          onUpdateTeacherAvailability(teacherId, availableDays);
-          setAvailabilityTeacherId(null);
+      <CourseNameDialog
+        open={Boolean(courseToRename)}
+        onOpenChange={(next) => {
+          if (!next) setCourseToRename(null);
+        }}
+        title="ویرایش نام درس"
+        initialName={courseToRename?.name}
+        courses={courses}
+        excludedCourseId={courseToRename?.id}
+        onSave={(name) => {
+          if (!courseToRename) return;
+          onUpdateCourse({ ...courseToRename, name });
+          toast.success("نام درس ویرایش شد");
+          setCourseToRename(null);
+        }}
+      />
+
+      <TeacherDetailsDialog
+        open={createTeacherOpen}
+        onOpenChange={setCreateTeacherOpen}
+        onSave={(details) => {
+          onCreateTeacher({
+            id: crypto.randomUUID(),
+            name: details.name,
+            code: details.personnel_code || "",
+            phone: details.phone || "",
+            active: true,
+            availableDays: [],
+          });
+          toast.success("معلم جدید ایجاد شد");
+        }}
+      />
+
+      <TeacherDetailsDialog
+        open={Boolean(teacherToEdit)}
+        onOpenChange={(next) => {
+          if (!next) setTeacherToEdit(null);
+        }}
+        teacher={
+          teacherToEdit
+            ? {
+                name: teacherToEdit.name,
+                personnel_code: teacherToEdit.code,
+                phone: teacherToEdit.phone,
+              }
+            : null
+        }
+        onSave={(details: TeacherDetailsInput) => {
+          if (!teacherToEdit) return;
+          onUpdateTeacher({
+            ...teacherToEdit,
+            name: details.name,
+            code: details.personnel_code || "",
+            phone: details.phone || "",
+          });
+          toast.success("اطلاعات معلم ویرایش شد");
+          setTeacherToEdit(null);
         }}
       />
 
@@ -501,7 +496,7 @@ export function ClassAssignmentsSheet({
           <AlertDialogHeader className="text-right">
             <AlertDialogTitle>تغییرات ذخیره نشده</AlertDialogTitle>
             <AlertDialogDescription>
-              تغییرات انتخاب معلمان ذخیره نشده است. آیا بدون ذخیره خارج می‌شوید؟
+              تغییرات تنظیم دروس ذخیره نشده است. آیا بدون ذخیره خارج می‌شوید؟
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -521,556 +516,205 @@ export function ClassAssignmentsSheet({
   );
 }
 
-function CourseGroup({
-  title,
-  description,
-  icon,
-  assignments,
-  courses,
-  teachers,
-  onTeacherChange,
-  onWeeklyPeriodsChange,
-  onRemove,
-  onEditAvailability,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  assignments: ClassAssignment[];
-  courses: CourseOption[];
-  teachers: TeacherOption[];
-  onTeacherChange: (assignmentId: string, teacherId: string) => void;
-  onWeeklyPeriodsChange: (assignmentId: string, value: number) => void;
-  onRemove: (assignmentId: string) => void;
-  onEditAvailability: (teacherId: string) => void;
-}) {
-  return (
-    <section className="space-y-3">
-      <div className="flex items-start gap-2">
-        <div className="mt-0.5">{icon}</div>
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        {assignments.map((assignment) => (
-          <CourseTeacherCard
-            key={assignment.id}
-            assignment={assignment}
-            courseName={
-              courses.find((course) => course.id === assignment.courseId)?.name ?? "درس نامشخص"
-            }
-            teachers={teachers}
-            onTeacherChange={(teacherId) => onTeacherChange(assignment.id, teacherId)}
-            onWeeklyPeriodsChange={(value) => onWeeklyPeriodsChange(assignment.id, value)}
-            onRemove={() => onRemove(assignment.id)}
-            onEditAvailability={onEditAvailability}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CourseTeacherCard({
-  assignment,
-  courseName,
-  teachers,
-  onTeacherChange,
-  onWeeklyPeriodsChange,
-  onRemove,
-  onEditAvailability,
-}: {
-  assignment: ClassAssignment;
-  courseName: string;
-  teachers: TeacherOption[];
-  onTeacherChange: (teacherId: string) => void;
-  onWeeklyPeriodsChange: (value: number) => void;
-  onRemove: () => void;
-  onEditAvailability: (teacherId: string) => void;
-}) {
-  const selectedTeacher = teachers.find((teacher) => teacher.id === assignment.teacherId);
-  const isComplete = Boolean(
-    selectedTeacher?.availableDays.length &&
-    assignment.slotsPerWeek >= 1 &&
-    assignment.slotsPerWeek <= MAX_WEEKLY_PERIODS,
-  );
-  return (
-    <Card
-      className={cn(
-        "flex h-full flex-col gap-4 border-0 p-4 shadow-sm ring-1",
-        isComplete ? "ring-border/60" : "ring-destructive/25",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <h3 className="truncate text-base font-semibold leading-6">{courseName}</h3>
-          <ConfigurationStatusBadge complete={isComplete} hasTeacher={Boolean(selectedTeacher)} />
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`حذف درس ${courseName} از کلاس`}
-          onClick={onRemove}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {selectedTeacher && (
-        <div className="rounded-lg bg-muted/40 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium">روزهای حضور معلم</span>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-xs"
-              onClick={() => onEditAvailability(selectedTeacher.id)}
-            >
-              ویرایش روزها
-            </Button>
-          </div>
-          <AvailabilityBadges availableDays={selectedTeacher.availableDays} />
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label>معلم درس</Label>
-        <SearchablePicker
-          value={assignment.teacherId}
-          placeholder="انتخاب معلم"
-          searchPlaceholder="جستجو با نام یا کد..."
-          emptyText="معلم فعالی یافت نشد."
-          options={teachers.map((teacher) => ({
-            id: teacher.id,
-            label: teacher.name,
-            detail: teacher.code,
-            search: `${teacher.name} ${teacher.code}`,
-          }))}
-          onChange={onTeacherChange}
-          clearLabel="پاک‌کردن انتخاب"
-        />
-      </div>
-
-      <div className="mt-auto flex items-center justify-between gap-3 border-t pt-3">
-        <div>
-          <p className="text-sm font-medium">زنگ هفتگی</p>
-          <p className="text-xs text-muted-foreground">از ۱ تا ۸ زنگ</p>
-        </div>
-        <div className="flex items-center rounded-lg border bg-background p-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            disabled={assignment.slotsPerWeek <= 1}
-            aria-label="کاهش تعداد زنگ"
-            onClick={() => onWeeklyPeriodsChange(assignment.slotsPerWeek - 1)}
-          >
-            <Minus className="h-3.5 w-3.5" />
-          </Button>
-          <span className="min-w-9 text-center text-sm font-semibold tabular-nums">
-            {assignment.slotsPerWeek.toLocaleString("fa-IR")}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            disabled={assignment.slotsPerWeek >= 8}
-            aria-label="افزایش تعداد زنگ"
-            onClick={() => onWeeklyPeriodsChange(assignment.slotsPerWeek + 1)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function ConfigurationStatusBadge({
-  complete,
-  hasTeacher,
-}: {
-  complete: boolean;
-  hasTeacher: boolean;
-}) {
-  if (complete)
-    return (
-      <Badge>
-        <Check className="me-1 h-3 w-3" /> کامل
-      </Badge>
-    );
-  return (
-    <Badge variant="destructive">
-      <CircleAlert className="me-1 h-3 w-3" />
-      {hasTeacher ? "روز حضور نامشخص" : "بدون معلم"}
-    </Badge>
-  );
-}
-
-function AvailabilityBadges({ availableDays }: { availableDays: Weekday[] }) {
-  if (!availableDays.length)
-    return <p className="text-xs font-medium text-destructive">روزهای حضور مشخص نشده</p>;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {WEEKDAY_OPTIONS.filter((day) => availableDays.includes(day.value)).map((day) => (
-        <Badge key={day.value} variant="secondary" className="font-normal">
-          {day.label}
-        </Badge>
-      ))}
-    </div>
-  );
-}
-
-function SearchablePicker({
+function ManagedEntityPicker({
   value,
-  options,
   placeholder,
+  createLabel,
   searchPlaceholder,
   emptyText,
-  clearLabel,
+  options,
+  invalid,
   onChange,
+  onCreate,
+  onEdit,
 }: {
   value: string;
-  options: Array<{ id: string; label: string; detail?: string; search: string }>;
   placeholder: string;
+  createLabel: string;
   searchPlaceholder: string;
   emptyText: string;
-  clearLabel?: string;
+  options: Array<{ id: string; label: string; disabled?: boolean }>;
+  invalid?: boolean;
   onChange: (value: string) => void;
+  onCreate: () => void;
+  onEdit: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const selected = options.find((option) => option.id === value);
+  const normalizedQuery = normalizeCourseName(query);
+  const filteredOptions = options.filter((option) =>
+    normalizeCourseName(option.label).includes(normalizedQuery),
+  );
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) setQuery("");
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange} dir="rtl">
+      <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between font-normal"
+          aria-invalid={invalid}
+          className={cn(
+            "w-full justify-between font-normal",
+            !selected && "text-muted-foreground",
+            invalid && "border-destructive",
+          )}
         >
-          <span className={cn("truncate", !selected && "text-muted-foreground")}>
-            {selected?.label ?? placeholder}
-          </span>
+          <span className="truncate">{selected?.label ?? placeholder}</span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] p-0"
-        dir="rtl"
+        side="bottom"
+        sideOffset={4}
+        avoidCollisions
+        className="w-72"
       >
-        <Command
-          filter={(itemValue, query) =>
-            itemValue.toLowerCase().includes(query.toLowerCase()) ? 1 : 0
-          }
+        <DropdownMenuItem
+          onSelect={() => {
+            setOpen(false);
+            onCreate();
+          }}
         >
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {value && clearLabel && (
-                <CommandItem
-                  value="clear-current-selection"
-                  onSelect={() => {
-                    onChange("");
-                    setOpen(false);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                  <span>{clearLabel}</span>
-                </CommandItem>
+          <Plus className="me-2 h-4 w-4" />
+          {createLabel}
+        </DropdownMenuItem>
+        <div className="relative p-2" onKeyDown={(event) => event.stopPropagation()}>
+          <Search className="absolute right-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            placeholder={searchPlaceholder}
+            className="h-8 pr-8 text-xs"
+            dir="rtl"
+            autoFocus
+          />
+        </div>
+        <DropdownMenuSeparator />
+        <div className="max-h-64 overflow-y-auto">
+          {filteredOptions.length === 0 && (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
+          )}
+          {filteredOptions.map((option) => (
+            <DropdownMenuItem
+              key={option.id}
+              className={cn(
+                "flex items-center gap-2",
+                value === option.id && "bg-accent",
+                option.disabled && "text-muted-foreground",
               )}
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={option.search}
-                  onSelect={() => {
-                    onChange(option.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn("h-4 w-4", value === option.id ? "opacity-100" : "opacity-0")}
-                  />
-                  <span className="flex-1">{option.label}</span>
-                  {option.detail && (
-                    <span className="text-xs text-muted-foreground">{option.detail}</span>
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+              onSelect={(event) => {
+                if (option.disabled) {
+                  event.preventDefault();
+                  return;
+                }
+                onChange(option.id);
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                title={`ویرایش ${option.label}`}
+                aria-label={`ویرایش ${option.label}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpen(false);
+                  onEdit(option.id);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function TeacherAvailabilityDialog({
+const normalizeCourseName = (name: string) =>
+  name.trim().replace(/\s+/g, " ").toLocaleLowerCase("fa");
+
+function CourseNameDialog({
   open,
   onOpenChange,
-  teacher,
+  title,
+  initialName = "",
+  courses,
+  excludedCourseId,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  teacher: TeacherOption | null;
-  onSave: (teacherId: string, availableDays: Weekday[]) => void;
+  title: string;
+  initialName?: string;
+  courses: CourseOption[];
+  excludedCourseId?: string;
+  onSave: (name: string) => void;
 }) {
-  const [selectedDays, setSelectedDays] = useState<Weekday[]>([]);
+  const [name, setName] = useState("");
 
   useEffect(() => {
-    if (open) setSelectedDays(teacher?.availableDays ?? []);
-  }, [open, teacher]);
+    if (open) setName(initialName);
+  }, [initialName, open]);
 
-  if (!teacher) return null;
-
-  const toggleDay = (day: Weekday) => {
-    setSelectedDays((current) =>
-      current.includes(day) ? current.filter((item) => item !== day) : [...current, day],
-    );
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir="rtl" className="sm:max-w-md">
-        <DialogHeader className="text-right">
-          <DialogTitle>روزهای حضور {teacher.name}</DialogTitle>
-          <DialogDescription>
-            این روزها برای معلم ذخیره می‌شوند و در تمام کلاس‌های او اعمال خواهند شد.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-3">
-          {WEEKDAY_OPTIONS.map((day) => {
-            const selected = selectedDays.includes(day.value);
-            return (
-              <Button
-                key={day.value}
-                type="button"
-                variant={selected ? "default" : "outline"}
-                aria-pressed={selected}
-                onClick={() => toggleDay(day.value)}
-              >
-                {selected && <Check className="me-2 h-4 w-4" />}
-                {day.label}
-              </Button>
-            );
-          })}
-        </div>
-        {!selectedDays.length && (
-          <p className="text-sm text-destructive">حداقل یک روز حضور انتخاب کنید.</p>
-        )}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            انصراف
-          </Button>
-          <Button
-            type="button"
-            disabled={!selectedDays.length}
-            onClick={() => {
-              onSave(teacher.id, selectedDays);
-              toast.success("روزهای حضور معلم ذخیره شد");
-            }}
-          >
-            ذخیره روزهای حضور
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+  const normalizedName = normalizeCourseName(name);
+  const duplicate = courses.some(
+    (course) =>
+      course.id !== excludedCourseId && normalizeCourseName(course.name) === normalizedName,
   );
-}
+  const valid = Boolean(normalizedName) && !duplicate;
 
-function QuickCreateCourseDialog({
-  open,
-  onOpenChange,
-  classItem,
-  onCreate,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  classItem: AssignmentClass;
-  onCreate: (course: CourseOption) => void;
-}) {
-  const [form, setForm] = useState({ name: "", category: "", active: true });
-  useEffect(() => {
-    if (open) setForm({ name: "", category: "", active: true });
-  }, [classItem.grade, classItem.major, open]);
-  const valid = Boolean(form.name.trim() && form.category);
-  const gradeName =
-    ({ "10": "دهم", "11": "یازدهم", "12": "دوازدهم" } as Record<string, string>)[classItem.grade] ??
-    classItem.grade;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir="rtl" className="sm:max-w-lg">
+      <DialogContent dir="rtl" className="sm:max-w-sm">
         <DialogHeader className="text-right">
-          <DialogTitle>ایجاد درس جدید</DialogTitle>
-          <DialogDescription>این درس پس از ذخیره به کلاس اضافه می‌شود.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>نام درس را وارد کنید.</DialogDescription>
         </DialogHeader>
-        <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          این درس برای پایه {gradeName} و رشته {classItem.major} ایجاد می‌شود.
-        </div>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <Field label="نام درس">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!valid) return;
+            onSave(name.trim().replace(/\s+/g, " "));
+            onOpenChange(false);
+          }}
+        >
+          <div className="space-y-2 py-4">
+            <label htmlFor="course-name" className="text-sm font-medium">
+              نام درس
+            </label>
             <Input
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              id="course-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              autoFocus
+              aria-invalid={duplicate}
             />
-          </Field>
-          <Field label="دسته‌بندی">
-            <Select
-              value={form.category}
-              onValueChange={(category) => setForm({ ...form, category })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="انتخاب دسته‌بندی" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="general">عمومی</SelectItem>
-                <SelectItem value="specialized">تخصصی</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-            <div>
-              <Label>وضعیت فعال</Label>
-              <p className="text-xs text-muted-foreground">قابل استفاده در کلاس‌ها</p>
-            </div>
-            <Switch
-              checked={form.active}
-              onCheckedChange={(active) => setForm({ ...form, active })}
-            />
+            {duplicate && <p className="text-xs text-destructive">درسی با این نام وجود دارد.</p>}
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            انصراف
-          </Button>
-          <Button
-            disabled={!valid}
-            onClick={() => {
-              const course: CourseOption = {
-                ...form,
-                name: form.name.trim(),
-                code: "",
-                id: crypto.randomUUID(),
-                grade: classItem.grade,
-                major: classItem.major,
-                gradeId: classItem.gradeId ?? classItem.grade,
-                gradeName,
-                majorId: classItem.majorId ?? classItem.major,
-                majorName: classItem.major,
-              };
-              onCreate(course);
-              toast.success("درس جدید ایجاد شد");
-              onOpenChange(false);
-            }}
-          >
-            ذخیره درس
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              انصراف
+            </Button>
+            <Button type="submit" disabled={!valid}>
+              ذخیره
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function QuickCreateTeacherDialog({
-  open,
-  onOpenChange,
-  onCreate,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreate: (teacher: TeacherOption) => void;
-}) {
-  const [form, setForm] = useState({ name: "", code: "", phone: "", active: true });
-  useEffect(() => {
-    if (open) setForm({ name: "", code: "", phone: "", active: true });
-  }, [open]);
-  const valid = Boolean(form.name.trim());
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir="rtl" className="sm:max-w-md">
-        <DialogHeader className="text-right">
-          <DialogTitle>ایجاد معلم جدید</DialogTitle>
-          <DialogDescription>
-            معلم جدید پس از ذخیره برای اولین درس بدون معلم انتخاب می‌شود.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <Field label="نام معلم">
-            <Input
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-            />
-          </Field>
-          <Field label="کد پرسنلی (اختیاری)">
-            <Input
-              dir="ltr"
-              value={form.code}
-              onChange={(event) => setForm({ ...form, code: event.target.value })}
-            />
-          </Field>
-          <Field label="شماره موبایل (اختیاری)">
-            <Input
-              dir="ltr"
-              type="tel"
-              value={form.phone}
-              onChange={(event) => setForm({ ...form, phone: event.target.value })}
-            />
-          </Field>
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-            <div>
-              <Label>وضعیت فعال</Label>
-              <p className="text-xs text-muted-foreground">قابل انتخاب برای کلاس‌ها</p>
-            </div>
-            <Switch
-              checked={form.active}
-              onCheckedChange={(active) => setForm({ ...form, active })}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            انصراف
-          </Button>
-          <Button
-            disabled={!valid}
-            onClick={() => {
-              const teacher = {
-                ...form,
-                name: form.name.trim(),
-                code: form.code.trim(),
-                phone: form.phone.trim(),
-                id: crypto.randomUUID(),
-                availableDays: [] as Weekday[],
-              };
-              onCreate(teacher);
-              toast.success("معلم جدید ایجاد شد");
-              onOpenChange(false);
-            }}
-          >
-            ذخیره معلم
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
-    </div>
   );
 }

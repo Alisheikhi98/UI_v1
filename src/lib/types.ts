@@ -1,9 +1,12 @@
+export type Weekday = "saturday" | "sunday" | "monday" | "tuesday" | "wednesday" | "thursday";
+
 export interface Teacher {
   id: string;
   name: string;
   email: string;
   phone: string;
   subjects: string[];
+  availableDays: Weekday[];
   status: "active" | "inactive";
   avatar?: string;
   personnel_code?: string;
