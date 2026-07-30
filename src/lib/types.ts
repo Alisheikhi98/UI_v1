@@ -5,7 +5,7 @@ export interface Teacher {
   name: string;
   email: string;
   phone: string;
-  subjects: string[];
+  courseIds: string[];
   availableDays: Weekday[];
   status: "active" | "inactive";
   avatar?: string;
@@ -15,19 +15,32 @@ export interface Teacher {
 export interface Class {
   id: string;
   name: string;
-  grade: string;
-  section: string;
-  studentCount: number;
-  classTeacher: string;
+  gradeId: string;
+  majorId: string;
+  section?: string;
+  studentCapacity: number;
+  advisorTeacherId?: string;
 }
 
-export interface Subject {
+export interface Course {
   id: string;
   name: string;
+  active: boolean;
+  gradeId: string;
+  majorId: string;
+  category: "general" | "specialized";
   code: string;
   weeklyHours: number;
-  assignedTeacher: string;
+  assignedTeacherId?: string;
   color: string;
+}
+
+export interface ClassAssignment {
+  id: string;
+  classId: string;
+  courseId: string;
+  teacherId: string;
+  weeklyPeriods: number;
 }
 
 export interface TimeSlot {
@@ -41,7 +54,7 @@ export interface ScheduleEntry {
   id: string;
   day: string;
   timeSlot: TimeSlot;
-  subject: Subject;
+  subject: Course;
   teacher: Teacher;
   class: Class;
 }

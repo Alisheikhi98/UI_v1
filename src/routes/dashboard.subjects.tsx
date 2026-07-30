@@ -1,33 +1,67 @@
-import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { mockSubjects, mockTeachers } from '@/lib/data'
-import type { Subject } from '@/lib/types'
-import { Plus, Search, MoreHorizontal, Edit, Trash2, BookOpen, Clock, User, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useCoursesRepository, useTeachersRepository } from "@/lib/mock-queries";
+import type { Course, Teacher } from "@/lib/types";
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  BookOpen,
+  Clock,
+  User,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/dashboard/subjects')({
-  head: () => ({ meta: [{ title: 'دروس - آموزش‌یار' }, { name: 'description', content: 'مدیریت دروس برنامه درسی' }] }),
+export const Route = createFileRoute("/dashboard/subjects")({
+  head: () => ({
+    meta: [
+      { title: "دروس - آموزش‌یار" },
+      { name: "description", content: "مدیریت دروس برنامه درسی" },
+    ],
+  }),
   component: SubjectsPage,
-})
+});
 
 const subjectColors = [
-  { name: 'آبی', value: '#1E40AF' },
-  { name: 'سبز', value: '#059669' },
-  { name: 'بنفش', value: '#7C3AED' },
-  { name: 'قرمز', value: '#DC2626' },
-  { name: 'زمردی', value: '#16A34A' },
-  { name: 'کهربایی', value: '#CA8A04' },
-  { name: 'فیروزه‌ای', value: '#0891B2' },
-  { name: 'صورتی', value: '#DB2777' },
-]
+  { name: "آبی", value: "#1E40AF" },
+  { name: "سبز", value: "#059669" },
+  { name: "بنفش", value: "#7C3AED" },
+  { name: "قرمز", value: "#DC2626" },
+  { name: "زمردی", value: "#16A34A" },
+  { name: "کهربایی", value: "#CA8A04" },
+  { name: "فیروزه‌ای", value: "#0891B2" },
+  { name: "صورتی", value: "#DB2777" },
+];
 
 function EmptyState({ onAddSubject }: { onAddSubject: () => void }) {
   return (
@@ -44,7 +78,7 @@ function EmptyState({ onAddSubject }: { onAddSubject: () => void }) {
         افزودن درس
       </Button>
     </Card>
-  )
+  );
 }
 
 function SubjectDialog({
@@ -52,33 +86,35 @@ function SubjectDialog({
   onOpenChange,
   subject,
   onSave,
+  teachers,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  subject?: Subject | null
-  onSave: (data: Partial<Subject>) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  subject?: Course | null;
+  onSave: (data: Partial<Course>) => void;
+  teachers: Teacher[];
 }) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState<Partial<Subject>>(
-    subject || { name: '', code: '', weeklyHours: 4, assignedTeacher: '', color: '#1E40AF' }
-  )
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<Partial<Course>>(
+    subject || { name: "", code: "", weeklyHours: 4, assignedTeacherId: "", color: "#1E40AF" },
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
-    onSave(formData)
-    setIsLoading(false)
-    onOpenChange(false)
-  }
+    e.preventDefault();
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    onSave(formData);
+    setIsLoading(false);
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{subject ? 'ویرایش درس' : 'افزودن درس جدید'}</DialogTitle>
+          <DialogTitle>{subject ? "ویرایش درس" : "افزودن درس جدید"}</DialogTitle>
           <DialogDescription>
-            {subject ? 'اطلاعات درس را به‌روز کنید.' : 'یک درس جدید به برنامه درسی اضافه کنید.'}
+            {subject ? "اطلاعات درس را به‌روز کنید." : "یک درس جدید به برنامه درسی اضافه کنید."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -87,7 +123,7 @@ function SubjectDialog({
               <Label htmlFor="name">نام درس</Label>
               <Input
                 id="name"
-                value={formData.name || ''}
+                value={formData.name || ""}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="ریاضی"
                 required
@@ -98,7 +134,7 @@ function SubjectDialog({
                 <Label htmlFor="code">کد درس</Label>
                 <Input
                   id="code"
-                  value={formData.code || ''}
+                  value={formData.code || ""}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                   placeholder="MATH"
                   required
@@ -112,8 +148,10 @@ function SubjectDialog({
                   type="number"
                   min="1"
                   max="10"
-                  value={formData.weeklyHours || ''}
-                  onChange={(e) => setFormData({ ...formData, weeklyHours: parseInt(e.target.value) || 0 })}
+                  value={formData.weeklyHours || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, weeklyHours: parseInt(e.target.value) || 0 })
+                  }
                   required
                 />
               </div>
@@ -121,18 +159,20 @@ function SubjectDialog({
             <div className="space-y-2">
               <Label>معلم مسئول</Label>
               <Select
-                value={formData.assignedTeacher}
-                onValueChange={(value) => setFormData({ ...formData, assignedTeacher: value })}
+                value={formData.assignedTeacherId}
+                onValueChange={(value) => setFormData({ ...formData, assignedTeacherId: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="انتخاب معلم" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockTeachers.filter(t => t.status === 'active').map((teacher) => (
-                    <SelectItem key={teacher.id} value={teacher.name}>
-                      {teacher.name}
-                    </SelectItem>
-                  ))}
+                  {teachers
+                    .filter((t) => t.status === "active")
+                    .map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -145,7 +185,9 @@ function SubjectDialog({
                     type="button"
                     onClick={() => setFormData({ ...formData, color: color.value })}
                     className={`h-8 w-8 rounded-full transition-all ${
-                      formData.color === color.value ? 'ring-2 ring-offset-2 ring-primary' : 'hover:scale-110'
+                      formData.color === color.value
+                        ? "ring-2 ring-offset-2 ring-primary"
+                        : "hover:scale-110"
                     }`}
                     style={{ backgroundColor: color.value }}
                     title={color.name}
@@ -164,55 +206,72 @@ function SubjectDialog({
                   <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   در حال ذخیره...
                 </>
-              ) : subject ? 'به‌روزرسانی' : 'افزودن درس'}
+              ) : subject ? (
+                "به‌روزرسانی"
+              ) : (
+                "افزودن درس"
+              )}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function SubjectsPage() {
-  const [subjects, setSubjects] = useState<Subject[]>(mockSubjects)
-  const [search, setSearch] = useState('')
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
+  const { items: subjects, create, update, remove } = useCoursesRepository();
+  const { items: teachers } = useTeachersRepository();
+  const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Course | null>(null);
 
-  const filteredSubjects = subjects.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase()) ||
-    s.assignedTeacher.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredSubjects = subjects.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.code.toLowerCase().includes(search.toLowerCase()) ||
+      (teachers.find((teacher) => teacher.id === s.assignedTeacherId)?.name ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+  );
 
-  const totalWeeklyHours = subjects.reduce((acc, s) => acc + s.weeklyHours, 0)
+  const totalWeeklyHours = subjects.reduce((acc, s) => acc + s.weeklyHours, 0);
 
-  const handleSave = (data: Partial<Subject>) => {
+  const handleSave = (data: Partial<Course>) => {
     if (editingSubject) {
-      setSubjects(subjects.map((s) => (s.id === editingSubject.id ? { ...s, ...data } : s)))
-      toast.success('درس با موفقیت به‌روز شد')
+      void update({ id: editingSubject.id, input: data });
+      toast.success("درس با موفقیت به‌روز شد");
     } else {
-      const newSubject: Subject = {
-        id: String(Date.now()),
-        name: data.name || '',
-        code: data.code || '',
+      const newSubject = {
+        name: data.name || "",
+        active: true,
+        gradeId: "10",
+        majorId: "major-1",
+        category: "general" as const,
+        code: data.code || "",
         weeklyHours: data.weeklyHours || 4,
-        assignedTeacher: data.assignedTeacher || '',
-        color: data.color || '#1E40AF',
-      }
-      setSubjects([...subjects, newSubject])
-      toast.success('درس با موفقیت اضافه شد')
+        assignedTeacherId: data.assignedTeacherId || "",
+        color: data.color || "#1E40AF",
+      };
+      void create(newSubject);
+      toast.success("درس با موفقیت اضافه شد");
     }
-    setEditingSubject(null)
-  }
+    setEditingSubject(null);
+  };
 
-  const handleDelete = (subject: Subject) => {
-    setSubjects(subjects.filter((s) => s.id !== subject.id))
-    toast.success('درس با موفقیت حذف شد')
-  }
+  const handleDelete = (subject: Course) => {
+    void remove(subject.id);
+    toast.success("درس با موفقیت حذف شد");
+  };
 
-  const openAddDialog = () => { setEditingSubject(null); setDialogOpen(true) }
-  const openEditDialog = (subject: Subject) => { setEditingSubject(subject); setDialogOpen(true) }
+  const openAddDialog = () => {
+    setEditingSubject(null);
+    setDialogOpen(true);
+  };
+  const openEditDialog = (subject: Course) => {
+    setEditingSubject(subject);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="flex flex-col">
@@ -221,22 +280,34 @@ function SubjectsPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">مجموع دروس</CardTitle>
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{subjects.length}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">ساعت هفتگی</CardTitle>
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{totalWeeklyHours}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">معلمان تخصیص‌یافته</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                مجموع دروس
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{new Set(subjects.map((s) => s.assignedTeacher)).size}</p>
+              <p className="text-2xl font-bold">{subjects.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                ساعت هفتگی
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{totalWeeklyHours}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                معلمان تخصیص‌یافته
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {new Set(subjects.map((s) => s.assignedTeacherId).filter(Boolean)).size}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -257,7 +328,7 @@ function SubjectsPage() {
           </Button>
         </div>
 
-        {filteredSubjects.length === 0 && search === '' ? (
+        {filteredSubjects.length === 0 && search === "" ? (
           <EmptyState onAddSubject={openAddDialog} />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -270,7 +341,10 @@ function SubjectsPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: `${subject.color}20` }}>
+                        <div
+                          className="flex h-9 w-9 items-center justify-center rounded-lg"
+                          style={{ backgroundColor: `${subject.color}20` }}
+                        >
                           <BookOpen className="h-4 w-4" style={{ color: subject.color }} />
                         </div>
                         <div>
@@ -290,7 +364,10 @@ function SubjectsPage() {
                             ویرایش
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(subject)}>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(subject)}
+                          >
                             <Trash2 className="me-2 h-4 w-4" />
                             حذف
                           </DropdownMenuItem>
@@ -305,7 +382,10 @@ function SubjectsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="h-3.5 w-3.5" />
-                      <span>{subject.assignedTeacher}</span>
+                      <span>
+                        {teachers.find((teacher) => teacher.id === subject.assignedTeacherId)
+                          ?.name ?? ""}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -320,7 +400,8 @@ function SubjectsPage() {
         onOpenChange={setDialogOpen}
         subject={editingSubject}
         onSave={handleSave}
+        teachers={teachers}
       />
     </div>
-  )
+  );
 }

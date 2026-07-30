@@ -49,60 +49,64 @@ import {
   TeacherDetailsDialog,
   type TeacherDetailsInput,
 } from "@/components/teachers/teacher-details-dialog";
+import {
+  selectCoursePickerOptions,
+  selectTeacherPickerOptions,
+  type ClassViewModel,
+  type PickerOption,
+} from "@/lib/class-management";
 import type {
-  ClassAssignment,
-  CourseOption,
-  TeacherOption,
-  Weekday,
-} from "@/lib/class-configuration";
+  ClassAssignmentReplacementInput,
+  CourseCreateInput,
+  CourseUpdateInput,
+  TeacherCreateInput,
+  TeacherUpdateInput,
+} from "@/lib/repositories";
+import type { ClassAssignment, Course, Teacher } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-export interface AssignmentClass {
-  id: string;
-  name: string;
-  grade: string;
-  major: string;
-  gradeId?: string;
-  majorId?: string;
-}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  classItem: AssignmentClass | null;
+  classItem: ClassViewModel | null;
   assignments: ClassAssignment[];
-  courses: CourseOption[];
-  teachers: TeacherOption[];
-  onSaveAssignment: (assignment: ClassAssignment) => void;
-  onDeleteAssignment: (id: string) => void;
-  onCreateCourse: (course: CourseOption) => void;
-  onUpdateCourse: (course: CourseOption) => void;
-  onCreateTeacher: (teacher: TeacherOption) => void;
-  onUpdateTeacher: (teacher: TeacherOption) => void;
-  onUpdateTeacherAvailability: (teacherId: string, availableDays: Weekday[]) => void;
+  courses: Course[];
+  teachers: Teacher[];
+  onSaveAssignments: (
+    classId: string,
+    assignments: readonly ClassAssignmentReplacementInput[],
+  ) => Promise<void>;
+  onCreateCourse: (course: CourseCreateInput) => void;
+  onUpdateCourse: (id: string, course: CourseUpdateInput) => void;
+  onCreateTeacher: (teacher: TeacherCreateInput) => void;
+  onUpdateTeacher: (id: string, teacher: TeacherUpdateInput) => void;
 }
 
-const serializeDraft = (items: ClassAssignment[]) =>
+type DraftAssignment = ClassAssignmentReplacementInput & { draftId: string };
+
+const serializeDraft = (items: DraftAssignment[]) =>
   JSON.stringify(
     [...items]
-      .sort((first, second) => first.id.localeCompare(second.id))
-      .map(({ id, classId, courseId, teacherId, slotsPerWeek }) => ({
+      .sort((first, second) => first.draftId.localeCompare(second.draftId))
+      .map(({ id, classId, courseId, teacherId, weeklyPeriods }) => ({
         id,
         classId,
         courseId,
         teacherId,
-        slotsPerWeek,
+        weeklyPeriods,
       })),
   );
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value > 0;
 
-const isDraftValid = (items: ClassAssignment[]) => {
+const isDraftValid = (items: DraftAssignment[]) => {
   const selectedCourseIds = items.map((item) => item.courseId).filter(Boolean);
+  const selectedTeacherIds = items.map((item) => item.teacherId).filter(Boolean);
   return (
     selectedCourseIds.length === new Set(selectedCourseIds).size &&
+    selectedTeacherIds.length === new Set(selectedTeacherIds).size &&
     items.every(
-      (item) => Boolean(item.courseId && item.teacherId) && isPositiveInteger(item.slotsPerWeek),
+      (item) => Boolean(item.courseId && item.teacherId) && isPositiveInteger(item.weeklyPeriods),
     )
   );
 };
@@ -114,32 +118,33 @@ export function ClassAssignmentsSheet({
   assignments,
   courses,
   teachers,
-  onSaveAssignment,
-  onDeleteAssignment,
+  onSaveAssignments,
   onCreateCourse,
   onUpdateCourse,
   onCreateTeacher,
   onUpdateTeacher,
 }: Props) {
-  const [draft, setDraft] = useState<ClassAssignment[]>([]);
-  const [initialDraft, setInitialDraft] = useState<ClassAssignment[]>([]);
+  const [draft, setDraft] = useState<DraftAssignment[]>([]);
+  const [initialDraft, setInitialDraft] = useState<DraftAssignment[]>([]);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
-  const [courseToRename, setCourseToRename] = useState<CourseOption | null>(null);
+  const [courseToRename, setCourseToRename] = useState<Course | null>(null);
   const [createTeacherOpen, setCreateTeacherOpen] = useState(false);
-  const [teacherToEdit, setTeacherToEdit] = useState<TeacherOption | null>(null);
+  const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
 
   useEffect(() => {
     if (!open || !classItem) return;
-    const current = assignments.filter((assignment) => assignment.classId === classItem.id);
+    const current = assignments
+      .filter((assignment) => assignment.classId === classItem.id)
+      .map((assignment) => ({ ...structuredClone(assignment), draftId: assignment.id }));
     setDraft(current);
-    setInitialDraft(current);
+    setInitialDraft(structuredClone(current));
   }, [assignments, classItem, open]);
 
   if (!classItem) return null;
 
-  const activeTeachers = teachers.filter((teacher) => teacher.active);
-  const activeCourses = courses.filter((course) => course.active);
+  const teacherOptions = selectTeacherPickerOptions(teachers);
+  const courseOptions = selectCoursePickerOptions(courses);
   const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
   const draftIsValid = isDraftValid(draft);
 
@@ -155,39 +160,42 @@ export function ClassAssignmentsSheet({
     setDraft((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        draftId: crypto.randomUUID(),
         classId: classItem.id,
         courseId: "",
         teacherId: "",
-        slotsPerWeek: 1,
+        weeklyPeriods: 1,
       },
     ]);
   };
 
   const updateAssignment = (
-    assignmentId: string,
-    changes: Partial<Pick<ClassAssignment, "courseId" | "teacherId" | "slotsPerWeek">>,
+    draftId: string,
+    changes: Partial<Pick<ClassAssignment, "courseId" | "teacherId" | "weeklyPeriods">>,
   ) => {
     setDraft((current) =>
       current.map((assignment) =>
-        assignment.id === assignmentId ? { ...assignment, ...changes } : assignment,
+        assignment.draftId === draftId ? { ...assignment, ...changes } : assignment,
       ),
     );
   };
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
     if (!draftIsValid) {
       toast.error("برای ذخیره، اطلاعات همه ردیف‌ها را به‌درستی تکمیل کنید");
       return;
     }
-    const draftIds = new Set(draft.map((assignment) => assignment.id));
-    initialDraft.forEach((assignment) => {
-      if (!draftIds.has(assignment.id)) onDeleteAssignment(assignment.id);
-    });
-    draft.forEach(onSaveAssignment);
-    setInitialDraft(draft);
-    toast.success("تنظیمات دروس کلاس ذخیره شد");
-    onOpenChange(false);
+    try {
+      const replacement = draft.map(({ draftId: _draftId, ...assignment }) => assignment);
+      await onSaveAssignments(classItem.id, structuredClone(replacement));
+      setInitialDraft(structuredClone(draft));
+      toast.success("تنظیمات دروس کلاس ذخیره شد");
+      onOpenChange(false);
+    } catch (error) {
+      toast.error("ذخیره تنظیمات کلاس انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   return (
@@ -204,7 +212,7 @@ export function ClassAssignmentsSheet({
             <div className="flex w-full flex-col items-center px-2 text-center">
               <DialogTitle className="w-full truncate text-center text-lg">مدیریت کلاس</DialogTitle>
               <p className="mt-1 w-full text-center text-sm text-muted-foreground">
-                پایه {classItem.grade} • رشته {classItem.major}
+                {classItem.gradeName} • رشته {classItem.majorName}
               </p>
               <DialogDescription className="mt-2 w-full text-center">
                 درس، معلم و تعداد زنگ هفتگی هر ردیف را مشخص کنید.
@@ -262,16 +270,16 @@ export function ClassAssignmentsSheet({
                     draft.map((assignment, index) => {
                       const selectedByOtherRows = new Set(
                         draft
-                          .filter((item) => item.id !== assignment.id)
+                          .filter((item) => item.draftId !== assignment.draftId)
                           .map((item) => item.courseId)
                           .filter(Boolean),
                       );
                       const courseInvalid = !assignment.courseId;
                       const teacherInvalid = !assignment.teacherId;
-                      const periodsInvalid = !isPositiveInteger(assignment.slotsPerWeek);
+                      const periodsInvalid = !isPositiveInteger(assignment.weeklyPeriods);
 
                       return (
-                        <TableRow key={assignment.id}>
+                        <TableRow key={assignment.draftId}>
                           <TableCell className="text-center align-top font-medium text-muted-foreground">
                             {index + 1}
                           </TableCell>
@@ -282,12 +290,13 @@ export function ClassAssignmentsSheet({
                               createLabel="درس جدید"
                               searchPlaceholder="جستجوی درس..."
                               emptyText="درسی یافت نشد"
-                              options={activeCourses.map((course) => ({
-                                id: course.id,
-                                label: course.name,
+                              options={courseOptions.map((course) => ({
+                                ...course,
                                 disabled: selectedByOtherRows.has(course.id),
                               }))}
-                              onChange={(courseId) => updateAssignment(assignment.id, { courseId })}
+                              onChange={(courseId) =>
+                                updateAssignment(assignment.draftId, { courseId })
+                              }
                               onCreate={() => setCreateCourseOpen(true)}
                               onEdit={(courseId) =>
                                 setCourseToRename(
@@ -309,12 +318,9 @@ export function ClassAssignmentsSheet({
                               createLabel="معلم جدید"
                               searchPlaceholder="جستجوی معلم..."
                               emptyText="معلمی یافت نشد"
-                              options={activeTeachers.map((teacher) => ({
-                                id: teacher.id,
-                                label: teacher.name,
-                              }))}
+                              options={teacherOptions}
                               onChange={(teacherId) =>
-                                updateAssignment(assignment.id, { teacherId })
+                                updateAssignment(assignment.draftId, { teacherId })
                               }
                               onCreate={() => setCreateTeacherOpen(true)}
                               onEdit={(teacherId) =>
@@ -337,8 +343,8 @@ export function ClassAssignmentsSheet({
                               min={1}
                               step={1}
                               value={
-                                Number.isFinite(assignment.slotsPerWeek)
-                                  ? assignment.slotsPerWeek
+                                Number.isFinite(assignment.weeklyPeriods)
+                                  ? assignment.weeklyPeriods
                                   : ""
                               }
                               aria-invalid={periodsInvalid}
@@ -347,8 +353,8 @@ export function ClassAssignmentsSheet({
                                 periodsInvalid && "border-destructive",
                               )}
                               onChange={(event) =>
-                                updateAssignment(assignment.id, {
-                                  slotsPerWeek:
+                                updateAssignment(assignment.draftId, {
+                                  weeklyPeriods:
                                     event.target.value === ""
                                       ? Number.NaN
                                       : Number(event.target.value),
@@ -370,7 +376,7 @@ export function ClassAssignmentsSheet({
                               aria-label="حذف ردیف درس"
                               onClick={() =>
                                 setDraft((current) =>
-                                  current.filter((item) => item.id !== assignment.id),
+                                  current.filter((item) => item.draftId !== assignment.draftId),
                                 )
                               }
                             >
@@ -417,15 +423,14 @@ export function ClassAssignmentsSheet({
         courses={courses}
         onSave={(name) => {
           onCreateCourse({
-            id: crypto.randomUUID(),
             name,
-            code: "",
-            grade: classItem.grade,
-            major: classItem.major,
-            category: "specialized",
             active: true,
-            gradeId: classItem.gradeId ?? classItem.grade,
-            majorId: classItem.majorId ?? classItem.major,
+            gradeId: classItem.gradeId,
+            majorId: classItem.majorId,
+            category: "specialized",
+            code: "",
+            weeklyHours: 1,
+            color: "#1E40AF",
           });
           toast.success("درس جدید ایجاد شد");
         }}
@@ -442,7 +447,7 @@ export function ClassAssignmentsSheet({
         excludedCourseId={courseToRename?.id}
         onSave={(name) => {
           if (!courseToRename) return;
-          onUpdateCourse({ ...courseToRename, name });
+          onUpdateCourse(courseToRename.id, { name });
           toast.success("نام درس ویرایش شد");
           setCourseToRename(null);
         }}
@@ -453,12 +458,13 @@ export function ClassAssignmentsSheet({
         onOpenChange={setCreateTeacherOpen}
         onSave={(details) => {
           onCreateTeacher({
-            id: crypto.randomUUID(),
             name: details.name,
-            code: details.personnel_code || "",
+            email: "",
             phone: details.phone || "",
-            active: true,
+            personnel_code: details.personnel_code || "",
+            courseIds: [],
             availableDays: [],
+            status: "active",
           });
           toast.success("معلم جدید ایجاد شد");
         }}
@@ -473,17 +479,16 @@ export function ClassAssignmentsSheet({
           teacherToEdit
             ? {
                 name: teacherToEdit.name,
-                personnel_code: teacherToEdit.code,
+                personnel_code: teacherToEdit.personnel_code,
                 phone: teacherToEdit.phone,
               }
             : null
         }
         onSave={(details: TeacherDetailsInput) => {
           if (!teacherToEdit) return;
-          onUpdateTeacher({
-            ...teacherToEdit,
+          onUpdateTeacher(teacherToEdit.id, {
             name: details.name,
-            code: details.personnel_code || "",
+            personnel_code: details.personnel_code || "",
             phone: details.phone || "",
           });
           toast.success("اطلاعات معلم ویرایش شد");
@@ -533,7 +538,7 @@ function ManagedEntityPicker({
   createLabel: string;
   searchPlaceholder: string;
   emptyText: string;
-  options: Array<{ id: string; label: string; disabled?: boolean }>;
+  options: Array<PickerOption & { disabled?: boolean }>;
   invalid?: boolean;
   onChange: (value: string) => void;
   onCreate: () => void;
@@ -544,7 +549,7 @@ function ManagedEntityPicker({
   const selected = options.find((option) => option.id === value);
   const normalizedQuery = normalizeCourseName(query);
   const filteredOptions = options.filter((option) =>
-    normalizeCourseName(option.label).includes(normalizedQuery),
+    normalizeCourseName(option.searchText).includes(normalizedQuery),
   );
 
   const handleOpenChange = (next: boolean) => {
@@ -660,7 +665,7 @@ function CourseNameDialog({
   onOpenChange: (open: boolean) => void;
   title: string;
   initialName?: string;
-  courses: CourseOption[];
+  courses: Course[];
   excludedCourseId?: string;
   onSave: (name: string) => void;
 }) {

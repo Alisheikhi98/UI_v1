@@ -1,88 +1,140 @@
-import { useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Progress } from '@/components/ui/progress'
-import { mockClasses, mockTimeSlots } from '@/lib/data'
-import { Sparkles, Settings2, Clock, CheckCircle, Loader2, ArrowLeft, GraduationCap } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { mockTimeSlots } from "@/lib/data";
+import { useClassesRepository } from "@/lib/mock-queries";
+import {
+  Sparkles,
+  Settings2,
+  Clock,
+  CheckCircle,
+  Loader2,
+  ArrowLeft,
+  GraduationCap,
+} from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/dashboard/generator')({
-  head: () => ({ meta: [{ title: 'تولید برنامه - آموزش‌یار' }, { name: 'description', content: 'تولید خودکار برنامه هفتگی بهینه' }] }),
+export const Route = createFileRoute("/dashboard/generator")({
+  head: () => ({
+    meta: [
+      { title: "تولید برنامه - آموزش‌یار" },
+      { name: "description", content: "تولید خودکار برنامه هفتگی بهینه" },
+    ],
+  }),
   component: ScheduleGeneratorPage,
-})
+});
 
-type GeneratorState = 'idle' | 'generating' | 'success' | 'error'
+type GeneratorState = "idle" | "generating" | "success" | "error";
 
 const constraints = [
-  { id: 'noConsecutive', label: 'جلوگیری از تکرار پشت‌سرهم یک درس', description: 'یک درس نمی‌تواند در دو ساعت متوالی برنامه‌ریزی شود' },
-  { id: 'teacherAvailability', label: 'رعایت در دسترس بودن معلم', description: 'معلمان فقط در ساعات مجاز خود برنامه‌ریزی می‌شوند' },
-  { id: 'breakPeriods', label: 'درج زنگ تفریح', description: 'به صورت خودکار زنگ‌های تفریح بین جلسات اضافه می‌شود' },
-  { id: 'balanceSubjects', label: 'توزیع متوازن دروس در هفته', description: 'دروس به‌طور یکنواخت در روزهای هفته پخش می‌شوند' },
-  { id: 'prioritySlots', label: 'استفاده از ساعات اولویت‌دار', description: 'دروس مهم در ساعات بهینه قرار می‌گیرند' },
-]
+  {
+    id: "noConsecutive",
+    label: "جلوگیری از تکرار پشت‌سرهم یک درس",
+    description: "یک درس نمی‌تواند در دو ساعت متوالی برنامه‌ریزی شود",
+  },
+  {
+    id: "teacherAvailability",
+    label: "رعایت در دسترس بودن معلم",
+    description: "معلمان فقط در ساعات مجاز خود برنامه‌ریزی می‌شوند",
+  },
+  {
+    id: "breakPeriods",
+    label: "درج زنگ تفریح",
+    description: "به صورت خودکار زنگ‌های تفریح بین جلسات اضافه می‌شود",
+  },
+  {
+    id: "balanceSubjects",
+    label: "توزیع متوازن دروس در هفته",
+    description: "دروس به‌طور یکنواخت در روزهای هفته پخش می‌شوند",
+  },
+  {
+    id: "prioritySlots",
+    label: "استفاده از ساعات اولویت‌دار",
+    description: "دروس مهم در ساعات بهینه قرار می‌گیرند",
+  },
+];
 
 function ScheduleGeneratorPage() {
-  const [selectedGrade, setSelectedGrade] = useState<string>('')
-  const [selectedClass, setSelectedClass] = useState<string>('')
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>(mockTimeSlots.map(t => t.id))
-  const [selectedConstraints, setSelectedConstraints] = useState<string[]>(['noConsecutive', 'teacherAvailability', 'breakPeriods'])
-  const [generatorState, setGeneratorState] = useState<GeneratorState>('idle')
-  const [progress, setProgress] = useState(0)
+  const { items: classes } = useClassesRepository();
+  const [selectedGrade, setSelectedGrade] = useState<string>("");
+  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>(
+    mockTimeSlots.map((t) => t.id),
+  );
+  const [selectedConstraints, setSelectedConstraints] = useState<string[]>([
+    "noConsecutive",
+    "teacherAvailability",
+    "breakPeriods",
+  ]);
+  const [generatorState, setGeneratorState] = useState<GeneratorState>("idle");
+  const [progress, setProgress] = useState(0);
 
-  const uniqueGrades = [...new Set(mockClasses.map((c) => c.grade))].sort()
-  const classesForGrade = mockClasses.filter((c) => c.grade === selectedGrade)
+  const uniqueGrades = [...new Set(classes.map((c) => c.gradeId))].sort();
+  const classesForGrade = classes.filter((c) => c.gradeId === selectedGrade);
 
   const handleTimeSlotToggle = (slotId: string) => {
-    setSelectedTimeSlots(prev =>
-      prev.includes(slotId) ? prev.filter(id => id !== slotId) : [...prev, slotId]
-    )
-  }
+    setSelectedTimeSlots((prev) =>
+      prev.includes(slotId) ? prev.filter((id) => id !== slotId) : [...prev, slotId],
+    );
+  };
 
   const handleConstraintToggle = (constraintId: string) => {
-    setSelectedConstraints(prev =>
-      prev.includes(constraintId) ? prev.filter(id => id !== constraintId) : [...prev, constraintId]
-    )
-  }
+    setSelectedConstraints((prev) =>
+      prev.includes(constraintId)
+        ? prev.filter((id) => id !== constraintId)
+        : [...prev, constraintId],
+    );
+  };
 
   const handleGenerate = async () => {
     if (!selectedGrade || !selectedClass) {
-      toast.error('لطفاً پایه و کلاس را انتخاب کنید')
-      return
+      toast.error("لطفاً پایه و کلاس را انتخاب کنید");
+      return;
     }
-    setGeneratorState('generating')
-    setProgress(0)
+    setGeneratorState("generating");
+    setProgress(0);
 
     const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) { clearInterval(interval); return 100 }
-        return prev + Math.random() * 15
-      })
-    }, 200)
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
 
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    clearInterval(interval)
-    setProgress(100)
-    await new Promise(resolve => setTimeout(resolve, 500))
-    setGeneratorState('success')
-    toast.success('برنامه با موفقیت تولید شد!')
-  }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    clearInterval(interval);
+    setProgress(100);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setGeneratorState("success");
+    toast.success("برنامه با موفقیت تولید شد!");
+  };
 
   const resetGenerator = () => {
-    setGeneratorState('idle')
-    setProgress(0)
-  }
+    setGeneratorState("idle");
+    setProgress(0);
+  };
 
   return (
     <div className="flex flex-col">
       <Header title="تولید برنامه" description="تولید خودکار برنامه هفتگی بهینه" />
       <div className="p-6 space-y-6">
-        {generatorState === 'success' ? (
+        {generatorState === "success" ? (
           <Card className="border-green-200 bg-green-50/50">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500">
@@ -90,7 +142,8 @@ function ScheduleGeneratorPage() {
               </div>
               <h3 className="mt-4 text-xl font-semibold">برنامه با موفقیت تولید شد</h3>
               <p className="mt-2 text-sm text-muted-foreground text-center max-w-md">
-                برنامه هفتگی {classesForGrade.find(c => c.id === selectedClass)?.name} تولید شده و آماده بررسی است.
+                برنامه هفتگی {classesForGrade.find((c) => c.id === selectedClass)?.name} تولید شده و
+                آماده بررسی است.
               </p>
               <div className="mt-6 flex gap-3">
                 <Button variant="outline" onClick={resetGenerator}>
@@ -105,7 +158,7 @@ function ScheduleGeneratorPage() {
               </div>
             </CardContent>
           </Card>
-        ) : generatorState === 'generating' ? (
+        ) : generatorState === "generating" ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="relative">
@@ -141,27 +194,39 @@ function ScheduleGeneratorPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>پایه</Label>
-                      <Select value={selectedGrade} onValueChange={(value) => { setSelectedGrade(value); setSelectedClass('') }}>
+                      <Select
+                        value={selectedGrade}
+                        onValueChange={(value) => {
+                          setSelectedGrade(value);
+                          setSelectedClass("");
+                        }}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="انتخاب پایه" />
                         </SelectTrigger>
                         <SelectContent>
                           {uniqueGrades.map((grade) => (
-                            <SelectItem key={grade} value={grade}>پایه {grade}</SelectItem>
+                            <SelectItem key={grade} value={grade}>
+                              پایه {grade}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>کلاس</Label>
-                      <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!selectedGrade}>
+                      <Select
+                        value={selectedClass}
+                        onValueChange={setSelectedClass}
+                        disabled={!selectedGrade}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="انتخاب کلاس" />
                         </SelectTrigger>
                         <SelectContent>
                           {classesForGrade.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
-                              {c.name} ({c.studentCount} دانش‌آموز)
+                              {c.name} ({c.studentCapacity} دانش‌آموز)
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -177,7 +242,9 @@ function ScheduleGeneratorPage() {
                     <Clock className="h-5 w-5" />
                     ساعات درسی
                   </CardTitle>
-                  <CardDescription>ساعاتی که باید در برنامه گنجانده شوند را انتخاب کنید</CardDescription>
+                  <CardDescription>
+                    ساعاتی که باید در برنامه گنجانده شوند را انتخاب کنید
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -185,7 +252,9 @@ function ScheduleGeneratorPage() {
                       <div
                         key={slot.id}
                         className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                          selectedTimeSlots.includes(slot.id) ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                          selectedTimeSlots.includes(slot.id)
+                            ? "border-primary bg-primary/5"
+                            : "hover:bg-muted/50"
                         }`}
                         onClick={() => handleTimeSlotToggle(slot.id)}
                       >
@@ -206,7 +275,9 @@ function ScheduleGeneratorPage() {
                     <Settings2 className="h-5 w-5" />
                     محدودیت‌های برنامه‌ریزی
                   </CardTitle>
-                  <CardDescription>قوانین و الزاماتی که باید در تولید برنامه رعایت شوند</CardDescription>
+                  <CardDescription>
+                    قوانین و الزاماتی که باید در تولید برنامه رعایت شوند
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -240,13 +311,17 @@ function ScheduleGeneratorPage() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">کلاس انتخاب‌شده</p>
                     <p className="text-sm mt-1">
-                      {selectedClass ? classesForGrade.find(c => c.id === selectedClass)?.name : 'انتخاب نشده'}
+                      {selectedClass
+                        ? classesForGrade.find((c) => c.id === selectedClass)?.name
+                        : "انتخاب نشده"}
                     </p>
                   </div>
                   <Separator />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">ساعات انتخاب‌شده</p>
-                    <p className="text-sm mt-1">{selectedTimeSlots.length} از {mockTimeSlots.length} ساعت</p>
+                    <p className="text-sm mt-1">
+                      {selectedTimeSlots.length} از {mockTimeSlots.length} ساعت
+                    </p>
                   </div>
                   <Separator />
                   <div>
@@ -274,5 +349,5 @@ function ScheduleGeneratorPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

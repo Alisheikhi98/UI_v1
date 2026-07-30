@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -39,11 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSchoolsRepository } from "@/lib/api/school-queries";
 import {
-  createSchool,
-  deleteSchool,
-  getSchools,
-  updateSchool,
   type School,
   type SchoolFormData,
   WEEK_DAYS,
@@ -89,39 +85,7 @@ const defaultForm = (): FormState => {
 };
 
 function SchoolsPage() {
-  const queryClient = useQueryClient();
-  const schoolsQuery = useQuery({
-    queryKey: ["schools"],
-    queryFn: getSchools,
-    enabled: typeof window !== "undefined",
-  });
-  const schools = useMemo(() => schoolsQuery.data ?? [], [schoolsQuery.data]);
-  const createMutation = useMutation({
-    mutationFn: createSchool,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["schools"] });
-      toast.success("مدرسه جدید با موفقیت اضافه شد");
-      setDialogOpen(false);
-    },
-    onError: (error) => toast.error("خطا در ایجاد مدرسه", { description: error.message }),
-  });
-  const updateMutation = useMutation({
-    mutationFn: updateSchool,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["schools"] });
-      toast.success("مدرسه با موفقیت به‌روزرسانی شد");
-      setDialogOpen(false);
-    },
-    onError: (error) => toast.error("خطا در ویرایش مدرسه", { description: error.message }),
-  });
-  const deleteMutation = useMutation({
-    mutationFn: deleteSchool,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["schools"] });
-      toast.success("مدرسه با موفقیت حذف شد");
-    },
-    onError: (error) => toast.error("حذف مدرسه امکان‌پذیر نیست", { description: error.message }),
-  });
+  const { schools, query: schoolsQuery, create, update, remove } = useSchoolsRepository();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<School | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
@@ -213,10 +177,19 @@ function SchoolsPage() {
         onOpenChange={setDialogOpen}
         editing={editing}
         onSubmit={async (data) => {
-          if (editing) {
-            await updateMutation.mutateAsync({ id: editing.id, data });
-          } else {
-            await createMutation.mutateAsync(data);
+          try {
+            if (editing) {
+              await update({ id: editing.id, data });
+              toast.success("مدرسه با موفقیت به‌روزرسانی شد");
+            } else {
+              await create(data);
+              toast.success("مدرسه جدید با موفقیت اضافه شد");
+            }
+            setDialogOpen(false);
+          } catch (error) {
+            toast.error(editing ? "خطا در ویرایش مدرسه" : "خطا در ایجاد مدرسه", {
+              description: error instanceof Error ? error.message : undefined,
+            });
           }
         }}
       />
@@ -237,7 +210,13 @@ function SchoolsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget) {
-                  deleteMutation.mutate(deleteTarget.id);
+                  void remove(deleteTarget.id)
+                    .then(() => toast.success("مدرسه با موفقیت حذف شد"))
+                    .catch((error) =>
+                      toast.error("حذف مدرسه امکان‌پذیر نیست", {
+                        description: error instanceof Error ? error.message : undefined,
+                      }),
+                    );
                   setDeleteTarget(null);
                 }
               }}

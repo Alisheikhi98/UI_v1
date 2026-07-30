@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
+import { isAssignmentComplete } from "@/lib/class-configuration";
 import {
-  isAssignmentComplete,
-  type ClassAssignment,
-  type CourseOption,
-  type TeacherOption,
-} from "@/lib/class-configuration";
+  GRADE_OPTIONS,
+  MAJOR_OPTIONS,
+  type ClassViewModel,
+  useClassManagementData,
+} from "@/lib/class-management";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +48,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { mockClasses, mockSubjects, mockTeachers } from "@/lib/data";
 import {
   Plus,
   Search,
@@ -88,28 +88,9 @@ function EmptyState({ onAddClass }: { onAddClass: () => void }) {
   );
 }
 
-interface ClassViewModel {
-  id: string;
-  name: string;
-  grade: string;
-  major: string;
-  gradeId: string;
-  gradeName: string;
-  majorId: string;
-  majorName: string;
-  studentCapacity: number;
-}
+type ClassFormData = Pick<ClassViewModel, "name" | "gradeId" | "majorId">;
 
-type ClassFormData = Pick<ClassViewModel, "name" | "grade" | "major">;
-
-const MAJOR_OPTIONS = ["ریاضی فیزیک", "علوم تجربی", "ادبیات و علوم انسانی"] as const;
-const GRADE_OPTIONS = [
-  { value: "10", label: "پایه دهم" },
-  { value: "11", label: "پایه یازدهم" },
-  { value: "12", label: "پایه دوازدهم" },
-] as const;
-
-const emptyClassForm = (): ClassFormData => ({ name: "", grade: "", major: "" });
+const emptyClassForm = (): ClassFormData => ({ name: "", gradeId: "", majorId: "" });
 
 function ClassDialog({
   open,
@@ -155,8 +136,8 @@ function ClassDialog({
             <div className="space-y-2">
               <Label>پایه</Label>
               <Select
-                value={formData.grade}
-                onValueChange={(grade) => setFormData({ ...formData, grade })}
+                value={formData.gradeId}
+                onValueChange={(gradeId) => setFormData({ ...formData, gradeId })}
                 required
               >
                 <SelectTrigger>
@@ -174,8 +155,8 @@ function ClassDialog({
             <div className="space-y-2">
               <Label>رشته تحصیلی</Label>
               <Select
-                value={formData.major}
-                onValueChange={(major) => setFormData({ ...formData, major })}
+                value={formData.majorId}
+                onValueChange={(majorId) => setFormData({ ...formData, majorId })}
                 required
               >
                 <SelectTrigger>
@@ -183,8 +164,8 @@ function ClassDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {MAJOR_OPTIONS.map((major) => (
-                    <SelectItem key={major} value={major}>
-                      {major}
+                    <SelectItem key={major.value} value={major.value}>
+                      {major.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -258,19 +239,16 @@ function RenameClassDialog({
 
 function ClassesPage() {
   const navigate = useNavigate();
-  const [classes, setClasses] = useState<ClassViewModel[]>(() =>
-    mockClasses.map(({ id, name, grade, studentCount }, index) => ({
-      id,
-      name,
-      grade,
-      major: MAJOR_OPTIONS[index % MAJOR_OPTIONS.length],
-      gradeId: grade,
-      gradeName: GRADE_OPTIONS.find((item) => item.value === grade)?.label ?? `پایه ${grade}`,
-      majorId: `major-${(index % MAJOR_OPTIONS.length) + 1}`,
-      majorName: MAJOR_OPTIONS[index % MAJOR_OPTIONS.length],
-      studentCapacity: studentCount,
-    })),
-  );
+  const {
+    classes,
+    courses,
+    teachers,
+    assignments,
+    classesRepository,
+    coursesRepository,
+    teachersRepository,
+    assignmentsRepository,
+  } = useClassManagementData();
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [majorFilter, setMajorFilter] = useState<string>("all");
@@ -278,95 +256,43 @@ function ClassesPage() {
   const [renamingClass, setRenamingClass] = useState<ClassViewModel | null>(null);
   const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const [classToDelete, setClassToDelete] = useState<ClassViewModel | null>(null);
-  const [courses, setCourses] = useState<CourseOption[]>(() =>
-    mockSubjects.map((subject, index) => ({
-      id: subject.id,
-      name: subject.name,
-      code: subject.code,
-      grade: GRADE_OPTIONS[index % GRADE_OPTIONS.length].value,
-      major: MAJOR_OPTIONS[index % MAJOR_OPTIONS.length],
-      category: index < 2 ? "general" : "specialized",
-      active: true,
-      gradeId: GRADE_OPTIONS[index % GRADE_OPTIONS.length].value,
-      gradeName: GRADE_OPTIONS[index % GRADE_OPTIONS.length].label,
-      majorId: `major-${(index % MAJOR_OPTIONS.length) + 1}`,
-      majorName: MAJOR_OPTIONS[index % MAJOR_OPTIONS.length],
-    })),
-  );
-  const [teachers, setTeachers] = useState<TeacherOption[]>(() =>
-    mockTeachers.map((teacher, index) => ({
-      id: teacher.id,
-      name: teacher.name,
-      code: teacher.id,
-      phone: teacher.phone,
-      active: teacher.status === "active",
-      availableDays: index < 2 ? ["saturday", "sunday", "monday", "tuesday", "wednesday"] : [],
-    })),
-  );
-  const [assignments, setAssignments] = useState<ClassAssignment[]>([
-    {
-      id: "assignment-1",
-      classId: "1",
-      courseId: "1",
-      teacherId: "1",
-      slotsPerWeek: 6,
-    },
-    {
-      id: "assignment-2",
-      classId: "1",
-      courseId: "3",
-      teacherId: "1",
-      slotsPerWeek: 4,
-    },
-    {
-      id: "assignment-3",
-      classId: "2",
-      courseId: "2",
-      teacherId: "2",
-      slotsPerWeek: 5,
-    },
-  ]);
-
   const filteredClasses = classes.filter((c) => {
     const normalizedSearch = search.toLowerCase();
     const matchesSearch =
       c.name.toLowerCase().includes(normalizedSearch) ||
-      c.major.toLowerCase().includes(normalizedSearch);
-    const matchesGrade = gradeFilter === "all" || c.grade === gradeFilter;
-    const matchesMajor = majorFilter === "all" || c.major === majorFilter;
+      c.majorName.toLowerCase().includes(normalizedSearch);
+    const matchesGrade = gradeFilter === "all" || c.gradeId === gradeFilter;
+    const matchesMajor = majorFilter === "all" || c.majorId === majorFilter;
     return matchesSearch && matchesGrade && matchesMajor;
   });
 
   const activeFilterCount = Number(gradeFilter !== "all") + Number(majorFilter !== "all");
 
   const handleSave = (data: ClassFormData) => {
-    const newClass: ClassViewModel = {
-      id: crypto.randomUUID(),
-      ...data,
-      gradeId: data.grade,
-      gradeName: GRADE_OPTIONS.find((item) => item.value === data.grade)?.label ?? data.grade,
-      majorId: `major-${MAJOR_OPTIONS.indexOf(data.major as (typeof MAJOR_OPTIONS)[number]) + 1}`,
-      majorName: data.major,
+    void classesRepository.create({
+      name: data.name,
+      gradeId: data.gradeId,
+      majorId: data.majorId,
+      section: "",
       studentCapacity: 0,
-    };
-    setClasses((current) => [...current, newClass]);
+    });
     toast.success("کلاس با موفقیت اضافه شد");
   };
 
   const handleDelete = (classItem: ClassViewModel) => {
-    setClasses(classes.filter((c) => c.id !== classItem.id));
-    setAssignments((current) =>
-      current.filter((assignment) => assignment.classId !== classItem.id),
-    );
+    void assignmentsRepository.replaceForClass({
+      classId: classItem.id,
+      assignments: [],
+    });
+    void classesRepository.remove(classItem.id);
     toast.success("کلاس با موفقیت حذف شد");
   };
 
   const openAddDialog = () => setDialogOpen(true);
   const renameClass = (name: string) => {
     if (!renamingClass) return;
-    setClasses((current) =>
-      current.map((item) => (item.id === renamingClass.id ? { ...item, name } : item)),
-    );
+    const current = classesRepository.items.find((item) => item.id === renamingClass.id);
+    if (current) void classesRepository.update({ id: current.id, input: { name } });
     setRenamingClass(null);
     toast.success("نام کلاس به‌روز شد");
   };
@@ -427,16 +353,16 @@ function ClassesPage() {
                 <div className="space-y-2 border-t pt-3">
                   <p className="px-1 text-xs font-semibold text-muted-foreground">رشته تحصیلی</p>
                   <div className="grid gap-1">
-                    {(["all", ...MAJOR_OPTIONS] as const).map((major) => (
+                    {[{ value: "all", label: "همه رشته‌ها" }, ...MAJOR_OPTIONS].map((major) => (
                       <Button
-                        key={major}
+                        key={major.value}
                         type="button"
                         variant="ghost"
                         className="h-8 justify-between px-2 font-normal"
-                        onClick={() => setMajorFilter(major)}
+                        onClick={() => setMajorFilter(major.value)}
                       >
-                        <span>{major === "all" ? "همه رشته‌ها" : major}</span>
-                        {majorFilter === major && <Check className="h-4 w-4 text-primary" />}
+                        <span>{major.label}</span>
+                        {majorFilter === major.value && <Check className="h-4 w-4 text-primary" />}
                       </Button>
                     ))}
                   </div>
@@ -606,10 +532,10 @@ function ClassesPage() {
                               </CardTitle>
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                                  پایه {classItem.grade}
+                                  {classItem.gradeName}
                                 </span>
                                 <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                                  رشته: {classItem.major}
+                                  رشته: {classItem.majorName}
                                 </span>
                               </div>
                             </div>
@@ -698,36 +624,16 @@ function ClassesPage() {
         assignments={assignments}
         courses={courses}
         teachers={teachers}
-        onSaveAssignment={(assignment) => {
-          setAssignments((current) => {
-            const exists = current.some((item) => item.id === assignment.id);
-            return exists
-              ? current.map((item) => (item.id === assignment.id ? assignment : item))
-              : [...current, assignment];
+        onSaveAssignments={async (classId, nextAssignments) => {
+          await assignmentsRepository.replaceForClass({
+            classId,
+            assignments: nextAssignments,
           });
         }}
-        onDeleteAssignment={(id) =>
-          setAssignments((current) => current.filter((item) => item.id !== id))
-        }
-        onCreateCourse={(course) => setCourses((current) => [...current, course])}
-        onUpdateCourse={(updatedCourse) =>
-          setCourses((current) =>
-            current.map((course) => (course.id === updatedCourse.id ? updatedCourse : course)),
-          )
-        }
-        onCreateTeacher={(teacher) => setTeachers((current) => [...current, teacher])}
-        onUpdateTeacher={(updatedTeacher) =>
-          setTeachers((current) =>
-            current.map((teacher) => (teacher.id === updatedTeacher.id ? updatedTeacher : teacher)),
-          )
-        }
-        onUpdateTeacherAvailability={(teacherId, availableDays) =>
-          setTeachers((current) =>
-            current.map((teacher) =>
-              teacher.id === teacherId ? { ...teacher, availableDays } : teacher,
-            ),
-          )
-        }
+        onCreateCourse={(course) => void coursesRepository.create(course)}
+        onUpdateCourse={(id, course) => void coursesRepository.update({ id, input: course })}
+        onCreateTeacher={(teacher) => void teachersRepository.create(teacher)}
+        onUpdateTeacher={(id, teacher) => void teachersRepository.update({ id, input: teacher })}
       />
     </div>
   );

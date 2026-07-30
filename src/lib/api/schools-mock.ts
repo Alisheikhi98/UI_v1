@@ -1,8 +1,9 @@
-import type { School, SchoolFormData } from "./schools-store";
+import type { SchoolPersistenceAdapter } from "@/lib/api/school-repository";
+import type { School, SchoolFormData } from "@/lib/api/schools-store";
 
 const STORAGE_KEY = "dev_mock_schools";
 
-const initialSchools: School[] = [
+const INITIAL_SCHOOLS: readonly School[] = [
   {
     id: 1,
     name: "Development School",
@@ -20,68 +21,78 @@ const initialSchools: School[] = [
   },
 ];
 
-let memorySchools = structuredClone(initialSchools);
-
-function writeSchools(schools: School[]) {
-  memorySchools = structuredClone(schools);
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(memorySchools));
-  }
+export interface StorageAdapter {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
 }
 
-function readSchools(): School[] {
-  if (typeof window === "undefined") return structuredClone(memorySchools);
+const clone = <T>(value: T): T => structuredClone(value);
 
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    writeSchools(memorySchools);
-    return structuredClone(memorySchools);
+export class MockSchoolPersistenceAdapter implements SchoolPersistenceAdapter {
+  private readonly storage: StorageAdapter | null;
+
+  constructor(
+    storage: StorageAdapter | null = typeof window === "undefined" ? null : window.localStorage,
+  ) {
+    this.storage = storage;
   }
 
-  try {
-    memorySchools = JSON.parse(stored) as School[];
-  } catch {
-    memorySchools = structuredClone(initialSchools);
-    writeSchools(memorySchools);
+  async getAll(): Promise<School[]> {
+    return this.read();
   }
 
-  return structuredClone(memorySchools);
-}
+  async getById(id: number): Promise<School | null> {
+    return this.read().find((school) => school.id === id) ?? null;
+  }
 
-export async function getMockSchools(): Promise<School[]> {
-  return readSchools();
-}
+  async create(data: SchoolFormData): Promise<School> {
+    const schools = this.read();
+    const school: School = {
+      ...clone(data),
+      id: schools.reduce((highest, item) => Math.max(highest, item.id), 0) + 1,
+      createdAt: new Date().toISOString(),
+    };
+    this.write([...schools, school]);
+    return clone(school);
+  }
 
-export async function createMockSchool(data: SchoolFormData): Promise<School> {
-  const schools = readSchools();
-  const school: School = {
-    ...structuredClone(data),
-    id: schools.reduce((highest, item) => Math.max(highest, item.id), 0) + 1,
-    createdAt: new Date().toISOString(),
-  };
-  writeSchools([...schools, school]);
-  return structuredClone(school);
-}
+  async update(id: number, data: SchoolFormData): Promise<School> {
+    const schools = this.read();
+    const current = schools.find((school) => school.id === id);
+    if (!current) throw new Error("School not found.");
 
-export async function updateMockSchool({
-  id,
-  data,
-}: {
-  id: number;
-  data: SchoolFormData;
-}): Promise<School> {
-  const schools = readSchools();
-  const index = schools.findIndex((school) => school.id === id);
-  if (index === -1) throw new Error("School not found.");
+    const updated: School = { ...clone(data), id, createdAt: current.createdAt };
+    this.write(schools.map((school) => (school.id === id ? updated : school)));
+    return clone(updated);
+  }
 
-  const updated: School = { ...structuredClone(data), id, createdAt: schools[index].createdAt };
-  schools[index] = updated;
-  writeSchools(schools);
-  return structuredClone(updated);
-}
+  async delete(id: number): Promise<void> {
+    const schools = this.read();
+    if (!schools.some((school) => school.id === id)) throw new Error("School not found.");
+    this.write(schools.filter((school) => school.id !== id));
+  }
 
-export async function deleteMockSchool(id: number): Promise<void> {
-  const schools = readSchools();
-  if (!schools.some((school) => school.id === id)) throw new Error("School not found.");
-  writeSchools(schools.filter((school) => school.id !== id));
+  private read(): School[] {
+    if (!this.storage) return clone([...INITIAL_SCHOOLS]);
+
+    const stored = this.storage.getItem(STORAGE_KEY);
+    if (!stored) {
+      const seeded = clone([...INITIAL_SCHOOLS]);
+      this.write(seeded);
+      return seeded;
+    }
+
+    try {
+      return JSON.parse(stored) as School[];
+    } catch {
+      const seeded = clone([...INITIAL_SCHOOLS]);
+      this.write(seeded);
+      return seeded;
+    }
+  }
+
+  private write(schools: School[]) {
+    if (!this.storage) return;
+    this.storage.setItem(STORAGE_KEY, JSON.stringify(clone(schools)));
+  }
 }

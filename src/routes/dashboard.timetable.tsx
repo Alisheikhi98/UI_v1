@@ -1,37 +1,64 @@
-import { useState, useMemo } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { mockClasses, mockTimeSlots, mockSubjects, weekDays, generateMockSchedule } from '@/lib/data'
-import { Download, Edit, Eye, GraduationCap, User } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState, useMemo } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { mockTimeSlots, weekDays, generateMockSchedule } from "@/lib/data";
+import {
+  useClassAssignmentsRepository,
+  useClassesRepository,
+  useCoursesRepository,
+  useTeachersRepository,
+} from "@/lib/mock-queries";
+import { Download, Edit, Eye, GraduationCap, User } from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/dashboard/timetable')({
-  head: () => ({ meta: [{ title: 'برنامه هفتگی - آموزش‌یار' }, { name: 'description', content: 'مشاهده و مدیریت برنامه هفتگی کلاس‌ها' }] }),
+export const Route = createFileRoute("/dashboard/timetable")({
+  head: () => ({
+    meta: [
+      { title: "برنامه هفتگی - آموزش‌یار" },
+      { name: "description", content: "مشاهده و مدیریت برنامه هفتگی کلاس‌ها" },
+    ],
+  }),
   component: TimetablePage,
-})
+});
 
 function TimetablePage() {
-  const [selectedGrade, setSelectedGrade] = useState<string>('10')
-  const [selectedClass, setSelectedClass] = useState<string>('1')
-  const [editMode, setEditMode] = useState(false)
+  const { items: classes } = useClassesRepository();
+  const { items: courses } = useCoursesRepository();
+  const { items: teachers } = useTeachersRepository();
+  const { items: assignments } = useClassAssignmentsRepository();
+  const [selectedGrade, setSelectedGrade] = useState<string>("10");
+  const [selectedClass, setSelectedClass] = useState<string>("1");
+  const [editMode, setEditMode] = useState(false);
 
-  const schedule = useMemo(() => generateMockSchedule(), [])
+  const schedule = useMemo(() => generateMockSchedule(courses, teachers), [courses, teachers]);
 
-  const uniqueGrades = [...new Set(mockClasses.map((c) => c.grade))].sort()
-  const classesForGrade = mockClasses.filter((c) => c.grade === selectedGrade)
-  const selectedClassData = mockClasses.find(c => c.id === selectedClass)
+  const uniqueGrades = [...new Set(classes.map((c) => c.gradeId))].sort();
+  const classesForGrade = classes.filter((c) => c.gradeId === selectedGrade);
+  const selectedClassData = classes.find((c) => c.id === selectedClass);
+  const selectedClassTeacher = teachers.find(
+    (teacher) =>
+      teacher.id ===
+      (selectedClassData?.advisorTeacherId ??
+        assignments.find((assignment) => assignment.classId === selectedClass)?.teacherId),
+  );
 
   const handleExport = () => {
-    toast.success('در حال صادر کردن برنامه...', {
-      description: 'فایل PDF به زودی آماده می‌شود.',
-    })
-  }
+    toast.success("در حال صادر کردن برنامه...", {
+      description: "فایل PDF به زودی آماده می‌شود.",
+    });
+  };
 
   return (
     <div className="flex flex-col">
@@ -39,18 +66,23 @@ function TimetablePage() {
       <div className="p-6 space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Select value={selectedGrade} onValueChange={(value) => {
-              setSelectedGrade(value)
-              const firstClass = mockClasses.find(c => c.grade === value)
-              if (firstClass) setSelectedClass(firstClass.id)
-            }}>
+            <Select
+              value={selectedGrade}
+              onValueChange={(value) => {
+                setSelectedGrade(value);
+                const firstClass = classes.find((c) => c.gradeId === value);
+                if (firstClass) setSelectedClass(firstClass.id);
+              }}
+            >
               <SelectTrigger className="w-36">
                 <GraduationCap className="me-2 h-4 w-4" />
                 <SelectValue placeholder="پایه" />
               </SelectTrigger>
               <SelectContent>
                 {uniqueGrades.map((grade) => (
-                  <SelectItem key={grade} value={grade}>پایه {grade}</SelectItem>
+                  <SelectItem key={grade} value={grade}>
+                    پایه {grade}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -60,14 +92,16 @@ function TimetablePage() {
               </SelectTrigger>
               <SelectContent>
                 {classesForGrade.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant={editMode ? 'default' : 'outline'}
+              variant={editMode ? "default" : "outline"}
               size="sm"
               onClick={() => setEditMode(!editMode)}
             >
@@ -96,10 +130,10 @@ function TimetablePage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{selectedClassData.name}</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{selectedClassData.studentCount} دانش‌آموز</Badge>
+                  <Badge variant="secondary">{selectedClassData.studentCapacity} دانش‌آموز</Badge>
                   <Badge variant="outline">
                     <User className="me-1 h-3 w-3" />
-                    {selectedClassData.classTeacher}
+                    {selectedClassTeacher?.name ?? ""}
                   </Badge>
                 </div>
               </div>
@@ -119,7 +153,10 @@ function TimetablePage() {
                           زمان
                         </th>
                         {weekDays.map((day) => (
-                          <th key={day} className="border-b p-3 text-center text-sm font-medium text-muted-foreground">
+                          <th
+                            key={day}
+                            className="border-b p-3 text-center text-sm font-medium text-muted-foreground"
+                          >
                             {day}
                           </th>
                         ))}
@@ -132,42 +169,60 @@ function TimetablePage() {
                             {slot.label}
                           </td>
                           {weekDays.map((day) => {
-                            const entry = schedule[day]?.[slot.id]
+                            const entry = schedule[day]?.[slot.id];
                             if (!entry) {
                               return (
-                                <td key={`${day}-${slot.id}`} className={`border-b p-2 text-center ${editMode ? 'hover:bg-muted/50 cursor-pointer' : ''}`}>
+                                <td
+                                  key={`${day}-${slot.id}`}
+                                  className={`border-b p-2 text-center ${editMode ? "hover:bg-muted/50 cursor-pointer" : ""}`}
+                                >
                                   {editMode && (
                                     <div className="flex items-center justify-center h-16 border-2 border-dashed border-muted-foreground/20 rounded-lg text-muted-foreground text-xs">
                                       + افزودن
                                     </div>
                                   )}
                                 </td>
-                              )
+                              );
                             }
                             return (
-                              <td key={`${day}-${slot.id}`} className={`border-b p-2 ${editMode ? 'cursor-pointer' : ''}`}>
+                              <td
+                                key={`${day}-${slot.id}`}
+                                className={`border-b p-2 ${editMode ? "cursor-pointer" : ""}`}
+                              >
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div
                                       className="rounded-lg p-3 h-16 flex flex-col justify-center transition-all hover:scale-[1.02]"
-                                      style={{ backgroundColor: `${entry.subject.color}15`, borderRight: `3px solid ${entry.subject.color}` }}
+                                      style={{
+                                        backgroundColor: `${entry.subject.color}15`,
+                                        borderRight: `3px solid ${entry.subject.color}`,
+                                      }}
                                     >
-                                      <p className="text-sm font-medium truncate" style={{ color: entry.subject.color }}>
+                                      <p
+                                        className="text-sm font-medium truncate"
+                                        style={{ color: entry.subject.color }}
+                                      >
                                         {entry.subject.name}
                                       </p>
-                                      <p className="text-xs text-muted-foreground truncate">{entry.teacher}</p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {entry.teacher}
+                                      </p>
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent side="top">
                                     <div className="space-y-1">
                                       <p className="font-medium">{entry.subject.name}</p>
-                                      <p className="text-xs text-muted-foreground">معلم: {entry.teacher}</p>
-                                      <p className="text-xs text-muted-foreground">کد: {entry.subject.code}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        معلم: {entry.teacher}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        کد: {entry.subject.code}
+                                      </p>
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
                               </td>
-                            )
+                            );
                           })}
                         </tr>
                       ))}
@@ -185,9 +240,12 @@ function TimetablePage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              {mockSubjects.map((subject) => (
+              {courses.map((subject) => (
                 <div key={subject.id} className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: subject.color }} />
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: subject.color }}
+                  />
                   <span className="text-sm">{subject.name}</span>
                 </div>
               ))}
@@ -196,5 +254,5 @@ function TimetablePage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

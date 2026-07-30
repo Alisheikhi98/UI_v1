@@ -53,7 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { mockSubjects, mockTeachers } from "@/lib/data";
+import { useCoursesRepository, useTeachersRepository } from "@/lib/mock-queries";
 import type { Teacher, Weekday } from "@/lib/types";
 
 const WEEKDAY_OPTIONS: ReadonlyArray<{ value: Weekday; label: string }> = [
@@ -64,8 +64,6 @@ const WEEKDAY_OPTIONS: ReadonlyArray<{ value: Weekday; label: string }> = [
   { value: "wednesday", label: "چهارشنبه" },
   { value: "thursday", label: "پنجشنبه" },
 ];
-
-const SUBJECT_BY_ID = new Map(mockSubjects.map((subject) => [subject.id, subject]));
 
 export const Route = createFileRoute("/dashboard/teachers")({
   head: () => ({
@@ -171,7 +169,9 @@ function TeacherAvailabilityDialog({
 }
 
 function TeachersPage() {
-  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
+  const { items: teachers, create, update, remove } = useTeachersRepository();
+  const { items: subjects } = useCoursesRepository();
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -190,28 +190,22 @@ function TeachersPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleSave = (data: TeacherDetailsInput) => {
+  const handleSave = async (data: TeacherDetailsInput) => {
     if (editingTeacher) {
-      setTeachers((current) =>
-        current.map((teacher) =>
-          teacher.id === editingTeacher.id ? { ...teacher, ...data } : teacher,
-        ),
-      );
+      await update({ id: editingTeacher.id, input: data });
       toast.success("اطلاعات معلم به‌روز شد", {
         description: `${data.name} با موفقیت ویرایش شد.`,
       });
     } else {
-      const newTeacher: Teacher = {
-        id: crypto.randomUUID(),
+      const newTeacher = await create({
         name: data.name,
         personnel_code: data.personnel_code || "",
         email: "",
         phone: data.phone || "",
-        subjects: [],
+        courseIds: [],
         availableDays: [],
         status: "active",
-      };
-      setTeachers((current) => [...current, newTeacher]);
+      });
       toast.success("معلم جدید اضافه شد", {
         description: `${newTeacher.name} با موفقیت به فهرست معلمان اضافه شد.`,
       });
@@ -219,12 +213,10 @@ function TeachersPage() {
     setEditingTeacher(null);
   };
 
-  const saveAvailability = (teacherId: string, availableDays: Weekday[]) => {
-    setTeachers((current) =>
-      current.map((teacher) =>
-        teacher.id === teacherId ? { ...teacher, availableDays } : teacher,
-      ),
-    );
+  const saveAvailability = async (teacherId: string, availableDays: Weekday[]) => {
+    const teacher = teachers.find((item) => item.id === teacherId);
+    if (!teacher) return;
+    await update({ id: teacher.id, input: { availableDays } });
     toast.success("روزهای حضور به‌روز شد");
     setAvailabilityTeacher(null);
   };
@@ -249,9 +241,9 @@ function TeachersPage() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!teacherToDelete) return;
-    setTeachers((current) => current.filter((teacher) => teacher.id !== teacherToDelete.id));
+    await remove(teacherToDelete.id);
     toast.success("معلم با موفقیت حذف شد", {
       description: `${teacherToDelete.name} از فهرست معلمان حذف شد.`,
     });
@@ -341,9 +333,9 @@ function TeachersPage() {
                           </TableCell>
                           <TableCell>
                             <div className="mx-auto flex max-w-64 flex-wrap justify-center gap-1">
-                              {teacher.subjects.length > 0 ? (
-                                teacher.subjects.map((subjectId) => {
-                                  const subject = SUBJECT_BY_ID.get(subjectId);
+                              {teacher.courseIds.length > 0 ? (
+                                teacher.courseIds.map((subjectId) => {
+                                  const subject = subjectById.get(subjectId);
                                   return subject ? (
                                     <Badge key={subjectId} variant="secondary" className="text-xs">
                                       {subject.name}

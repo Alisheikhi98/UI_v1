@@ -1,10 +1,6 @@
 import { ApiError, apiRequest } from "./client";
-import {
-  createMockSchool,
-  deleteMockSchool,
-  getMockSchools,
-  updateMockSchool,
-} from "./schools-mock";
+import { SchoolRepository, type SchoolPersistenceAdapter } from "./school-repository";
+import { MockSchoolPersistenceAdapter } from "./schools-mock";
 
 const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true";
 
@@ -270,18 +266,17 @@ async function deleteSchoolWithApi(): Promise<never> {
   throw new ApiError("OpenAPI برای حذف مدرسه endpoint تعریف نکرده است.", 405);
 }
 
-export function getSchools(): Promise<School[]> {
-  return USE_MOCK_API ? getMockSchools() : getSchoolsFromApi();
-}
+const apiSchoolPersistenceAdapter: SchoolPersistenceAdapter = {
+  getAll: getSchoolsFromApi,
+  async getById(id) {
+    const school = await apiRequest<SchoolRead>(`/schools/${id}`);
+    return toSchool(school, await getSchoolDaySlots(id));
+  },
+  create: createSchoolWithApi,
+  update: (id, data) => updateSchoolWithApi({ id, data }),
+  delete: () => deleteSchoolWithApi(),
+};
 
-export function createSchool(data: SchoolFormData): Promise<School> {
-  return USE_MOCK_API ? createMockSchool(data) : createSchoolWithApi(data);
-}
-
-export function updateSchool(input: { id: number; data: SchoolFormData }): Promise<School> {
-  return USE_MOCK_API ? updateMockSchool(input) : updateSchoolWithApi(input);
-}
-
-export function deleteSchool(id: number): Promise<void> {
-  return USE_MOCK_API ? deleteMockSchool(id) : deleteSchoolWithApi();
-}
+export const schoolRepository = new SchoolRepository(
+  USE_MOCK_API ? new MockSchoolPersistenceAdapter() : apiSchoolPersistenceAdapter,
+);
