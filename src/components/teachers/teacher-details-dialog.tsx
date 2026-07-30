@@ -26,13 +26,14 @@ export function TeacherDetailsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teacher?: TeacherDetailsInput | null;
-  onSave: (data: TeacherDetailsInput) => void;
+  onSave: (data: TeacherDetailsInput) => void | Promise<void>;
 }) {
   const [formData, setFormData] = useState<TeacherDetailsInput>({
     name: "",
     personnel_code: "",
     phone: "",
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -43,12 +44,17 @@ export function TeacherDetailsDialog({
     });
   }, [teacher, open]);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = formData.name.trim();
     if (!name) return;
-    onSave({ ...formData, name });
-    onOpenChange(false);
+    setIsSaving(true);
+    try {
+      await onSave({ ...formData, name });
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -95,7 +101,7 @@ export function TeacherDetailsDialog({
             </div>
           </div>
           <DialogFooter className="flex-row-reverse justify-start gap-2">
-            <Button type="submit" disabled={!formData.name.trim()}>
+            <Button type="submit" disabled={!formData.name.trim() || isSaving}>
               {teacher ? "به‌روزرسانی" : "افزودن معلم"}
             </Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

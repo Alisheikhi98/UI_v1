@@ -239,6 +239,7 @@ function RenameClassDialog({
 
 function ClassesPage() {
   const navigate = useNavigate();
+  const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const {
     classes,
     courses,
@@ -248,13 +249,12 @@ function ClassesPage() {
     coursesRepository,
     teachersRepository,
     assignmentsRepository,
-  } = useClassManagementData();
+  } = useClassManagementData(assignmentClass?.id);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [majorFilter, setMajorFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [renamingClass, setRenamingClass] = useState<ClassViewModel | null>(null);
-  const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const [classToDelete, setClassToDelete] = useState<ClassViewModel | null>(null);
   const filteredClasses = classes.filter((c) => {
     const normalizedSearch = search.toLowerCase();
@@ -268,33 +268,45 @@ function ClassesPage() {
 
   const activeFilterCount = Number(gradeFilter !== "all") + Number(majorFilter !== "all");
 
-  const handleSave = (data: ClassFormData) => {
-    void classesRepository.create({
-      name: data.name,
-      gradeId: data.gradeId,
-      majorId: data.majorId,
-      section: "",
-      studentCapacity: 0,
-    });
-    toast.success("کلاس با موفقیت اضافه شد");
+  const handleSave = async (data: ClassFormData) => {
+    try {
+      await classesRepository.create({
+        name: data.name,
+        gradeId: data.gradeId,
+        majorId: data.majorId,
+      });
+      toast.success("کلاس با موفقیت اضافه شد");
+    } catch (error) {
+      toast.error("ایجاد کلاس انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
-  const handleDelete = (classItem: ClassViewModel) => {
-    void assignmentsRepository.replaceForClass({
-      classId: classItem.id,
-      assignments: [],
-    });
-    void classesRepository.remove(classItem.id);
-    toast.success("کلاس با موفقیت حذف شد");
+  const handleDelete = async (classItem: ClassViewModel) => {
+    try {
+      await classesRepository.remove(classItem.id);
+      toast.success("کلاس با موفقیت حذف شد");
+    } catch (error) {
+      toast.error("حذف کلاس انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   const openAddDialog = () => setDialogOpen(true);
-  const renameClass = (name: string) => {
+  const renameClass = async (name: string) => {
     if (!renamingClass) return;
     const current = classesRepository.items.find((item) => item.id === renamingClass.id);
-    if (current) void classesRepository.update({ id: current.id, input: { name } });
-    setRenamingClass(null);
-    toast.success("نام کلاس به‌روز شد");
+    try {
+      if (current) await classesRepository.update({ id: current.id, input: { name } });
+      setRenamingClass(null);
+      toast.success("نام کلاس به‌روز شد");
+    } catch (error) {
+      toast.error("ویرایش کلاس انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
   const assignmentCount = (classId: string) =>
     assignments.filter((assignment) => assignment.classId === classId).length;
@@ -630,10 +642,18 @@ function ClassesPage() {
             assignments: nextAssignments,
           });
         }}
-        onCreateCourse={(course) => void coursesRepository.create(course)}
-        onUpdateCourse={(id, course) => void coursesRepository.update({ id, input: course })}
-        onCreateTeacher={(teacher) => void teachersRepository.create(teacher)}
-        onUpdateTeacher={(id, teacher) => void teachersRepository.update({ id, input: teacher })}
+        onCreateCourse={async (course) => {
+          await coursesRepository.create(course);
+        }}
+        onUpdateCourse={async (id, course) => {
+          await coursesRepository.update({ id, input: course });
+        }}
+        onCreateTeacher={async (teacher) => {
+          await teachersRepository.create(teacher);
+        }}
+        onUpdateTeacher={async (id, teacher) => {
+          await teachersRepository.update({ id, input: teacher });
+        }}
       />
     </div>
   );

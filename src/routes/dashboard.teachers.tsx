@@ -53,8 +53,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCoursesRepository, useTeachersRepository } from "@/lib/mock-queries";
-import type { Teacher, Weekday } from "@/lib/types";
+import {
+  useCoursesRepository,
+  useDaySlotsRepository,
+  useTeacherAvailabilityMutation,
+  useTeachersRepository,
+} from "@/lib/mock-queries";
+import type { DaySlot, Teacher, Weekday } from "@/lib/types";
 
 const WEEKDAY_OPTIONS: ReadonlyArray<{ value: Weekday; label: string }> = [
   { value: "saturday", label: "شنبه" },
@@ -97,18 +102,27 @@ function TeacherAvailabilityDialog({
   open,
   onOpenChange,
   teacher,
+  daySlots,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teacher: Teacher | null;
-  onSave: (teacherId: string, availableDays: Weekday[]) => void;
+  daySlots: DaySlot[];
+  onSave: (teacherId: string, daySlotIds: string[]) => Promise<void>;
 }) {
   const [selectedDays, setSelectedDays] = useState<Weekday[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setSelectedDays(teacher?.availableDays || []);
-  }, [open, teacher]);
+    if (!open) return;
+    const availableIds = new Set(teacher?.availableDaySlotIds ?? []);
+    setSelectedDays(
+      WEEKDAY_OPTIONS.filter((_, index) =>
+        daySlots.some((slot) => slot.dayId === index + 1 && availableIds.has(slot.id)),
+      ).map((day) => day.value),
+    );
+  }, [daySlots, open, teacher]);
 
   const toggleDay = (day: Weekday) => {
     setSelectedDays((current) =>
@@ -118,10 +132,23 @@ function TeacherAvailabilityDialog({
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!teacher) return;
-    onSave(teacher.id, selectedDays);
-    onOpenChange(false);
+    const selectedDayIds = new Set(
+      WEEKDAY_OPTIONS.flatMap((day, index) =>
+        selectedDays.includes(day.value) ? [index + 1] : [],
+      ),
+    );
+    setIsSaving(true);
+    try {
+      await onSave(
+        teacher.id,
+        daySlots.filter((slot) => selectedDayIds.has(slot.dayId)).map((slot) => slot.id),
+      );
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -158,7 +185,9 @@ function TeacherAvailabilityDialog({
           })}
         </div>
         <DialogFooter className="flex-row-reverse justify-start gap-2">
-          <Button onClick={handleSave}>ذخیره روزهای حضور</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            ذخیره روزهای حضور
+          </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             انصراف
           </Button>
@@ -169,9 +198,13 @@ function TeacherAvailabilityDialog({
 }
 
 function TeachersPage() {
-  const { items: teachers, create, update, remove } = useTeachersRepository();
-  const { items: subjects } = useCoursesRepository();
-  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+  const { items: teachers, relatedCourses, create, update, remove } = useTeachersRepository();
+  const { items: schoolCourses } = useCoursesRepository();
+  const { data: daySlots = [] } = useDaySlotsRepository();
+  const availabilityMutation = useTeacherAvailabilityMutation();
+  const subjectById = new Map(
+    [...schoolCourses, ...relatedCourses].map((subject) => [subject.id, subject]),
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -191,34 +224,42 @@ function TeachersPage() {
   });
 
   const handleSave = async (data: TeacherDetailsInput) => {
-    if (editingTeacher) {
-      await update({ id: editingTeacher.id, input: data });
-      toast.success("اطلاعات معلم به‌روز شد", {
-        description: `${data.name} با موفقیت ویرایش شد.`,
+    try {
+      if (editingTeacher) {
+        await update({ id: editingTeacher.id, input: data });
+        toast.success("اطلاعات معلم به‌روز شد", {
+          description: `${data.name} با موفقیت ویرایش شد.`,
+        });
+      } else {
+        const newTeacher = await create({
+          name: data.name,
+          personnel_code: data.personnel_code || "",
+          phone: data.phone || "",
+        });
+        toast.success("معلم جدید اضافه شد", {
+          description: `${newTeacher.name} با موفقیت به فهرست معلمان اضافه شد.`,
+        });
+      }
+      setEditingTeacher(null);
+    } catch (error) {
+      toast.error("ذخیره اطلاعات معلم انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
       });
-    } else {
-      const newTeacher = await create({
-        name: data.name,
-        personnel_code: data.personnel_code || "",
-        email: "",
-        phone: data.phone || "",
-        courseIds: [],
-        availableDays: [],
-        status: "active",
-      });
-      toast.success("معلم جدید اضافه شد", {
-        description: `${newTeacher.name} با موفقیت به فهرست معلمان اضافه شد.`,
-      });
+      throw error;
     }
-    setEditingTeacher(null);
   };
 
-  const saveAvailability = async (teacherId: string, availableDays: Weekday[]) => {
-    const teacher = teachers.find((item) => item.id === teacherId);
-    if (!teacher) return;
-    await update({ id: teacher.id, input: { availableDays } });
-    toast.success("روزهای حضور به‌روز شد");
-    setAvailabilityTeacher(null);
+  const saveAvailability = async (teacherId: string, daySlotIds: string[]) => {
+    try {
+      await availabilityMutation.mutateAsync({ teacherId, daySlotIds });
+      toast.success("روزهای حضور به‌روز شد");
+      setAvailabilityTeacher(null);
+    } catch (error) {
+      toast.error("ذخیره روزهای حضور انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
   };
 
   const openAddDialog = () => {
@@ -243,12 +284,18 @@ function TeachersPage() {
 
   const confirmDelete = async () => {
     if (!teacherToDelete) return;
-    await remove(teacherToDelete.id);
-    toast.success("معلم با موفقیت حذف شد", {
-      description: `${teacherToDelete.name} از فهرست معلمان حذف شد.`,
-    });
-    setTeacherToDelete(null);
-    setDeleteDialogOpen(false);
+    try {
+      await remove(teacherToDelete.id);
+      toast.success("معلم با موفقیت حذف شد", {
+        description: `${teacherToDelete.name} از فهرست معلمان حذف شد.`,
+      });
+      setTeacherToDelete(null);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      toast.error("حذف معلم انجام نشد", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   return (
@@ -355,7 +402,7 @@ function TeachersPage() {
                               aria-label={`ویرایش روزهای حضور ${teacher.name}`}
                               title="ویرایش روزهای حضور"
                               className={
-                                teacher.availableDays.length === 0
+                                teacher.availableDaySlotIds.length === 0
                                   ? "text-amber-600 dark:text-amber-400"
                                   : "text-primary"
                               }
@@ -419,6 +466,7 @@ function TeachersPage() {
           if (!open) setAvailabilityTeacher(null);
         }}
         teacher={availabilityTeacher}
+        daySlots={daySlots}
         onSave={saveAvailability}
       />
       <Dialog

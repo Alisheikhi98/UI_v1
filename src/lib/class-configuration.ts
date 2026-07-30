@@ -10,6 +10,6 @@ export function isAssignmentComplete(assignment: ClassAssignment, teachers: Teac
     teacher &&
     assignment.weeklyPeriods >= 1 &&
     assignment.weeklyPeriods <= MAX_WEEKLY_PERIODS &&
-    teacher.availableDays.length,
+    teacher.availableDaySlotIds.length,
   );
 }

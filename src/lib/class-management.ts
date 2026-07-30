@@ -8,11 +8,16 @@ import { selectClassViewModels } from "@/lib/class-management-selectors";
 
 export * from "@/lib/class-management-selectors";
 
-export function useClassManagementData() {
+export function useClassManagementData(activeClassId?: string) {
   const classesRepository = useClassesRepository();
-  const coursesRepository = useCoursesRepository();
+  const classIds = classesRepository.items.map((schoolClass) => schoolClass.id);
+  const coursesRepository = useCoursesRepository({
+    filters: activeClassId ? { classId: activeClassId } : undefined,
+  });
   const teachersRepository = useTeachersRepository();
-  const assignmentsRepository = useClassAssignmentsRepository();
+  const assignmentsRepository = useClassAssignmentsRepository({
+    filters: { classIds },
+  });
 
   return {
     classes: selectClassViewModels(classesRepository.items),

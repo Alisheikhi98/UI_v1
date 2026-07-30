@@ -18,6 +18,13 @@ import {
   selectCoursePickerOptions,
   selectTeacherPickerOptions,
 } from "../src/lib/class-management-selectors.ts";
+import {
+  mapClass,
+  mapClassAssignment,
+  mapCourse,
+  mapDaySlot,
+  mapTeacher,
+} from "../src/lib/api/mappers.ts";
 
 test("canonical entities preserve IDs, relationships, and stable class metadata", async () => {
   const classes = classRepository.snapshot();
@@ -190,13 +197,12 @@ test("invalid assignment transactions and cancelled drafts never mutate reposito
     ]),
     /Invalid teacher ID/,
   );
-  await assert.rejects(
-    classAssignmentRepository.replaceForClass("1", [
-      classAssignments[0],
-      { ...classAssignments[1], teacherId: classAssignments[0].teacherId },
-    ]),
-    /Duplicate teacher assignments/,
-  );
+  const sameTeacherAssignments = [
+    classAssignments[0],
+    { ...classAssignments[1], teacherId: classAssignments[0].teacherId },
+  ];
+  await classAssignmentRepository.replaceForClass("1", sameTeacherAssignments);
+  await classAssignmentRepository.replaceForClass("1", classAssignments);
   assert.deepEqual(classAssignmentRepository.snapshot(), before);
 });
 
@@ -218,7 +224,7 @@ test("backend-shaped repositories preserve generated IDs and pagination metadata
     email: "",
     phone: "",
     courseIds: [],
-    availableDays: [],
+    availableDaySlotIds: [],
     status: "active",
   };
   const created = await repository.create(teacherInput);
@@ -277,4 +283,102 @@ test("active hooks depend on configured repository interfaces, not mock implemen
   assert.doesNotMatch(source, /from ["']@\/lib\/mock-repositories["']/);
   assert.match(source, /from ["']@\/lib\/repositories\/configured["']/);
   assert.match(source, /repository\.list\(\{ \.\.\.params, signal:/);
+});
+
+test("FastAPI mappers preserve backend IDs and translate snake_case contracts", () => {
+  const timestamp = "2026-07-30T00:00:00Z";
+  assert.equal(
+    mapTeacher({
+      id: 12,
+      school_id: 2,
+      name: "Teacher",
+      code: "T-1",
+      phone: null,
+      active: true,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).id,
+    "12",
+  );
+  assert.equal(
+    mapCourse({
+      id: 20,
+      school_id: 2,
+      name: "Physics",
+      major_id: 3,
+      grade: 10,
+      category: "specialized",
+      active: true,
+      course_code: "PHYS-10",
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).majorId,
+    "major-3",
+  );
+  assert.equal(
+    mapClass({
+      id: 30,
+      school_id: 2,
+      major_id: 3,
+      name: "10-A",
+      grade: 10,
+      active: true,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).gradeId,
+    "10",
+  );
+  assert.equal(
+    mapClassAssignment({
+      id: 40,
+      school_id: 2,
+      class_id: 30,
+      course_id: 20,
+      course_name: "Physics",
+      teacher_id: 12,
+      teacher_name: "Teacher",
+      slots_per_week: 4,
+      active: true,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).weeklyPeriods,
+    4,
+  );
+  assert.equal(
+    mapDaySlot({
+      id: 50,
+      school_id: 2,
+      day_id: 1,
+      slot_number: 2,
+      title: null,
+      start_time: "08:00:00",
+      end_time: "09:00:00",
+      active: true,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).dayId,
+    1,
+  );
+});
+
+test("API assignment replacement reports the missing backend transaction", async () => {
+  const source = await readFile(
+    fileURLToPath(new URL("../src/lib/api/api-repositories.ts", import.meta.url)),
+    "utf8",
+  );
+  assert.match(source, /class BackendCapabilityError/);
+  assert.match(source, /atomic bulk assignment replacement endpoint/);
+  assert.doesNotMatch(source, /mockClassAssignmentRepository/);
+});
+
+test("day-slot requests never send the backend response-only active field", async () => {
+  const source = await readFile(
+    fileURLToPath(new URL("../src/lib/api/schools-store.ts", import.meta.url)),
+    "utf8",
+  );
+  const entryBlock = source.slice(
+    source.indexOf("interface DaySlotEntry"),
+    source.indexOf("export const WEEK_DAYS"),
+  );
+  assert.doesNotMatch(entryBlock, /\bactive\s*:/);
 });

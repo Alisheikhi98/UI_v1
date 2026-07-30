@@ -76,10 +76,10 @@ interface Props {
     classId: string,
     assignments: readonly ClassAssignmentReplacementInput[],
   ) => Promise<void>;
-  onCreateCourse: (course: CourseCreateInput) => void;
-  onUpdateCourse: (id: string, course: CourseUpdateInput) => void;
-  onCreateTeacher: (teacher: TeacherCreateInput) => void;
-  onUpdateTeacher: (id: string, teacher: TeacherUpdateInput) => void;
+  onCreateCourse: (course: CourseCreateInput) => Promise<void>;
+  onUpdateCourse: (id: string, course: CourseUpdateInput) => Promise<void>;
+  onCreateTeacher: (teacher: TeacherCreateInput) => Promise<void>;
+  onUpdateTeacher: (id: string, teacher: TeacherUpdateInput) => Promise<void>;
 }
 
 type DraftAssignment = ClassAssignmentReplacementInput & { draftId: string };
@@ -101,10 +101,8 @@ const isPositiveInteger = (value: number) => Number.isInteger(value) && value > 
 
 const isDraftValid = (items: DraftAssignment[]) => {
   const selectedCourseIds = items.map((item) => item.courseId).filter(Boolean);
-  const selectedTeacherIds = items.map((item) => item.teacherId).filter(Boolean);
   return (
     selectedCourseIds.length === new Set(selectedCourseIds).size &&
-    selectedTeacherIds.length === new Set(selectedTeacherIds).size &&
     items.every(
       (item) => Boolean(item.courseId && item.teacherId) && isPositiveInteger(item.weeklyPeriods),
     )
@@ -421,18 +419,22 @@ export function ClassAssignmentsSheet({
         onOpenChange={setCreateCourseOpen}
         title="ایجاد درس جدید"
         courses={courses}
-        onSave={(name) => {
-          onCreateCourse({
-            name,
-            active: true,
-            gradeId: classItem.gradeId,
-            majorId: classItem.majorId,
-            category: "specialized",
-            code: "",
-            weeklyHours: 1,
-            color: "#1E40AF",
-          });
-          toast.success("درس جدید ایجاد شد");
+        onSave={async (name) => {
+          try {
+            await onCreateCourse({
+              name,
+              active: true,
+              gradeId: classItem.gradeId,
+              majorId: classItem.majorId,
+              category: "specialized",
+            });
+            toast.success("درس جدید ایجاد شد");
+          } catch (error) {
+            toast.error("ایجاد درس انجام نشد", {
+              description: error instanceof Error ? error.message : undefined,
+            });
+            throw error;
+          }
         }}
       />
 
@@ -445,28 +447,38 @@ export function ClassAssignmentsSheet({
         initialName={courseToRename?.name}
         courses={courses}
         excludedCourseId={courseToRename?.id}
-        onSave={(name) => {
+        onSave={async (name) => {
           if (!courseToRename) return;
-          onUpdateCourse(courseToRename.id, { name });
-          toast.success("نام درس ویرایش شد");
-          setCourseToRename(null);
+          try {
+            await onUpdateCourse(courseToRename.id, { name });
+            toast.success("نام درس ویرایش شد");
+            setCourseToRename(null);
+          } catch (error) {
+            toast.error("ویرایش درس انجام نشد", {
+              description: error instanceof Error ? error.message : undefined,
+            });
+            throw error;
+          }
         }}
       />
 
       <TeacherDetailsDialog
         open={createTeacherOpen}
         onOpenChange={setCreateTeacherOpen}
-        onSave={(details) => {
-          onCreateTeacher({
-            name: details.name,
-            email: "",
-            phone: details.phone || "",
-            personnel_code: details.personnel_code || "",
-            courseIds: [],
-            availableDays: [],
-            status: "active",
-          });
-          toast.success("معلم جدید ایجاد شد");
+        onSave={async (details) => {
+          try {
+            await onCreateTeacher({
+              name: details.name,
+              phone: details.phone || "",
+              personnel_code: details.personnel_code || "",
+            });
+            toast.success("معلم جدید ایجاد شد");
+          } catch (error) {
+            toast.error("ایجاد معلم انجام نشد", {
+              description: error instanceof Error ? error.message : undefined,
+            });
+            throw error;
+          }
         }}
       />
 
@@ -484,15 +496,22 @@ export function ClassAssignmentsSheet({
               }
             : null
         }
-        onSave={(details: TeacherDetailsInput) => {
+        onSave={async (details: TeacherDetailsInput) => {
           if (!teacherToEdit) return;
-          onUpdateTeacher(teacherToEdit.id, {
-            name: details.name,
-            personnel_code: details.personnel_code || "",
-            phone: details.phone || "",
-          });
-          toast.success("اطلاعات معلم ویرایش شد");
-          setTeacherToEdit(null);
+          try {
+            await onUpdateTeacher(teacherToEdit.id, {
+              name: details.name,
+              personnel_code: details.personnel_code || "",
+              phone: details.phone || "",
+            });
+            toast.success("اطلاعات معلم ویرایش شد");
+            setTeacherToEdit(null);
+          } catch (error) {
+            toast.error("ویرایش معلم انجام نشد", {
+              description: error instanceof Error ? error.message : undefined,
+            });
+            throw error;
+          }
         }}
       />
 
@@ -667,7 +686,7 @@ function CourseNameDialog({
   initialName?: string;
   courses: Course[];
   excludedCourseId?: string;
-  onSave: (name: string) => void;
+  onSave: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState("");
 
@@ -690,10 +709,10 @@ function CourseNameDialog({
           <DialogDescription>نام درس را وارد کنید.</DialogDescription>
         </DialogHeader>
         <form
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
             if (!valid) return;
-            onSave(name.trim().replace(/\s+/g, " "));
+            await onSave(name.trim().replace(/\s+/g, " "));
             onOpenChange(false);
           }}
         >

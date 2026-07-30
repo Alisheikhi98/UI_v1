@@ -64,7 +64,6 @@ interface DaySlotEntry {
   day_id: number;
   slot_number: number;
   title?: string | null;
-  active: boolean;
 }
 
 export const WEEK_DAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
@@ -197,7 +196,6 @@ function buildDaySlotEntries(data: SchoolFormData): DaySlotEntry[] {
       slot_number: period.index,
       start_time: period.start,
       end_time: period.end,
-      active: true,
     }));
   });
 }
@@ -207,6 +205,9 @@ async function saveDaySlots(schoolId: number, data: SchoolFormData) {
   if (desiredEntries.length === 0) return;
 
   const existingSlots = await getSchoolDaySlots(schoolId);
+  const existingByKey = new Map(
+    existingSlots.map((slot) => [`${slot.day_id}:${slot.slot_number}`, slot]),
+  );
   const desiredKeys = new Set(
     desiredEntries.map((entry) => `${entry.day_id}:${entry.slot_number}`),
   );
@@ -214,10 +215,33 @@ async function saveDaySlots(schoolId: number, data: SchoolFormData) {
     (slot) => slot.active && !desiredKeys.has(`${slot.day_id}:${slot.slot_number}`),
   );
 
-  await apiRequest<DaySlotResponse[]>(`/schools/${schoolId}/day-slots`, {
-    method: "POST",
-    body: JSON.stringify({ entries: desiredEntries }),
+  const newEntries = desiredEntries.filter(
+    (entry) => !existingByKey.has(`${entry.day_id}:${entry.slot_number}`),
+  );
+  const existingEntries = desiredEntries.flatMap((entry) => {
+    const slot = existingByKey.get(`${entry.day_id}:${entry.slot_number}`);
+    return slot ? [{ entry, slot }] : [];
   });
+
+  if (newEntries.length > 0) {
+    await apiRequest<DaySlotResponse[]>(`/schools/${schoolId}/day-slots`, {
+      method: "POST",
+      body: JSON.stringify({ entries: newEntries }),
+    });
+  }
+
+  await Promise.all(
+    existingEntries.map(({ entry, slot }) =>
+      apiRequest<DaySlotResponse>(`/schools/${schoolId}/day-slots/${slot.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          start_time: entry.start_time,
+          end_time: entry.end_time,
+          title: entry.title ?? null,
+        }),
+      }),
+    ),
+  );
 
   await Promise.all(
     obsoleteSlots.map((slot) =>

@@ -2,14 +2,20 @@ import type { Class, ClassAssignment, Course, Teacher } from "@/lib/types";
 import type {
   ClassAssignmentReplacementInput,
   ClassAssignmentRepository,
+  ClassCreateInput,
   ClassRepository,
+  ClassUpdateInput,
+  CourseCreateInput,
   CourseRepository,
+  CourseUpdateInput,
   CreateInput,
   EntityRepository,
   PaginatedResult,
   RepositoryListParams,
   RepositoryRequestOptions,
   TeacherRepository,
+  TeacherCreateInput,
+  TeacherUpdateInput,
   UpdateInput,
 } from "@/lib/repositories";
 
@@ -124,7 +130,7 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۱۲۳۴۵۶۷",
     personnel_code: "1",
     courseIds: ["1", "3"],
-    availableDays: ["saturday", "sunday", "monday", "wednesday"],
+    availableDaySlotIds: ["mock-slot-1", "mock-slot-2", "mock-slot-3", "mock-slot-5"],
     status: "active",
   },
   {
@@ -134,7 +140,7 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۲۳۴۵۶۷۸",
     personnel_code: "2",
     courseIds: ["2"],
-    availableDays: ["saturday", "monday", "tuesday", "thursday"],
+    availableDaySlotIds: ["mock-slot-1", "mock-slot-3", "mock-slot-4", "mock-slot-6"],
     status: "active",
   },
   {
@@ -144,7 +150,7 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۳۴۵۶۷۸۹",
     personnel_code: "3",
     courseIds: ["4", "5"],
-    availableDays: ["sunday", "monday", "wednesday", "thursday"],
+    availableDaySlotIds: ["mock-slot-2", "mock-slot-3", "mock-slot-5", "mock-slot-6"],
     status: "active",
   },
   {
@@ -154,7 +160,7 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۴۵۶۷۸۹۰",
     personnel_code: "4",
     courseIds: ["6", "7"],
-    availableDays: ["saturday", "tuesday"],
+    availableDaySlotIds: ["mock-slot-1", "mock-slot-4"],
     status: "inactive",
   },
   {
@@ -164,7 +170,7 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۵۶۷۸۹۰۱",
     personnel_code: "5",
     courseIds: ["8"],
-    availableDays: [],
+    availableDaySlotIds: [],
     status: "active",
   },
 ];
@@ -327,11 +333,58 @@ const initialCourses: Course[] = [
 
 export class MockTeacherRepository
   extends MockEntityRepository<Teacher>
-  implements TeacherRepository {}
-export class MockCourseRepository
-  extends MockEntityRepository<Course>
-  implements CourseRepository {}
-export class MockClassRepository extends MockEntityRepository<Class> implements ClassRepository {}
+  implements TeacherRepository
+{
+  create(input: TeacherCreateInput, options?: RepositoryRequestOptions) {
+    return super.create(
+      {
+        name: input.name,
+        personnel_code: input.personnel_code ?? "",
+        phone: input.phone ?? "",
+        email: "",
+        courseIds: [],
+        availableDaySlotIds: [],
+        status: "active",
+      },
+      options,
+    );
+  }
+
+  update(id: string, input: TeacherUpdateInput, options?: RepositoryRequestOptions) {
+    return super.update(id, input, options);
+  }
+
+  setAvailability(id: string, availableDaySlotIds: string[], options?: RepositoryRequestOptions) {
+    return super.update(id, { availableDaySlotIds }, options);
+  }
+}
+export class MockCourseRepository extends MockEntityRepository<Course> implements CourseRepository {
+  create(input: CourseCreateInput, options?: RepositoryRequestOptions) {
+    return super.create(
+      {
+        ...input,
+        active: input.active ?? true,
+        code: "",
+        weeklyHours: 1,
+        color: "#1E40AF",
+      },
+      options,
+    );
+  }
+
+  update(id: string, input: CourseUpdateInput, options?: RepositoryRequestOptions) {
+    return super.update(id, input, options);
+  }
+}
+export class MockClassRepository extends MockEntityRepository<Class> implements ClassRepository {
+  create(input: ClassCreateInput, options?: RepositoryRequestOptions) {
+    return super.create({ ...input, studentCapacity: 0 }, options);
+  }
+
+  update(id: string, input: ClassUpdateInput, options?: RepositoryRequestOptions) {
+    return super.update(id, input, options);
+  }
+}
 
 export const teacherRepository = new MockTeacherRepository(initialTeachers);
 export const courseRepository = new MockCourseRepository(initialCourses);
@@ -385,12 +438,6 @@ export class MockClassAssignmentRepository
     if (new Set(assignments.map((assignment) => assignment.courseId)).size !== assignments.length) {
       throw new Error("Duplicate course assignments are not allowed.");
     }
-    if (
-      new Set(assignments.map((assignment) => assignment.teacherId)).size !== assignments.length
-    ) {
-      throw new Error("Duplicate teacher assignments are not allowed.");
-    }
-
     const courseIds = new Set(courses.map((course) => course.id));
     const teacherIds = new Set(teachers.map((teacher) => teacher.id));
     if (assignments.some((assignment) => !courseIds.has(assignment.courseId))) {

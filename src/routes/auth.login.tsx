@@ -14,15 +14,16 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { loginUser } from "@/lib/api/auth";
+import { setActiveSchoolId } from "@/lib/active-school";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/auth/login")({
   head: () => ({ meta: [{ title: "ورود - آموزش‌یار" }] }),
   component: LoginPage,
 });
 
-// Development-only mock authentication. Replace this function with the real
-// authentication API call when the backend database is available.
-async function authenticateForDevelopment(username: string, password: string) {
+async function authenticate(username: string, password: string) {
   if (!username.trim()) {
     throw new Error("Username is required.");
   }
@@ -31,11 +32,13 @@ async function authenticateForDevelopment(username: string, password: string) {
     throw new Error("Password is required.");
   }
 
-  return "dev-mock-token";
+  if (import.meta.env.VITE_USE_MOCK_API === "true") return "dev-mock-token";
+  return (await loginUser(username, password)).access_token;
 }
 
 function LoginPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,8 +50,10 @@ function LoginPage() {
     setIsLoading(true);
 
     try {
-      const accessToken = await authenticateForDevelopment(username, password);
+      const accessToken = await authenticate(username, password);
       localStorage.setItem("access_token", accessToken);
+      setActiveSchoolId(null);
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
 
       toast.success("خوش آمدید!", {
         description: "با موفقیت وارد شدید.",

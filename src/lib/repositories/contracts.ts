@@ -1,4 +1,4 @@
-import type { Class, ClassAssignment, Course, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlot, Teacher } from "@/lib/types";
 
 export interface RepositoryRequestOptions {
   signal?: AbortSignal;
@@ -27,29 +27,59 @@ export interface PaginatedResult<T> {
 export type CreateInput<T extends { id: string }> = Omit<T, "id">;
 export type UpdateInput<T extends { id: string }> = Partial<Omit<T, "id">>;
 
-export interface EntityRepository<T extends { id: string }> {
+export interface EntityRepository<
+  T extends { id: string },
+  TCreate = CreateInput<T>,
+  TUpdate = UpdateInput<T>,
+> {
   list(params?: RepositoryListParams): Promise<PaginatedResult<T>>;
   getById(id: string, options?: RepositoryRequestOptions): Promise<T | null>;
-  create(input: CreateInput<T>, options?: RepositoryRequestOptions): Promise<T>;
-  update(id: string, input: UpdateInput<T>, options?: RepositoryRequestOptions): Promise<T>;
+  create(input: TCreate, options?: RepositoryRequestOptions): Promise<T>;
+  update(id: string, input: TUpdate, options?: RepositoryRequestOptions): Promise<T>;
   delete(id: string, options?: RepositoryRequestOptions): Promise<void>;
 }
 
-export type TeacherCreateInput = CreateInput<Teacher>;
-export type TeacherUpdateInput = UpdateInput<Teacher>;
+export interface TeacherCreateInput {
+  name: string;
+  personnel_code?: string;
+  phone?: string;
+}
+export type TeacherUpdateInput = Partial<TeacherCreateInput>;
 // Named domain contracts intentionally specialize the reusable CRUD contract.
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface TeacherRepository extends EntityRepository<Teacher> {}
+export interface TeacherRepository extends EntityRepository<
+  Teacher,
+  TeacherCreateInput,
+  TeacherUpdateInput
+> {}
 
-export type CourseCreateInput = CreateInput<Course>;
-export type CourseUpdateInput = UpdateInput<Course>;
+export interface CourseCreateInput {
+  name: string;
+  gradeId: string;
+  majorId: string;
+  category: Course["category"];
+  active?: boolean;
+}
+export type CourseUpdateInput = Partial<Omit<CourseCreateInput, "active">>;
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface CourseRepository extends EntityRepository<Course> {}
+export interface CourseRepository extends EntityRepository<
+  Course,
+  CourseCreateInput,
+  CourseUpdateInput
+> {}
 
-export type ClassCreateInput = CreateInput<Class>;
-export type ClassUpdateInput = UpdateInput<Class>;
+export interface ClassCreateInput {
+  name: string;
+  gradeId: string;
+  majorId: string;
+}
+export type ClassUpdateInput = Partial<ClassCreateInput>;
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ClassRepository extends EntityRepository<Class> {}
+export interface ClassRepository extends EntityRepository<
+  Class,
+  ClassCreateInput,
+  ClassUpdateInput
+> {}
 
 export type ClassAssignmentCreateInput = CreateInput<ClassAssignment>;
 export type ClassAssignmentUpdateInput = UpdateInput<ClassAssignment>;
@@ -63,4 +93,21 @@ export interface ClassAssignmentRepository extends EntityRepository<ClassAssignm
     assignments: readonly ClassAssignmentReplacementInput[],
     options?: RepositoryRequestOptions,
   ): Promise<ClassAssignment[]>;
+}
+
+export interface DaySlotRepository {
+  list(options?: RepositoryRequestOptions): Promise<DaySlot[]>;
+}
+
+export interface TeacherAvailabilityRepository {
+  list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]>;
+  replace(
+    teacherId: string,
+    daySlotIds: readonly string[],
+    options?: RepositoryRequestOptions,
+  ): Promise<string[]>;
+}
+
+export interface TeacherCoursesRepository {
+  list(teacherId: string, options?: RepositoryRequestOptions): Promise<Course[]>;
 }

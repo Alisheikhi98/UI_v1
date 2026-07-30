@@ -48,6 +48,7 @@ import {
   PeriodTime,
 } from "@/lib/api/schools-store";
 import { cn } from "@/lib/utils";
+import { setActiveSchoolId } from "@/lib/active-school";
 
 export const Route = createFileRoute("/dashboard/schools")({
   component: SchoolsPage,
@@ -110,6 +111,7 @@ function SchoolsPage() {
     setDialogOpen(true);
   };
   const openEdit = (s: School) => {
+    setActiveSchoolId(s.id);
     setEditing(s);
     setDialogOpen(true);
   };

@@ -6,10 +6,21 @@ export interface Teacher {
   email: string;
   phone: string;
   courseIds: string[];
-  availableDays: Weekday[];
+  availableDaySlotIds: string[];
   status: "active" | "inactive";
   avatar?: string;
   personnel_code?: string;
+}
+
+export interface DaySlot {
+  id: string;
+  schoolId: string;
+  dayId: number;
+  slotNumber: number;
+  title: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  active: boolean;
 }
 
 export interface Class {

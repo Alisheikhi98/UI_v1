@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useSchoolsRepository } from "@/lib/api/school-queries";
 
 function NotFoundComponent() {
   return (
@@ -116,8 +117,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ActiveSchoolBootstrap />
       <Outlet />
       <Toaster richColors position="top-left" />
     </QueryClientProvider>
   );
+}
+
+function ActiveSchoolBootstrap() {
+  useSchoolsRepository();
+  return null;
 }
