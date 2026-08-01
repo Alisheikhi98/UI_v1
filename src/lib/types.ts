@@ -1,16 +1,17 @@
-export type Weekday = "saturday" | "sunday" | "monday" | "tuesday" | "wednesday" | "thursday";
-
 export interface Teacher {
   id: string;
   name: string;
   email: string;
   phone: string;
   courseIds: string[];
-  availableDaySlotIds: string[];
   status: "active" | "inactive";
   avatar?: string;
   personnel_code?: string;
 }
+
+export type TeacherWithAvailability = Teacher & {
+  availableDaySlotIds: string[];
+};
 
 export interface DaySlot {
   id: string;
@@ -21,6 +22,12 @@ export interface DaySlot {
   startTime: string | null;
   endTime: string | null;
   active: boolean;
+}
+
+export interface DaySlotGroup {
+  dayId: number;
+  dayName: string;
+  slots: DaySlot[];
 }
 
 export interface Class {

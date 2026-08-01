@@ -118,7 +118,7 @@ async function request<T>(path: string, init: RequestInit, requiresAuth: boolean
       issues,
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     );
-    if (response.status === 401 && typeof window !== "undefined") {
+    if (requiresAuth && response.status === 401 && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("api:unauthorized", { detail: error }));
     }
     throw error;

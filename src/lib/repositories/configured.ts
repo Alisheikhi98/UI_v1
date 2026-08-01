@@ -1,15 +1,4 @@
 import {
-  classAssignmentRepository as mockClassAssignmentRepository,
-  classRepository as mockClassRepository,
-  courseRepository as mockCourseRepository,
-  teacherRepository as mockTeacherRepository,
-} from "@/lib/mock-repositories";
-import {
-  MockDaySlotRepository,
-  MockTeacherAvailabilityRepository,
-  MockTeacherCoursesRepository,
-} from "@/lib/mock-related-repositories";
-import {
   ApiClassAssignmentRepository,
   ApiClassRepository,
   ApiCourseRepository,
@@ -58,27 +47,43 @@ const initialResult = <T>(items: T[]): PaginatedResult<T> => ({
 // without changing hooks, routes, or components.
 export const useMockApi = import.meta.env.VITE_USE_MOCK_API === "true";
 
-const createMockRepositories = (): RepositoryRegistry => ({
-  teachers: {
-    repository: mockTeacherRepository,
-    initialData: initialResult(mockTeacherRepository.snapshot()),
-  },
-  courses: {
-    repository: mockCourseRepository,
-    initialData: initialResult(mockCourseRepository.snapshot()),
-  },
-  classes: {
-    repository: mockClassRepository,
-    initialData: initialResult(mockClassRepository.snapshot()),
-  },
-  classAssignments: {
-    repository: mockClassAssignmentRepository,
-    initialData: initialResult(mockClassAssignmentRepository.snapshot()),
-  },
-  daySlots: new MockDaySlotRepository(),
-  teacherAvailability: new MockTeacherAvailabilityRepository(),
-  teacherCourses: new MockTeacherCoursesRepository(),
-});
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  console.info(
+    `Repository mode: ${useMockApi ? "MOCK" : "API"}\nAPI base URL: ${import.meta.env.VITE_API_BASE_URL ?? "(not configured)"}`,
+  );
+}
+
+const createMockRepositories = async (): Promise<RepositoryRegistry> => {
+  const [
+    { classAssignmentRepository, classRepository, courseRepository, teacherRepository },
+    { MockDaySlotRepository, MockTeacherAvailabilityRepository, MockTeacherCoursesRepository },
+  ] = await Promise.all([
+    import("@/lib/mock-repositories"),
+    import("@/lib/mock-related-repositories"),
+  ]);
+
+  return {
+    teachers: {
+      repository: teacherRepository,
+      initialData: initialResult(teacherRepository.snapshot()),
+    },
+    courses: {
+      repository: courseRepository,
+      initialData: initialResult(courseRepository.snapshot()),
+    },
+    classes: {
+      repository: classRepository,
+      initialData: initialResult(classRepository.snapshot()),
+    },
+    classAssignments: {
+      repository: classAssignmentRepository,
+      initialData: initialResult(classAssignmentRepository.snapshot()),
+    },
+    daySlots: new MockDaySlotRepository(),
+    teacherAvailability: new MockTeacherAvailabilityRepository(),
+    teacherCourses: new MockTeacherCoursesRepository(),
+  };
+};
 
 const apiRepositories: RepositoryRegistry = {
   teachers: { repository: new ApiTeacherRepository(getActiveSchoolId) },
@@ -90,4 +95,4 @@ const apiRepositories: RepositoryRegistry = {
   teacherCourses: new ApiTeacherCoursesRepository(getActiveSchoolId),
 };
 
-export const repositories = useMockApi ? createMockRepositories() : apiRepositories;
+export const repositories = useMockApi ? await createMockRepositories() : apiRepositories;

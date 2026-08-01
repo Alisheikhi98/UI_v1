@@ -1,4 +1,4 @@
-import type { Class, ClassAssignment, Course, DaySlot, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
 
 export interface RepositoryRequestOptions {
   signal?: AbortSignal;
@@ -96,7 +96,7 @@ export interface ClassAssignmentRepository extends EntityRepository<ClassAssignm
 }
 
 export interface DaySlotRepository {
-  list(options?: RepositoryRequestOptions): Promise<DaySlot[]>;
+  listWeek(options?: RepositoryRequestOptions): Promise<DaySlotGroup[]>;
 }
 
 export interface TeacherAvailabilityRepository {

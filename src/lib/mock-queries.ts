@@ -5,31 +5,18 @@ import type { RepositoryBinding } from "@/lib/repositories/configured";
 import type {
   ClassAssignmentReplacementInput,
   EntityRepository,
+  PaginatedResult,
   RepositoryListParams,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlot, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
 import { publishQuerySnapshot } from "@/lib/query-cache-publication";
+import { isClassAssignmentPartialFailure } from "@/lib/api/class-assignment-reconciliation";
+import { repositoryQueryKeys } from "@/lib/repository-query-keys";
+import { createCompatibleCourse } from "@/lib/course-creation";
+import { canLoadClassAssignments } from "@/lib/class-assignment-query";
+import { createTeacherCoursesQueryOptions } from "@/lib/teacher-courses";
 
-export const repositoryQueryKeys = {
-  schools: (schoolId: string | null) => ["schools", schoolId ?? "none"] as const,
-  teachers: (schoolId: string | null, params?: unknown) =>
-    ["teachers", schoolId ?? "none", params ?? {}] as const,
-  teacherAvailability: (schoolId: string | null, teacherId: string) =>
-    ["teacher-availability", schoolId ?? "none", teacherId] as const,
-  teacherCourses: (schoolId: string | null, teacherId: string) =>
-    ["teacher-courses", schoolId ?? "none", teacherId] as const,
-  courses: (schoolId: string | null, classId?: string) =>
-    [
-      classId ? "class-compatible-courses" : "courses",
-      schoolId ?? "none",
-      classId ?? "all",
-    ] as const,
-  classes: (schoolId: string | null, params?: unknown) =>
-    ["classes", schoolId ?? "none", params ?? {}] as const,
-  assignments: (schoolId: string | null, classIds: readonly string[]) =>
-    ["class-assignments", schoolId ?? "none", [...classIds].sort()] as const,
-  daySlots: (schoolId: string | null) => ["day-slots", schoolId ?? "none"] as const,
-};
+export { repositoryQueryKeys };
 
 // Kept as a compatibility export for existing architecture tests.
 export const mockQueryKeys = {
@@ -70,8 +57,11 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
     enabled,
   });
   const refresh = async () => {
-    const result = await repository.list(params);
-    publishQuerySnapshot(queryClient, queryKey, result);
+    await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+    await queryClient.refetchQueries(
+      { queryKey, exact: true, type: "active" },
+      { throwOnError: true },
+    );
   };
 
   const create = useMutation({
@@ -97,58 +87,77 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
   };
 }
 
-export function useTeachersRepository(params: RepositoryListParams = {}) {
+export function useTeachersRepository(
+  params: RepositoryListParams = {},
+  options: { includeAvailability?: boolean } = {},
+) {
+  const filters = params.filters ?? {};
+  const effectiveParams: RepositoryListParams = Object.prototype.hasOwnProperty.call(
+    filters,
+    "active",
+  )
+    ? params
+    : { ...params, filters: { ...filters, active: true } };
   const schoolId = useActiveSchoolId();
   const base = useRepository<
     Teacher,
     Parameters<typeof repositories.teachers.repository.create>[0],
     Parameters<typeof repositories.teachers.repository.update>[1]
-  >(repositoryQueryKeys.teachers(schoolId, keyParams(params)), repositories.teachers, params);
-  const relationQueries = useQueries({
-    queries: base.items.flatMap((teacher) => [
-      {
-        queryKey: repositoryQueryKeys.teacherAvailability(schoolId, teacher.id),
-        queryFn: ({ signal }: { signal: AbortSignal }) =>
-          repositories.teacherAvailability.list(teacher.id, { signal }),
-        enabled: useMockApi || schoolId !== null,
-      },
-      {
-        queryKey: repositoryQueryKeys.teacherCourses(schoolId, teacher.id),
-        queryFn: ({ signal }: { signal: AbortSignal }) =>
-          repositories.teacherCourses.list(teacher.id, { signal }),
-        enabled: useMockApi || schoolId !== null,
-      },
-    ]),
+  >(
+    repositoryQueryKeys.teachers(schoolId, keyParams(effectiveParams)),
+    repositories.teachers,
+    effectiveParams,
+  );
+  const availabilityQueries = useQueries({
+    queries: base.items.map((teacher) => ({
+      queryKey: repositoryQueryKeys.teacherAvailability(schoolId, teacher.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        repositories.teacherAvailability.list(teacher.id, { signal }),
+      enabled: Boolean(options.includeAvailability) && (useMockApi || schoolId !== null),
+    })),
   });
-  const items = base.items.map((teacher, index) => {
-    const availability = relationQueries[index * 2]?.data as string[] | undefined;
-    const courses = relationQueries[index * 2 + 1]?.data as Course[] | undefined;
-    return {
-      ...teacher,
-      availableDaySlotIds: availability ?? teacher.availableDaySlotIds,
-      courseIds: courses?.map((course) => course.id) ?? teacher.courseIds,
-    };
+  const items = base.items.map((teacher, index) => ({
+    ...teacher,
+    availableDaySlotIds: (availabilityQueries[index]?.data as string[] | undefined) ?? [],
+  }));
+  return { ...base, items };
+}
+
+export function useTeacherCoursesQuery(teacherId: string | null, enabled = true) {
+  const schoolId = useActiveSchoolId();
+  return useQuery<Course[]>({
+    queryKey: repositoryQueryKeys.teacherCourses(schoolId, teacherId ?? "none"),
+    ...createTeacherCoursesQueryOptions(repositories.teacherCourses, teacherId ?? "none"),
+    enabled: enabled && Boolean(teacherId) && (useMockApi || schoolId !== null),
   });
-  const relatedCourses = [
-    ...new Map(
-      relationQueries
-        .flatMap((query, index) =>
-          index % 2 === 1 ? ((query.data as Course[] | undefined) ?? []) : [],
-        )
-        .map((course) => [course.id, course]),
-    ).values(),
-  ];
-  return { ...base, items, relatedCourses };
 }
 
 export function useCoursesRepository(params: RepositoryListParams = {}) {
   const schoolId = useActiveSchoolId();
   const classId = typeof params.filters?.classId === "string" ? params.filters.classId : undefined;
-  return useRepository(
+  const queryClient = useQueryClient();
+  const base = useRepository(
     repositoryQueryKeys.courses(schoolId, classId),
-    repositories.courses,
+    classId ? { ...repositories.courses, initialData: undefined } : repositories.courses,
     params,
   );
+  const compatibleCreate = useMutation({
+    mutationFn: (input: Parameters<typeof repositories.courses.repository.create>[0]) => {
+      if (!classId) throw new Error("A class must be selected before creating a course.");
+      return createCompatibleCourse({
+        repository: repositories.courses.repository,
+        queryClient,
+        schoolId,
+        classId,
+        input,
+      });
+    },
+  });
+
+  return {
+    ...base,
+    create: classId ? compatibleCreate.mutateAsync : base.create,
+  };
 }
 
 export function useClassesRepository(params: RepositoryListParams = {}) {
@@ -162,10 +171,22 @@ export function useClassesRepository(params: RepositoryListParams = {}) {
 
 export function useDaySlotsRepository() {
   const schoolId = useActiveSchoolId();
-  return useQuery<DaySlot[]>({
+  return useQuery<DaySlotGroup[]>({
     queryKey: repositoryQueryKeys.daySlots(schoolId),
-    queryFn: ({ signal }) => repositories.daySlots.list({ signal }),
+    queryFn: ({ signal }) => repositories.daySlots.listWeek({ signal }),
     enabled: useMockApi || schoolId !== null,
+  });
+}
+
+export function useTeacherAvailabilityQuery(teacherId: string | null) {
+  const schoolId = useActiveSchoolId();
+  return useQuery<string[]>({
+    queryKey: repositoryQueryKeys.teacherAvailability(schoolId, teacherId ?? "none"),
+    queryFn: ({ signal }) => {
+      if (!teacherId) throw new Error("A teacher must be selected.");
+      return repositories.teacherAvailability.list(teacherId, { signal });
+    },
+    enabled: Boolean(teacherId) && (useMockApi || schoolId !== null),
   });
 }
 
@@ -175,11 +196,12 @@ export function useTeacherAvailabilityMutation() {
   return useMutation({
     mutationFn: ({ teacherId, daySlotIds }: { teacherId: string; daySlotIds: readonly string[] }) =>
       repositories.teacherAvailability.replace(teacherId, daySlotIds),
-    onSuccess: (daySlotIds, variables) => {
-      queryClient.setQueryData(
-        repositoryQueryKeys.teacherAvailability(schoolId, variables.teacherId),
-        daySlotIds,
-      );
+    onSuccess: async (_daySlotIds, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.teacherAvailability(schoolId, variables.teacherId),
+        exact: true,
+        refetchType: "active",
+      });
     },
   });
 }
@@ -193,12 +215,40 @@ export function useClassAssignmentsRepository(params: RepositoryListParams = {})
   const { repository, initialData } = repositories.classAssignments;
   const queryClient = useQueryClient();
   const queryKey = repositoryQueryKeys.assignments(schoolId, classIds);
+  const scopedInitialData =
+    useMockApi && classIds.length > 0 && initialData
+      ? {
+          ...initialData,
+          items: initialData.items.filter((assignment) => classIds.includes(assignment.classId)),
+          total: initialData.items.filter((assignment) => classIds.includes(assignment.classId))
+            .length,
+        }
+      : undefined;
   const query = useQuery({
     queryKey,
     ...createListQueryOptions(repository, params),
-    initialData: useMockApi ? initialData : undefined,
-    enabled: useMockApi || (schoolId !== null && classIds.length > 0),
+    initialData: scopedInitialData,
+    enabled: canLoadClassAssignments(useMockApi, schoolId, classIds),
   });
+  const publishClassSnapshots = (classId: string, serverAssignments: ClassAssignment[]) => {
+    const snapshots = queryClient.getQueriesData<PaginatedResult<ClassAssignment>>({
+      queryKey: repositoryQueryKeys.assignmentsRoot(schoolId),
+    });
+    snapshots.forEach(([targetKey, current]) => {
+      const targetClassIds = Array.isArray(targetKey[2]) ? targetKey[2].map(String) : [];
+      if (!targetClassIds.includes(classId)) return;
+      const items = [
+        ...(current?.items.filter((assignment) => assignment.classId !== classId) ?? []),
+        ...serverAssignments,
+      ];
+      publishQuerySnapshot(queryClient, targetKey, {
+        items,
+        total: items.length,
+        page: current?.page ?? 1,
+        pageSize: Math.max(1, current?.pageSize ?? items.length),
+      });
+    });
+  };
   const replace = useMutation({
     mutationFn: ({
       classId,
@@ -207,9 +257,13 @@ export function useClassAssignmentsRepository(params: RepositoryListParams = {})
       classId: string;
       assignments: readonly ClassAssignmentReplacementInput[];
     }) => repository.replaceForClass(classId, assignments),
-    onSuccess: async () => {
-      const result = await repository.list(params);
-      publishQuerySnapshot(queryClient, queryKey, result);
+    onSuccess: (serverAssignments, variables) => {
+      publishClassSnapshots(variables.classId, serverAssignments);
+    },
+    onError: (error, variables) => {
+      if (isClassAssignmentPartialFailure(error) && error.refetchError === undefined) {
+        publishClassSnapshots(variables.classId, error.serverAssignments);
+      }
     },
   });
 

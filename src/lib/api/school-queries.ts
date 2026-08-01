@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { schoolRepository, type SchoolFormData } from "@/lib/api/schools-store";
-import { setActiveSchoolId, useActiveSchoolId } from "@/lib/active-school";
-import { repositoryQueryKeys } from "@/lib/mock-queries";
+import { resolveActiveSchoolId, setActiveSchoolId, useActiveSchoolId } from "@/lib/active-school";
+import { repositoryQueryKeys } from "@/lib/repository-query-keys";
 
 export const schoolQueryKey = repositoryQueryKeys.schools;
 
@@ -17,7 +17,12 @@ export function useSchoolsRepository() {
   });
 
   useEffect(() => {
-    if (activeSchoolId === null && query.data?.[0]) setActiveSchoolId(query.data[0].id);
+    if (!query.data) return;
+    const resolvedSchoolId = resolveActiveSchoolId(
+      activeSchoolId,
+      query.data.map((school) => school.id),
+    );
+    if (resolvedSchoolId !== activeSchoolId) setActiveSchoolId(resolvedSchoolId);
   }, [activeSchoolId, query.data]);
 
   const publish = async () => {

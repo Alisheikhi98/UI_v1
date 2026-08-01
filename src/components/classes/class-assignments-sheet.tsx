@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   BookOpen,
   Check,
   ChevronsUpDown,
   GraduationCap,
+  LoaderCircle,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
 } from "lucide-react";
@@ -64,27 +67,35 @@ import type {
 } from "@/lib/repositories";
 import type { ClassAssignment, Course, Teacher } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { isClassAssignmentPartialFailure } from "@/lib/api/class-assignment-reconciliation";
+import { createCourseInputForClass, selectCreatedCourseInDraft } from "@/lib/course-creation";
+import {
+  initializeClassAssignmentDraft,
+  isAssignmentDraftRowDirty,
+  type ClassAssignmentDraft,
+} from "@/lib/class-assignment-draft";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classItem: ClassViewModel | null;
   assignments: ClassAssignment[];
+  assignmentsStatus: "pending" | "error" | "success";
+  assignmentsError: Error | null;
   courses: Course[];
   teachers: Teacher[];
   onSaveAssignments: (
     classId: string,
     assignments: readonly ClassAssignmentReplacementInput[],
-  ) => Promise<void>;
-  onCreateCourse: (course: CourseCreateInput) => Promise<void>;
+  ) => Promise<ClassAssignment[]>;
+  onRetryAssignments: () => void;
+  onCreateCourse: (course: CourseCreateInput) => Promise<Course>;
   onUpdateCourse: (id: string, course: CourseUpdateInput) => Promise<void>;
   onCreateTeacher: (teacher: TeacherCreateInput) => Promise<void>;
   onUpdateTeacher: (id: string, teacher: TeacherUpdateInput) => Promise<void>;
 }
 
-type DraftAssignment = ClassAssignmentReplacementInput & { draftId: string };
-
-const serializeDraft = (items: DraftAssignment[]) =>
+const serializeDraft = (items: ClassAssignmentDraft[]) =>
   JSON.stringify(
     [...items]
       .sort((first, second) => first.draftId.localeCompare(second.draftId))
@@ -99,7 +110,7 @@ const serializeDraft = (items: DraftAssignment[]) =>
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value > 0;
 
-const isDraftValid = (items: DraftAssignment[]) => {
+const isDraftValid = (items: ClassAssignmentDraft[]) => {
   const selectedCourseIds = items.map((item) => item.courseId).filter(Boolean);
   return (
     selectedCourseIds.length === new Set(selectedCourseIds).size &&
@@ -114,30 +125,48 @@ export function ClassAssignmentsSheet({
   onOpenChange,
   classItem,
   assignments,
+  assignmentsStatus,
+  assignmentsError,
   courses,
   teachers,
   onSaveAssignments,
+  onRetryAssignments,
   onCreateCourse,
   onUpdateCourse,
   onCreateTeacher,
   onUpdateTeacher,
 }: Props) {
-  const [draft, setDraft] = useState<DraftAssignment[]>([]);
-  const [initialDraft, setInitialDraft] = useState<DraftAssignment[]>([]);
+  const [draft, setDraft] = useState<ClassAssignmentDraft[]>([]);
+  const [initialDraft, setInitialDraft] = useState<ClassAssignmentDraft[]>([]);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
+  const [createCourseTargetDraftId, setCreateCourseTargetDraftId] = useState<string | null>(null);
   const [courseToRename, setCourseToRename] = useState<Course | null>(null);
   const [createTeacherOpen, setCreateTeacherOpen] = useState(false);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInProgress = useRef(false);
+  const initializedClassId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!open || !classItem) return;
-    const current = assignments
-      .filter((assignment) => assignment.classId === classItem.id)
-      .map((assignment) => ({ ...structuredClone(assignment), draftId: assignment.id }));
+    if (!open) {
+      initializedClassId.current = null;
+      return;
+    }
+    if (!classItem) return;
+
+    const current = initializeClassAssignmentDraft({
+      classId: classItem.id,
+      assignments,
+      queryStatus: assignmentsStatus,
+      initializedClassId: initializedClassId.current,
+    });
+    if (!current) return;
+
+    initializedClassId.current = classItem.id;
     setDraft(current);
     setInitialDraft(structuredClone(current));
-  }, [assignments, classItem, open]);
+  }, [assignments, assignmentsStatus, classItem, open]);
 
   if (!classItem) return null;
 
@@ -147,6 +176,7 @@ export function ClassAssignmentsSheet({
   const draftIsValid = isDraftValid(draft);
 
   const requestClose = () => {
+    if (saveInProgress.current) return;
     if (isDirty) {
       setConfirmCloseOpen(true);
       return;
@@ -179,10 +209,13 @@ export function ClassAssignmentsSheet({
   };
 
   const saveChanges = async () => {
+    if (saveInProgress.current) return;
     if (!draftIsValid) {
       toast.error("برای ذخیره، اطلاعات همه ردیف‌ها را به‌درستی تکمیل کنید");
       return;
     }
+    saveInProgress.current = true;
+    setIsSaving(true);
     try {
       const replacement = draft.map(({ draftId: _draftId, ...assignment }) => assignment);
       await onSaveAssignments(classItem.id, structuredClone(replacement));
@@ -190,9 +223,18 @@ export function ClassAssignmentsSheet({
       toast.success("تنظیمات دروس کلاس ذخیره شد");
       onOpenChange(false);
     } catch (error) {
-      toast.error("ذخیره تنظیمات کلاس انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
-      });
+      if (isClassAssignmentPartialFailure(error)) {
+        toast.warning("ردیف‌های کلاس به‌طور کامل ذخیره نشدند", {
+          description: error.cause instanceof Error ? error.cause.message : error.message,
+        });
+      } else {
+        toast.error("ذخیره تنظیمات کلاس انجام نشد", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      }
+    } finally {
+      saveInProgress.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -229,6 +271,7 @@ export function ClassAssignmentsSheet({
               <Button
                 type="button"
                 onClick={addEmptyRow}
+                disabled={assignmentsStatus !== "success"}
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 <Plus className="me-2 h-4 w-4" />
@@ -248,7 +291,40 @@ export function ClassAssignmentsSheet({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {draft.length === 0 ? (
+                  {assignmentsStatus === "pending" ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-56 text-center">
+                        <div className="flex flex-col items-center">
+                          <LoaderCircle className="mb-3 h-8 w-8 animate-spin text-primary" />
+                          <p className="font-medium">در حال دریافت تنظیمات کلاس...</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            اطلاعات ذخیره‌شده از سرور دریافت می‌شود.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : assignmentsStatus === "error" ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-56 text-center">
+                        <div className="flex flex-col items-center">
+                          <AlertCircle className="mb-3 h-8 w-8 text-destructive" />
+                          <p className="font-medium">دریافت تنظیمات کلاس انجام نشد.</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {assignmentsError?.message ?? "دوباره تلاش کنید."}
+                          </p>
+                          <Button
+                            type="button"
+                            className="mt-4"
+                            variant="outline"
+                            onClick={onRetryAssignments}
+                          >
+                            <RefreshCw className="me-2 h-4 w-4" />
+                            تلاش دوباره
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : draft.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="h-56 text-center">
                         <div className="flex flex-col items-center">
@@ -280,6 +356,11 @@ export function ClassAssignmentsSheet({
                         <TableRow key={assignment.draftId}>
                           <TableCell className="text-center align-top font-medium text-muted-foreground">
                             {index + 1}
+                            {isAssignmentDraftRowDirty(assignment, initialDraft) && (
+                              <span className="mt-1 block text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                                ذخیره‌نشده
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="align-top">
                             <ManagedEntityPicker
@@ -295,7 +376,10 @@ export function ClassAssignmentsSheet({
                               onChange={(courseId) =>
                                 updateAssignment(assignment.draftId, { courseId })
                               }
-                              onCreate={() => setCreateCourseOpen(true)}
+                              onCreate={() => {
+                                setCreateCourseTargetDraftId(assignment.draftId);
+                                setCreateCourseOpen(true);
+                              }}
                               onEdit={(courseId) =>
                                 setCourseToRename(
                                   courses.find((course) => course.id === courseId) ?? null,
@@ -391,7 +475,7 @@ export function ClassAssignmentsSheet({
           </div>
 
           <DialogFooter className="shrink-0 flex-col-reverse gap-2 border-t bg-background px-4 py-3 sm:flex-row sm:px-6">
-            <Button type="button" variant="ghost" onClick={requestClose}>
+            <Button type="button" variant="ghost" onClick={requestClose} disabled={isSaving}>
               بستن
             </Button>
             <div className="hidden flex-1 text-xs text-muted-foreground sm:block">
@@ -404,7 +488,7 @@ export function ClassAssignmentsSheet({
             <Button
               type="button"
               className="min-w-40"
-              disabled={!isDirty || !draftIsValid}
+              disabled={assignmentsStatus !== "success" || !isDirty || !draftIsValid || isSaving}
               onClick={saveChanges}
             >
               <Check className="me-2 h-4 w-4" />
@@ -416,18 +500,20 @@ export function ClassAssignmentsSheet({
 
       <CourseNameDialog
         open={createCourseOpen}
-        onOpenChange={setCreateCourseOpen}
+        onOpenChange={(nextOpen) => {
+          setCreateCourseOpen(nextOpen);
+          if (!nextOpen) setCreateCourseTargetDraftId(null);
+        }}
         title="ایجاد درس جدید"
         courses={courses}
         onSave={async (name) => {
           try {
-            await onCreateCourse({
-              name,
-              active: true,
-              gradeId: classItem.gradeId,
-              majorId: classItem.majorId,
-              category: "specialized",
-            });
+            const createdCourse = await onCreateCourse(createCourseInputForClass(classItem, name));
+            if (createCourseTargetDraftId) {
+              setDraft((current) =>
+                selectCreatedCourseInDraft(current, createCourseTargetDraftId, createdCourse.id),
+              );
+            }
             toast.success("درس جدید ایجاد شد");
           } catch (error) {
             toast.error("ایجاد درس انجام نشد", {
@@ -689,9 +775,13 @@ function CourseNameDialog({
   onSave: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setName(initialName);
+    if (open) {
+      setName(initialName);
+      setIsSaving(false);
+    }
   }, [initialName, open]);
 
   const normalizedName = normalizeCourseName(name);
@@ -711,9 +801,16 @@ function CourseNameDialog({
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            if (!valid) return;
-            await onSave(name.trim().replace(/\s+/g, " "));
-            onOpenChange(false);
+            if (!valid || isSaving) return;
+            setIsSaving(true);
+            try {
+              await onSave(name.trim().replace(/\s+/g, " "));
+              onOpenChange(false);
+            } catch {
+              // The caller owns the user-facing API error; keep this dialog open.
+            } finally {
+              setIsSaving(false);
+            }
           }}
         >
           <div className="space-y-2 py-4">
@@ -730,10 +827,15 @@ function CourseNameDialog({
             {duplicate && <p className="text-xs text-destructive">درسی با این نام وجود دارد.</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSaving}
+              onClick={() => onOpenChange(false)}
+            >
               انصراف
             </Button>
-            <Button type="submit" disabled={!valid}>
+            <Button type="submit" disabled={!valid || isSaving}>
               ذخیره
             </Button>
           </DialogFooter>

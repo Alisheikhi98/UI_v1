@@ -7,12 +7,13 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useSchoolsRepository } from "@/lib/api/school-queries";
+import { setActiveSchoolId } from "@/lib/active-school";
 
 function NotFoundComponent() {
   return (
@@ -117,11 +118,40 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <UnauthorizedRecovery />
       <ActiveSchoolBootstrap />
       <Outlet />
       <Toaster richColors position="top-left" />
     </QueryClientProvider>
   );
+}
+
+function UnauthorizedRecovery() {
+  const { queryClient } = Route.useRouteContext();
+  const recoveryInProgress = useRef(false);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      if (recoveryInProgress.current) return;
+      recoveryInProgress.current = true;
+
+      window.localStorage.removeItem("access_token");
+      setActiveSchoolId(null);
+      queryClient.clear();
+
+      if (window.location.pathname !== "/auth/login") {
+        window.location.replace("/auth/login");
+        return;
+      }
+
+      recoveryInProgress.current = false;
+    };
+
+    window.addEventListener("api:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("api:unauthorized", handleUnauthorized);
+  }, [queryClient]);
+
+  return null;
 }
 
 function ActiveSchoolBootstrap() {

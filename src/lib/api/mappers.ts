@@ -1,13 +1,15 @@
-import type { Class, ClassAssignment, Course, DaySlot, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlot, DaySlotGroup, Teacher } from "@/lib/types";
 import type {
   ClassAssignmentDto,
   ClassDto,
+  CourseCreateDto,
   CourseDto,
   DaySlotDto,
   FastApiPage,
   TeacherDto,
+  WeeklyDaySlotsDto,
 } from "@/lib/api/dtos";
-import type { PaginatedResult } from "@/lib/repositories";
+import type { CourseCreateInput, PaginatedResult } from "@/lib/repositories";
 
 export function toApiId(id: string, field: string): number {
   const numeric = Number(id.startsWith("major-") ? id.slice(6) : id);
@@ -34,7 +36,6 @@ export const mapTeacher = (dto: TeacherDto): Teacher => ({
   phone: dto.phone ?? "",
   personnel_code: dto.code ?? "",
   courseIds: [],
-  availableDaySlotIds: [],
   status: dto.active ? "active" : "inactive",
 });
 
@@ -53,6 +54,14 @@ export const mapCourse = (dto: CourseDto): Course => ({
   code: dto.course_code ?? "",
   weeklyHours: 1,
   color: courseColor(dto.id),
+});
+
+export const mapCourseCreateInputToDto = (input: CourseCreateInput): CourseCreateDto => ({
+  name: input.name,
+  major_id: toApiId(input.majorId, "majorId"),
+  grade: Number(input.gradeId),
+  category: input.category,
+  active: input.active ?? true,
 });
 
 export const mapClass = (dto: ClassDto): Class => ({
@@ -81,3 +90,10 @@ export const mapDaySlot = (dto: DaySlotDto): DaySlot => ({
   endTime: dto.end_time?.slice(0, 5) ?? null,
   active: dto.active,
 });
+
+export const mapWeeklyDaySlots = (dto: WeeklyDaySlotsDto): DaySlotGroup[] =>
+  dto.days.map((day) => ({
+    dayId: day.day_id,
+    dayName: day.day_name,
+    slots: day.slots.filter((slot) => slot.active).map(mapDaySlot),
+  }));

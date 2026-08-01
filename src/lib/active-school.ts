@@ -32,6 +32,17 @@ export function setActiveSchoolId(schoolId: string | number | null) {
   listeners.forEach((listener) => listener());
 }
 
+export function resolveActiveSchoolId(
+  persistedSchoolId: string | null,
+  accessibleSchoolIds: readonly (string | number)[],
+): string | null {
+  const normalizedIds = accessibleSchoolIds.map(String);
+  if (persistedSchoolId !== null && normalizedIds.includes(persistedSchoolId)) {
+    return persistedSchoolId;
+  }
+  return normalizedIds[0] ?? null;
+}
+
 export function useActiveSchoolId() {
   return useSyncExternalStore(subscribe, getSnapshot, () => null);
 }

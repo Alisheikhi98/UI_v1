@@ -224,7 +224,6 @@ test("backend-shaped repositories preserve generated IDs and pagination metadata
     email: "",
     phone: "",
     courseIds: [],
-    availableDaySlotIds: [],
     status: "active",
   };
   const created = await repository.create(teacherInput);
@@ -361,13 +360,16 @@ test("FastAPI mappers preserve backend IDs and translate snake_case contracts", 
   );
 });
 
-test("API assignment replacement reports the missing backend transaction", async () => {
+test("API assignment replacement uses FastAPI CRUD without a mock fallback", async () => {
   const source = await readFile(
     fileURLToPath(new URL("../src/lib/api/api-repositories.ts", import.meta.url)),
     "utf8",
   );
-  assert.match(source, /class BackendCapabilityError/);
-  assert.match(source, /atomic bulk assignment replacement endpoint/);
+  assert.match(source, /ClassAssignmentReconciler/);
+  assert.match(source, /method: "POST"/);
+  assert.match(source, /method: "PATCH"/);
+  assert.match(source, /method: "DELETE"/);
+  assert.doesNotMatch(source, /atomic bulk assignment replacement endpoint/);
   assert.doesNotMatch(source, /mockClassAssignmentRepository/);
 });
 

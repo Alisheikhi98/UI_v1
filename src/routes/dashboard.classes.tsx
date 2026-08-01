@@ -99,23 +99,35 @@ function ClassDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: ClassFormData) => void;
+  onSave: (data: ClassFormData) => Promise<void>;
 }) {
   const [formData, setFormData] = useState<ClassFormData>(emptyClassForm);
+  const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setFormData(emptyClassForm());
+    setSubmitError(null);
   }, [open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-    onOpenChange(false);
+    if (isSaving) return;
+    setIsSaving(true);
+    setSubmitError(null);
+    try {
+      await onSave(formData);
+      onOpenChange(false);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "ذخیره کلاس انجام نشد.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSaving && onOpenChange(nextOpen)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>افزودن کلاس جدید</DialogTitle>
@@ -173,10 +185,18 @@ function ClassDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
               انصراف
             </Button>
-            <Button type="submit">افزودن کلاس</Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? "در حال ذخیره..." : "افزودن کلاس"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -193,25 +213,40 @@ function RenameClassDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classItem: ClassViewModel | null;
-  onSave: (name: string) => void;
+  onSave: (name: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) setName(classItem?.name ?? "");
+    if (open) {
+      setName(classItem?.name ?? "");
+      setSubmitError(null);
+    }
   }, [classItem, open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSaving && onOpenChange(nextOpen)}>
       <DialogContent dir="rtl" className="sm:max-w-sm">
         <DialogHeader className="text-right">
           <DialogTitle>ویرایش نام کلاس</DialogTitle>
           <DialogDescription>پایه و رشته کلاس پس از ایجاد قابل تغییر نیستند.</DialogDescription>
         </DialogHeader>
         <form
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            if (name.trim()) onSave(name.trim());
+            if (!name.trim() || isSaving) return;
+            setIsSaving(true);
+            setSubmitError(null);
+            try {
+              await onSave(name.trim());
+              onOpenChange(false);
+            } catch (error) {
+              setSubmitError(error instanceof Error ? error.message : "ویرایش کلاس انجام نشد.");
+            } finally {
+              setIsSaving(false);
+            }
           }}
         >
           <div className="space-y-2 py-4">
@@ -224,11 +259,20 @@ function RenameClassDialog({
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
               انصراف
             </Button>
-            <Button type="submit" disabled={!name.trim() || name.trim() === classItem?.name}>
-              ذخیره نام
+            <Button
+              type="submit"
+              disabled={isSaving || !name.trim() || name.trim() === classItem?.name}
+            >
+              {isSaving ? "در حال ذخیره..." : "ذخیره نام"}
             </Button>
           </DialogFooter>
         </form>
@@ -245,10 +289,11 @@ function ClassesPage() {
     courses,
     teachers,
     assignments,
+    activeClassAssignments,
     classesRepository,
     coursesRepository,
     teachersRepository,
-    assignmentsRepository,
+    activeClassAssignmentsRepository,
   } = useClassManagementData(assignmentClass?.id);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
@@ -256,6 +301,8 @@ function ClassesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [renamingClass, setRenamingClass] = useState<ClassViewModel | null>(null);
   const [classToDelete, setClassToDelete] = useState<ClassViewModel | null>(null);
+  const [isDeletingClass, setIsDeletingClass] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const filteredClasses = classes.filter((c) => {
     const normalizedSearch = search.toLowerCase();
     const matchesSearch =
@@ -280,6 +327,7 @@ function ClassesPage() {
       toast.error("ایجاد کلاس انجام نشد", {
         description: error instanceof Error ? error.message : undefined,
       });
+      throw error;
     }
   };
 
@@ -291,6 +339,7 @@ function ClassesPage() {
       toast.error("حذف کلاس انجام نشد", {
         description: error instanceof Error ? error.message : undefined,
       });
+      throw error;
     }
   };
 
@@ -299,13 +348,14 @@ function ClassesPage() {
     if (!renamingClass) return;
     const current = classesRepository.items.find((item) => item.id === renamingClass.id);
     try {
-      if (current) await classesRepository.update({ id: current.id, input: { name } });
-      setRenamingClass(null);
+      if (!current) throw new Error("کلاس انتخاب‌شده دیگر در فهرست مدرسه وجود ندارد.");
+      await classesRepository.update({ id: current.id, input: { name } });
       toast.success("نام کلاس به‌روز شد");
     } catch (error) {
       toast.error("ویرایش کلاس انجام نشد", {
         description: error instanceof Error ? error.message : undefined,
       });
+      throw error;
     }
   };
   const assignmentCount = (classId: string) =>
@@ -604,7 +654,12 @@ function ClassesPage() {
 
       <AlertDialog
         open={Boolean(classToDelete)}
-        onOpenChange={(open) => !open && setClassToDelete(null)}
+        onOpenChange={(open) => {
+          if (!isDeletingClass && !open) {
+            setClassToDelete(null);
+            setDeleteError(null);
+          }
+        }}
       >
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader className="text-right">
@@ -613,17 +668,29 @@ function ClassesPage() {
               با حذف کلاس «{classToDelete?.name}»، اطلاعات انتخاب معلمان این کلاس نیز حذف می‌شود.{" "}
               معلمان و درس‌های مشترک حذف نخواهند شد.
             </AlertDialogDescription>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingClass}>انصراف</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (classToDelete) handleDelete(classToDelete);
-                setClassToDelete(null);
+              disabled={isDeletingClass}
+              onClick={async (event) => {
+                event.preventDefault();
+                if (!classToDelete || isDeletingClass) return;
+                setIsDeletingClass(true);
+                setDeleteError(null);
+                try {
+                  await handleDelete(classToDelete);
+                  setClassToDelete(null);
+                } catch (error) {
+                  setDeleteError(error instanceof Error ? error.message : "حذف کلاس انجام نشد.");
+                } finally {
+                  setIsDeletingClass(false);
+                }
               }}
             >
-              حذف کلاس
+              {isDeletingClass ? "در حال حذف..." : "حذف کلاس"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -633,17 +700,22 @@ function ClassesPage() {
         open={Boolean(assignmentClass)}
         onOpenChange={(open) => !open && setAssignmentClass(null)}
         classItem={assignmentClass}
-        assignments={assignments}
+        assignments={activeClassAssignments}
+        assignmentsStatus={activeClassAssignmentsRepository.query.status}
+        assignmentsError={activeClassAssignmentsRepository.query.error}
         courses={courses}
         teachers={teachers}
         onSaveAssignments={async (classId, nextAssignments) => {
-          await assignmentsRepository.replaceForClass({
+          return activeClassAssignmentsRepository.replaceForClass({
             classId,
             assignments: nextAssignments,
           });
         }}
+        onRetryAssignments={() => {
+          void activeClassAssignmentsRepository.query.refetch();
+        }}
         onCreateCourse={async (course) => {
-          await coursesRepository.create(course);
+          return coursesRepository.create(course);
         }}
         onUpdateCourse={async (id, course) => {
           await coursesRepository.update({ id, input: course });

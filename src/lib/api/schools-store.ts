@@ -1,6 +1,6 @@
 import { ApiError, apiRequest } from "./client";
 import { SchoolRepository, type SchoolPersistenceAdapter } from "./school-repository";
-import { MockSchoolPersistenceAdapter } from "./schools-mock";
+import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true";
 
@@ -66,7 +66,11 @@ interface DaySlotEntry {
   title?: string | null;
 }
 
-export const WEEK_DAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
+interface DaySlotDeleteCheckResponse {
+  requires_confirmation: boolean;
+}
+
+export const WEEK_DAYS = BACKEND_WEEKDAY_NAMES.map(getWeekdayDisplayLabel);
 export const DEFAULT_WORKING_DAYS = WEEK_DAYS.slice(0, 5);
 
 const DEFAULT_TIMING = {
@@ -202,8 +206,6 @@ function buildDaySlotEntries(data: SchoolFormData): DaySlotEntry[] {
 
 async function saveDaySlots(schoolId: number, data: SchoolFormData) {
   const desiredEntries = buildDaySlotEntries(data);
-  if (desiredEntries.length === 0) return;
-
   const existingSlots = await getSchoolDaySlots(schoolId);
   const existingByKey = new Map(
     existingSlots.map((slot) => [`${slot.day_id}:${slot.slot_number}`, slot]),
@@ -244,12 +246,17 @@ async function saveDaySlots(schoolId: number, data: SchoolFormData) {
   );
 
   await Promise.all(
-    obsoleteSlots.map((slot) =>
-      apiRequest(`/schools/${schoolId}/day-slots/${slot.id}`, {
+    obsoleteSlots.map(async (slot) => {
+      const deleteCheck = await apiRequest<DaySlotDeleteCheckResponse>(
+        `/schools/${schoolId}/day-slots/${slot.id}/delete-check`,
+      );
+      await apiRequest(`/schools/${schoolId}/day-slots/${slot.id}`, {
         method: "DELETE",
-        body: JSON.stringify({ confirm_delete_dependencies: false }),
-      }),
-    ),
+        body: JSON.stringify({
+          confirm_delete_dependencies: deleteCheck.requires_confirmation,
+        }),
+      });
+    }),
   );
 }
 
@@ -301,6 +308,8 @@ const apiSchoolPersistenceAdapter: SchoolPersistenceAdapter = {
   delete: () => deleteSchoolWithApi(),
 };
 
-export const schoolRepository = new SchoolRepository(
-  USE_MOCK_API ? new MockSchoolPersistenceAdapter() : apiSchoolPersistenceAdapter,
-);
+const schoolPersistenceAdapter = USE_MOCK_API
+  ? new (await import("./schools-mock")).MockSchoolPersistenceAdapter()
+  : apiSchoolPersistenceAdapter;
+
+export const schoolRepository = new SchoolRepository(schoolPersistenceAdapter);

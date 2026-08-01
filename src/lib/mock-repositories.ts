@@ -130,7 +130,6 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۱۲۳۴۵۶۷",
     personnel_code: "1",
     courseIds: ["1", "3"],
-    availableDaySlotIds: ["mock-slot-1", "mock-slot-2", "mock-slot-3", "mock-slot-5"],
     status: "active",
   },
   {
@@ -140,7 +139,6 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۲۳۴۵۶۷۸",
     personnel_code: "2",
     courseIds: ["2"],
-    availableDaySlotIds: ["mock-slot-1", "mock-slot-3", "mock-slot-4", "mock-slot-6"],
     status: "active",
   },
   {
@@ -150,7 +148,6 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۳۴۵۶۷۸۹",
     personnel_code: "3",
     courseIds: ["4", "5"],
-    availableDaySlotIds: ["mock-slot-2", "mock-slot-3", "mock-slot-5", "mock-slot-6"],
     status: "active",
   },
   {
@@ -160,7 +157,6 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۴۵۶۷۸۹۰",
     personnel_code: "4",
     courseIds: ["6", "7"],
-    availableDaySlotIds: ["mock-slot-1", "mock-slot-4"],
     status: "inactive",
   },
   {
@@ -170,7 +166,6 @@ const initialTeachers: Teacher[] = [
     phone: "۰۲۱-۵۶۷۸۹۰۱",
     personnel_code: "5",
     courseIds: ["8"],
-    availableDaySlotIds: [],
     status: "active",
   },
 ];
@@ -343,7 +338,6 @@ export class MockTeacherRepository
         phone: input.phone ?? "",
         email: "",
         courseIds: [],
-        availableDaySlotIds: [],
         status: "active",
       },
       options,
@@ -353,12 +347,42 @@ export class MockTeacherRepository
   update(id: string, input: TeacherUpdateInput, options?: RepositoryRequestOptions) {
     return super.update(id, input, options);
   }
-
-  setAvailability(id: string, availableDaySlotIds: string[], options?: RepositoryRequestOptions) {
-    return super.update(id, { availableDaySlotIds }, options);
-  }
 }
 export class MockCourseRepository extends MockEntityRepository<Course> implements CourseRepository {
+  private readonly classes: Pick<ClassRepository, "getById">;
+
+  constructor(seed: Course[], classes: Pick<ClassRepository, "getById">) {
+    super(seed);
+    this.classes = classes;
+  }
+
+  async list(params: RepositoryListParams = {}): Promise<PaginatedResult<Course>> {
+    const classId =
+      typeof params.filters?.classId === "string" ? params.filters.classId : undefined;
+    if (!classId) return super.list(params);
+
+    const selectedClass = await this.classes.getById(classId, { signal: params.signal });
+    if (!selectedClass) {
+      return {
+        items: [],
+        total: 0,
+        page: Math.max(1, params.page ?? 1),
+        pageSize: Math.max(1, params.pageSize ?? 1),
+      };
+    }
+
+    const { classId: _classId, ...filters } = params.filters ?? {};
+    return super.list({
+      ...params,
+      filters: {
+        ...filters,
+        gradeId: selectedClass.gradeId,
+        majorId: selectedClass.majorId,
+        active: true,
+      },
+    });
+  }
+
   create(input: CourseCreateInput, options?: RepositoryRequestOptions) {
     return super.create(
       {
@@ -387,8 +411,8 @@ export class MockClassRepository extends MockEntityRepository<Class> implements 
 }
 
 export const teacherRepository = new MockTeacherRepository(initialTeachers);
-export const courseRepository = new MockCourseRepository(initialCourses);
 export const classRepository = new MockClassRepository(initialClasses);
+export const courseRepository = new MockCourseRepository(initialCourses, classRepository);
 
 export class MockClassAssignmentRepository
   extends MockEntityRepository<ClassAssignment>

@@ -3,22 +3,34 @@ import type {
   ClassAssignmentDto,
   ClassDto,
   CourseDto,
-  DaySlotDto,
   DeleteCheckDto,
   FastApiPage,
   TeacherAvailabilityDto,
   TeacherCourseGroupDto,
   TeacherDto,
+  WeeklyDaySlotsDto,
 } from "@/lib/api/dtos";
 import {
   mapClass,
   mapClassAssignment,
   mapCourse,
-  mapDaySlot,
+  mapCourseCreateInputToDto,
   mapPage,
   mapTeacher,
+  mapWeeklyDaySlots,
   toApiId,
 } from "@/lib/api/mappers";
+import {
+  ClassAssignmentReconciler,
+  type ClassAssignmentCreateOperation,
+  type ClassAssignmentUpdateOperation,
+} from "@/lib/api/class-assignment-reconciliation";
+import {
+  classAssignmentPath,
+  classAssignmentsPath,
+  mapAssignmentCreatePayload,
+  mapAssignmentUpdatePayload,
+} from "@/lib/api/class-assignment-requests";
 import type {
   ClassAssignmentCreateInput,
   ClassAssignmentRepository,
@@ -40,7 +52,7 @@ import type {
   TeacherRepository,
   TeacherUpdateInput,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlot, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
 
 export class BackendCapabilityError extends Error {
   constructor(message: string) {
@@ -228,13 +240,13 @@ export class ApiDaySlotRepository implements DaySlotRepository {
     this.getSchoolId = getSchoolId;
   }
 
-  async list(options?: RepositoryRequestOptions): Promise<DaySlot[]> {
+  async listWeek(options?: RepositoryRequestOptions): Promise<DaySlotGroup[]> {
     const schoolId = requireSchoolId(this.getSchoolId);
-    const rows = await apiRequest<DaySlotDto[]>(
-      `/schools/${schoolId}/day-slots`,
+    const week = await apiRequest<WeeklyDaySlotsDto>(
+      `/schools/${schoolId}/day-slots/week`,
       withSignal(options),
     );
-    return rows.map(mapDaySlot);
+    return mapWeeklyDaySlots(week);
   }
 }
 
@@ -275,13 +287,7 @@ export class ApiCourseRepository implements CourseRepository {
       await apiRequest<CourseDto>(`/schools/${schoolId}/courses`, {
         ...withSignal(options),
         method: "POST",
-        body: JSON.stringify({
-          name: input.name,
-          major_id: toApiId(input.majorId, "majorId"),
-          grade: Number(input.gradeId),
-          category: input.category,
-          active: input.active ?? true,
-        }),
+        body: JSON.stringify(mapCourseCreateInputToDto(input)),
       }),
     );
   }
@@ -409,26 +415,33 @@ export class ApiClassRepository implements ClassRepository {
 
 export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
   private readonly getSchoolId: SchoolIdProvider;
+  private readonly reconciler: ClassAssignmentReconciler;
+
   constructor(getSchoolId: SchoolIdProvider) {
     this.getSchoolId = getSchoolId;
+    this.reconciler = new ClassAssignmentReconciler({
+      load: (classId, options) => this.loadForClass(classId, options),
+      remove: (classId, assignmentId, options) =>
+        this.deleteForClass(classId, assignmentId, options),
+      update: async (classId, operation, options) => {
+        await this.updateForClass(classId, operation, options);
+      },
+      create: async (classId, operation, options) => {
+        await this.createForClass(classId, operation, options);
+      },
+    });
   }
 
   async list(params: RepositoryListParams = {}): Promise<PaginatedResult<ClassAssignment>> {
-    const schoolId = requireSchoolId(this.getSchoolId);
     const classId = asOptionalString(params.filters?.classId);
     const classIds = [...asStringArray(params.filters?.classIds), ...(classId ? [classId] : [])];
     if (classIds.length === 0) {
       throw new Error("Class assignment queries require a classId or classIds filter.");
     }
     const pages = await Promise.all(
-      [...new Set(classIds)].map((classId) =>
-        apiRequest<ClassAssignmentDto[]>(
-          `/schools/${schoolId}/classes/${toApiId(classId, "classId")}/assignments`,
-          withSignal(params),
-        ),
-      ),
+      [...new Set(classIds)].map((classId) => this.loadForClass(classId, params)),
     );
-    const items = pages.flat().map(mapClassAssignment);
+    const items = pages.flat();
     return { items, total: items.length, page: 1, pageSize: Math.max(1, items.length) };
   }
 
@@ -440,20 +453,14 @@ export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
     input: ClassAssignmentCreateInput,
     options?: RepositoryRequestOptions,
   ): Promise<ClassAssignment> {
-    const schoolId = requireSchoolId(this.getSchoolId);
-    return mapClassAssignment(
-      await apiRequest<ClassAssignmentDto>(
-        `/schools/${schoolId}/classes/${toApiId(input.classId, "classId")}/assignments`,
-        {
-          ...withSignal(options),
-          method: "POST",
-          body: JSON.stringify({
-            course_id: toApiId(input.courseId, "courseId"),
-            teacher_id: toApiId(input.teacherId, "teacherId"),
-            slots_per_week: input.weeklyPeriods,
-          }),
-        },
-      ),
+    return this.createForClass(
+      input.classId,
+      {
+        courseId: input.courseId,
+        teacherId: input.teacherId,
+        weeklyPeriods: input.weeklyPeriods,
+      },
+      options,
     );
   }
 
@@ -463,22 +470,15 @@ export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
     options?: RepositoryRequestOptions,
   ): Promise<ClassAssignment> {
     if (!input.classId) throw new Error("classId is required to update an assignment.");
-    const schoolId = requireSchoolId(this.getSchoolId);
-    return mapClassAssignment(
-      await apiRequest<ClassAssignmentDto>(
-        `/schools/${schoolId}/classes/${toApiId(input.classId, "classId")}/assignments/${toApiId(
-          id,
-          "assignmentId",
-        )}`,
-        {
-          ...withSignal(options),
-          method: "PATCH",
-          body: JSON.stringify({
-            ...(input.teacherId ? { teacher_id: toApiId(input.teacherId, "teacherId") } : {}),
-            ...(input.weeklyPeriods !== undefined ? { slots_per_week: input.weeklyPeriods } : {}),
-          }),
-        },
-      ),
+    const current = await this.getAssignmentForClass(input.classId, id, options);
+    return this.updateForClass(
+      input.classId,
+      {
+        assignmentId: id,
+        teacherId: input.teacherId ?? current.teacherId,
+        weeklyPeriods: input.weeklyPeriods ?? current.weeklyPeriods,
+      },
+      options,
     );
   }
 
@@ -489,13 +489,90 @@ export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
   }
 
   replaceForClass(
-    _classId: string,
-    _assignments: readonly ClassAssignmentReplacementInput[],
+    classId: string,
+    assignments: readonly ClassAssignmentReplacementInput[],
+    options?: RepositoryRequestOptions,
   ): Promise<ClassAssignment[]> {
-    return Promise.reject(
-      new BackendCapabilityError(
-        "The FastAPI backend does not provide an atomic bulk assignment replacement endpoint. Saving Class Management is blocked until replaceForClass is implemented by the backend.",
+    toApiId(classId, "classId");
+    const courseIds = new Set<number>();
+    assignments.forEach((assignment) => {
+      const courseId = toApiId(assignment.courseId, "courseId");
+      if (courseIds.has(courseId)) {
+        throw new Error("Duplicate courses are not allowed within the same class.");
+      }
+      courseIds.add(courseId);
+      toApiId(assignment.teacherId, "teacherId");
+      if (assignment.id) toApiId(assignment.id, "assignmentId");
+    });
+    return this.reconciler.replaceForClass(classId, assignments, options);
+  }
+
+  private async loadForClass(
+    classId: string,
+    options?: RepositoryRequestOptions,
+  ): Promise<ClassAssignment[]> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    const rows = await apiRequest<ClassAssignmentDto[]>(
+      classAssignmentsPath(schoolId, classId),
+      withSignal(options),
+    );
+    return rows.map(mapClassAssignment);
+  }
+
+  private async getAssignmentForClass(
+    classId: string,
+    assignmentId: string,
+    options?: RepositoryRequestOptions,
+  ): Promise<ClassAssignment> {
+    const assignment = (await this.loadForClass(classId, options)).find(
+      (item) => item.id === assignmentId,
+    );
+    if (!assignment) throw new ApiError("Class assignment was not found.", 404);
+    return assignment;
+  }
+
+  private async createForClass(
+    classId: string,
+    input: ClassAssignmentCreateOperation,
+    options?: RepositoryRequestOptions,
+  ): Promise<ClassAssignment> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    return mapClassAssignment(
+      await apiRequest<ClassAssignmentDto>(classAssignmentsPath(schoolId, classId), {
+        ...withSignal(options),
+        method: "POST",
+        body: JSON.stringify(mapAssignmentCreatePayload(input)),
+      }),
+    );
+  }
+
+  private async updateForClass(
+    classId: string,
+    input: ClassAssignmentUpdateOperation,
+    options?: RepositoryRequestOptions,
+  ): Promise<ClassAssignment> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    return mapClassAssignment(
+      await apiRequest<ClassAssignmentDto>(
+        classAssignmentPath(schoolId, classId, input.assignmentId),
+        {
+          ...withSignal(options),
+          method: "PATCH",
+          body: JSON.stringify(mapAssignmentUpdatePayload(input)),
+        },
       ),
     );
+  }
+
+  private async deleteForClass(
+    classId: string,
+    assignmentId: string,
+    options?: RepositoryRequestOptions,
+  ): Promise<void> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    await apiRequest<ClassAssignmentDto>(classAssignmentPath(schoolId, classId, assignmentId), {
+      ...withSignal(options),
+      method: "DELETE",
+    });
   }
 }

@@ -5,28 +5,42 @@ import type {
   TeacherAvailabilityRepository,
   TeacherCoursesRepository,
 } from "@/lib/repositories";
-import type { Course, DaySlot } from "@/lib/types";
+import type { Course, DaySlotGroup } from "@/lib/types";
+import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
-export const mockDaySlots: DaySlot[] = Array.from({ length: 6 }, (_, index) => ({
-  id: `mock-slot-${index + 1}`,
-  schoolId: "1",
-  dayId: index + 1,
-  slotNumber: 1,
-  title: null,
-  startTime: "08:00",
-  endTime: "09:00",
-  active: true,
+const mockWeekdayNames = BACKEND_WEEKDAY_NAMES.slice(0, 6).map(getWeekdayDisplayLabel);
+const mockDaySlotGroups: DaySlotGroup[] = mockWeekdayNames.map((dayName, dayIndex) => ({
+  dayId: dayIndex + 1,
+  dayName,
+  slots: Array.from({ length: 3 }, (_, slotIndex) => ({
+    id: `mock-slot-${dayIndex * 3 + slotIndex + 1}`,
+    schoolId: "1",
+    dayId: dayIndex + 1,
+    slotNumber: slotIndex + 1,
+    title: null,
+    startTime: `${String(8 + slotIndex).padStart(2, "0")}:00`,
+    endTime: `${String(9 + slotIndex).padStart(2, "0")}:00`,
+    active: true,
+  })),
 }));
 
+const mockAvailabilityByTeacher = new Map<string, string[]>([
+  ["1", ["mock-slot-1", "mock-slot-2", "mock-slot-3", "mock-slot-5"]],
+  ["2", ["mock-slot-1", "mock-slot-3", "mock-slot-4", "mock-slot-6"]],
+  ["3", ["mock-slot-2", "mock-slot-3", "mock-slot-5", "mock-slot-6"]],
+  ["4", ["mock-slot-1", "mock-slot-4"]],
+  ["5", []],
+]);
+
 export class MockDaySlotRepository implements DaySlotRepository {
-  list(): Promise<DaySlot[]> {
-    return Promise.resolve(structuredClone(mockDaySlots));
+  listWeek(): Promise<DaySlotGroup[]> {
+    return Promise.resolve(structuredClone(mockDaySlotGroups));
   }
 }
 
 export class MockTeacherAvailabilityRepository implements TeacherAvailabilityRepository {
   async list(teacherId: string): Promise<string[]> {
-    return (await teacherRepository.getById(teacherId))?.availableDaySlotIds ?? [];
+    return structuredClone(mockAvailabilityByTeacher.get(teacherId) ?? []);
   }
 
   async replace(
@@ -34,7 +48,10 @@ export class MockTeacherAvailabilityRepository implements TeacherAvailabilityRep
     daySlotIds: readonly string[],
     options?: RepositoryRequestOptions,
   ): Promise<string[]> {
-    await teacherRepository.setAvailability(teacherId, [...daySlotIds], options);
+    if (!(await teacherRepository.getById(teacherId, options))) {
+      throw new Error("Teacher not found.");
+    }
+    mockAvailabilityByTeacher.set(teacherId, [...daySlotIds]);
     return [...daySlotIds];
   }
 }

@@ -14,9 +14,12 @@ export function useClassManagementData(activeClassId?: string) {
   const coursesRepository = useCoursesRepository({
     filters: activeClassId ? { classId: activeClassId } : undefined,
   });
-  const teachersRepository = useTeachersRepository();
+  const teachersRepository = useTeachersRepository({}, { includeAvailability: true });
   const assignmentsRepository = useClassAssignmentsRepository({
     filters: { classIds },
+  });
+  const activeClassAssignmentsRepository = useClassAssignmentsRepository({
+    filters: activeClassId ? { classId: activeClassId } : { classIds: [] },
   });
 
   return {
@@ -24,9 +27,11 @@ export function useClassManagementData(activeClassId?: string) {
     courses: coursesRepository.items,
     teachers: teachersRepository.items,
     assignments: assignmentsRepository.items,
+    activeClassAssignments: activeClassAssignmentsRepository.items,
     classesRepository,
     coursesRepository,
     teachersRepository,
     assignmentsRepository,
+    activeClassAssignmentsRepository,
   };
 }

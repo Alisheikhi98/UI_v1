@@ -1,10 +1,13 @@
-import type { ClassAssignment, Teacher } from "@/lib/types";
+import type { ClassAssignment, TeacherWithAvailability } from "@/lib/types";
 
-export type { ClassAssignment, Weekday } from "@/lib/types";
+export type { ClassAssignment } from "@/lib/types";
 
 export const MAX_WEEKLY_PERIODS = 8;
 
-export function isAssignmentComplete(assignment: ClassAssignment, teachers: Teacher[]): boolean {
+export function isAssignmentComplete(
+  assignment: ClassAssignment,
+  teachers: TeacherWithAvailability[],
+): boolean {
   const teacher = teachers.find((item) => item.id === assignment.teacherId);
   return Boolean(
     teacher &&

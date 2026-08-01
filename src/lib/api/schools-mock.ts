@@ -1,5 +1,6 @@
 import type { SchoolPersistenceAdapter } from "@/lib/api/school-repository";
 import type { School, SchoolFormData } from "@/lib/api/schools-store";
+import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "../weekday-labels.ts";
 
 const STORAGE_KEY = "dev_mock_schools";
 
@@ -9,7 +10,7 @@ const INITIAL_SCHOOLS: readonly School[] = [
     name: "Development School",
     slug: "development-school",
     status: "active",
-    workingDays: ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه"],
+    workingDays: BACKEND_WEEKDAY_NAMES.slice(0, 5).map(getWeekdayDisplayLabel),
     timing: { periodsCount: 4, dayStart: "08:00", classDuration: 75, breakDuration: 15 },
     periods: [
       { index: 1, start: "08:00", end: "09:15" },

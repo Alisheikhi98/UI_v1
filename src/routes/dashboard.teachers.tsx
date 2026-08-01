@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDays,
-  Check,
   Edit,
   Filter,
   GraduationCap,
@@ -22,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -56,19 +56,22 @@ import {
 import {
   useCoursesRepository,
   useDaySlotsRepository,
+  useTeacherAvailabilityQuery,
   useTeacherAvailabilityMutation,
   useTeachersRepository,
 } from "@/lib/mock-queries";
-import type { DaySlot, Teacher, Weekday } from "@/lib/types";
-
-const WEEKDAY_OPTIONS: ReadonlyArray<{ value: Weekday; label: string }> = [
-  { value: "saturday", label: "شنبه" },
-  { value: "sunday", label: "یکشنبه" },
-  { value: "monday", label: "دوشنبه" },
-  { value: "tuesday", label: "سه‌شنبه" },
-  { value: "wednesday", label: "چهارشنبه" },
-  { value: "thursday", label: "پنجشنبه" },
-];
+import type { DaySlotGroup, Teacher } from "@/lib/types";
+import {
+  isWeekdayFullySelected,
+  normalizeDaySlotGroups,
+  sanitizeAvailabilitySelection,
+  TeacherAvailabilitySaveGuard,
+  TeacherAvailabilitySaveInProgressError,
+  toggleAvailabilitySlot,
+  toggleWeekdayAvailability,
+} from "@/lib/teacher-availability";
+import { useMockApi } from "@/lib/repositories/configured";
+import { getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 export const Route = createFileRoute("/dashboard/teachers")({
   head: () => ({
@@ -102,93 +105,136 @@ function TeacherAvailabilityDialog({
   open,
   onOpenChange,
   teacher,
-  daySlots,
+  daySlotGroups,
+  availableDaySlotIds,
+  isLoading,
+  loadError,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teacher: Teacher | null;
-  daySlots: DaySlot[];
+  daySlotGroups: DaySlotGroup[];
+  availableDaySlotIds: string[];
+  isLoading: boolean;
+  loadError: Error | null;
   onSave: (teacherId: string, daySlotIds: string[]) => Promise<void>;
 }) {
-  const [selectedDays, setSelectedDays] = useState<Weekday[]>([]);
+  const groups = useMemo(() => normalizeDaySlotGroups(daySlotGroups), [daySlotGroups]);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const saveGuard = useRef(new TeacherAvailabilitySaveGuard());
 
   useEffect(() => {
-    if (!open) return;
-    const availableIds = new Set(teacher?.availableDaySlotIds ?? []);
-    setSelectedDays(
-      WEEKDAY_OPTIONS.filter((_, index) =>
-        daySlots.some((slot) => slot.dayId === index + 1 && availableIds.has(slot.id)),
-      ).map((day) => day.value),
-    );
-  }, [daySlots, open, teacher]);
-
-  const toggleDay = (day: Weekday) => {
-    setSelectedDays((current) =>
-      current.includes(day)
-        ? current.filter((selectedDay) => selectedDay !== day)
-        : [...current, day],
-    );
-  };
+    if (!open || isLoading) return;
+    setSelectedSlotIds(sanitizeAvailabilitySelection(groups, availableDaySlotIds));
+  }, [availableDaySlotIds, groups, isLoading, open, teacher?.id]);
 
   const handleSave = async () => {
-    if (!teacher) return;
-    const selectedDayIds = new Set(
-      WEEKDAY_OPTIONS.flatMap((day, index) =>
-        selectedDays.includes(day.value) ? [index + 1] : [],
-      ),
-    );
-    setIsSaving(true);
+    if (!teacher || isLoading) return;
     try {
-      await onSave(
-        teacher.id,
-        daySlots.filter((slot) => selectedDayIds.has(slot.dayId)).map((slot) => slot.id),
-      );
-      onOpenChange(false);
-    } finally {
-      setIsSaving(false);
+      await saveGuard.current.run(async () => {
+        setIsSaving(true);
+        try {
+          await onSave(teacher.id, sanitizeAvailabilitySelection(groups, selectedSlotIds));
+          onOpenChange(false);
+        } finally {
+          setIsSaving(false);
+        }
+      });
+    } catch (error) {
+      if (error instanceof TeacherAvailabilitySaveInProgressError) return;
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isSaving) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-lg" dir="rtl">
         <DialogHeader className="text-right">
-          <DialogTitle>روزهای حضور {teacher?.name}</DialogTitle>
+          <DialogTitle>زمان‌های حضور {teacher?.name}</DialogTitle>
           <DialogDescription>
-            روزهایی را مشخص کنید که این معلم در مدرسه در دسترس است. انتخاب روز اختیاری است.
+            زنگ‌هایی را مشخص کنید که این معلم در مدرسه در دسترس است. انتخاب زمان اختیاری است.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-2 py-4 sm:grid-cols-3">
-          {WEEKDAY_OPTIONS.map((day) => {
-            const selected = selectedDays.includes(day.value);
-            return (
-              <Button
-                key={day.value}
-                type="button"
-                variant={selected ? "secondary" : "outline"}
-                aria-pressed={selected}
-                onClick={() => toggleDay(day.value)}
-                className="justify-start gap-2"
-              >
-                <span
-                  className={`flex h-4 w-4 items-center justify-center rounded border ${
-                    selected ? "border-primary bg-primary text-primary-foreground" : ""
-                  }`}
-                >
-                  {selected && <Check className="h-3 w-3" />}
-                </span>
-                {day.label}
-              </Button>
-            );
-          })}
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto py-4">
+          {isLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              در حال دریافت زنگ‌های مدرسه...
+            </p>
+          ) : loadError ? (
+            <p className="py-8 text-center text-sm text-destructive">{loadError.message}</p>
+          ) : groups.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              هنوز زنگی برای این مدرسه ثبت نشده است.
+            </p>
+          ) : (
+            groups.map((group) => {
+              const allSelected = isWeekdayFullySelected(selectedSlotIds, group);
+              return (
+                <section key={group.dayId} className="rounded-lg border p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold">
+                      {getWeekdayDisplayLabel(group.dayName)}
+                    </h3>
+                    {group.slots.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isSaving}
+                        onClick={() =>
+                          setSelectedSlotIds((current) => toggleWeekdayAvailability(current, group))
+                        }
+                      >
+                        {allSelected ? "پاک‌کردن همه" : "انتخاب همه"}
+                      </Button>
+                    )}
+                  </div>
+                  {group.slots.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">زنگی برای این روز ثبت نشده است.</p>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {group.slots.map((slot) => {
+                        const selected = selectedSlotIds.includes(slot.id);
+                        return (
+                          <label
+                            key={slot.id}
+                            className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm hover:bg-muted/50"
+                          >
+                            <Checkbox
+                              checked={selected}
+                              disabled={isSaving}
+                              onCheckedChange={() =>
+                                setSelectedSlotIds((current) =>
+                                  toggleAvailabilitySlot(current, slot.id),
+                                )
+                              }
+                            />
+                            <span className="font-medium">زنگ {slot.slotNumber}</span>
+                            <span className="ms-auto text-xs text-muted-foreground" dir="ltr">
+                              {slot.startTime ?? "--:--"} – {slot.endTime ?? "--:--"}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })
+          )}
         </div>
         <DialogFooter className="flex-row-reverse justify-start gap-2">
-          <Button onClick={handleSave} disabled={isSaving}>
-            ذخیره روزهای حضور
+          <Button onClick={handleSave} disabled={isSaving || isLoading || Boolean(loadError)}>
+            ذخیره زمان‌های حضور
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             انصراف
           </Button>
         </DialogFooter>
@@ -198,21 +244,29 @@ function TeacherAvailabilityDialog({
 }
 
 function TeachersPage() {
-  const { items: teachers, relatedCourses, create, update, remove } = useTeachersRepository();
-  const { items: schoolCourses } = useCoursesRepository();
-  const { data: daySlots = [] } = useDaySlotsRepository();
-  const availabilityMutation = useTeacherAvailabilityMutation();
-  const subjectById = new Map(
-    [...schoolCourses, ...relatedCourses].map((subject) => [subject.id, subject]),
-  );
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const teacherActiveFilter =
+    statusFilter === "active" ? true : statusFilter === "inactive" ? false : "all";
+  const {
+    items: teachers,
+    create,
+    update,
+    remove,
+  } = useTeachersRepository({
+    filters: { active: teacherActiveFilter },
+  });
+  const { items: schoolCourses } = useCoursesRepository();
+  const daySlotsQuery = useDaySlotsRepository();
+  const availabilityMutation = useTeacherAvailabilityMutation();
+  const subjectById = new Map(schoolCourses.map((subject) => [subject.id, subject]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
   const [availabilityTeacher, setAvailabilityTeacher] = useState<Teacher | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const availabilityQuery = useTeacherAvailabilityQuery(availabilityTeacher?.id ?? null);
 
   const normalizedSearch = search.trim().toLocaleLowerCase("fa");
   const filteredTeachers = teachers.filter((teacher) => {
@@ -252,10 +306,9 @@ function TeachersPage() {
   const saveAvailability = async (teacherId: string, daySlotIds: string[]) => {
     try {
       await availabilityMutation.mutateAsync({ teacherId, daySlotIds });
-      toast.success("روزهای حضور به‌روز شد");
-      setAvailabilityTeacher(null);
+      toast.success("زمان‌های حضور به‌روز شد");
     } catch (error) {
-      toast.error("ذخیره روزهای حضور انجام نشد", {
+      toast.error("ذخیره زمان‌های حضور انجام نشد", {
         description: error instanceof Error ? error.message : undefined,
       });
       throw error;
@@ -390,7 +443,9 @@ function TeachersPage() {
                                   ) : null;
                                 })
                               ) : (
-                                <span className="text-xs text-muted-foreground">بدون درس</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {useMockApi ? "بدون درس" : "—"}
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -401,11 +456,7 @@ function TeachersPage() {
                               onClick={() => openAvailabilityDialog(teacher)}
                               aria-label={`ویرایش روزهای حضور ${teacher.name}`}
                               title="ویرایش روزهای حضور"
-                              className={
-                                teacher.availableDaySlotIds.length === 0
-                                  ? "text-amber-600 dark:text-amber-400"
-                                  : "text-primary"
-                              }
+                              className="text-primary"
                             >
                               <CalendarDays className="h-5 w-5" />
                             </Button>
@@ -466,7 +517,16 @@ function TeachersPage() {
           if (!open) setAvailabilityTeacher(null);
         }}
         teacher={availabilityTeacher}
-        daySlots={daySlots}
+        daySlotGroups={daySlotsQuery.data ?? []}
+        availableDaySlotIds={availabilityQuery.data ?? []}
+        isLoading={daySlotsQuery.isLoading || availabilityQuery.isLoading}
+        loadError={
+          daySlotsQuery.error instanceof Error
+            ? daySlotsQuery.error
+            : availabilityQuery.error instanceof Error
+              ? availabilityQuery.error
+              : null
+        }
         onSave={saveAvailability}
       />
       <Dialog

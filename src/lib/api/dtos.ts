@@ -28,6 +28,14 @@ export interface DaySlotDto {
   updated_at: string;
 }
 
+export interface WeeklyDaySlotsDto {
+  days: Array<{
+    day_id: number;
+    day_name: string;
+    slots: DaySlotDto[];
+  }>;
+}
+
 export interface TeacherDto {
   id: number;
   school_id: number;
@@ -60,6 +68,14 @@ export interface CourseDto {
   course_code: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CourseCreateDto {
+  name: string;
+  major_id: number;
+  grade: number;
+  category: "general" | "specialized";
+  active: boolean;
 }
 
 export interface TeacherCourseGroupDto {
