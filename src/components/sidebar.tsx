@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { AuthenticatedUser } from "@/lib/api/auth";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
@@ -24,7 +25,15 @@ const navigation = [
   { name: "تنظیمات", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  user,
+  onLogout,
+  isLoggingOut,
+}: {
+  user: AuthenticatedUser;
+  onLogout: () => Promise<void>;
+  isLoggingOut: boolean;
+}) {
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -96,20 +105,26 @@ export function Sidebar() {
           <div className="border-t border-sidebar-border p-4">
             <div className="flex items-center gap-3 rounded-lg px-3 py-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <span className="text-sm font-medium">مد</span>
+                <span className="text-sm font-medium">{user.full_name.slice(0, 2)}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">مدیر سیستم</p>
-                <p className="text-xs text-muted-foreground truncate">admin@school.edu</p>
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user.full_name}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user.email ?? user.username}
+                </p>
               </div>
             </div>
-            <Link
-              to="/"
-              className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            <button
+              type="button"
+              onClick={() => void onLogout()}
+              disabled={isLoggingOut}
+              className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
             >
               <LogOut className="h-4 w-4" />
-              خروج از سیستم
-            </Link>
+              {isLoggingOut ? "در حال خروج…" : "خروج از سیستم"}
+            </button>
           </div>
         </div>
       </aside>

@@ -12,8 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { useSchoolsRepository } from "@/lib/api/school-queries";
-import { setActiveSchoolId } from "@/lib/active-school";
+import { buildLoginUrl, clearAuthenticatedSession } from "@/lib/auth-session";
 
 function NotFoundComponent() {
   return (
@@ -119,7 +118,6 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <UnauthorizedRecovery />
-      <ActiveSchoolBootstrap />
       <Outlet />
       <Toaster richColors position="top-left" />
     </QueryClientProvider>
@@ -135,12 +133,11 @@ function UnauthorizedRecovery() {
       if (recoveryInProgress.current) return;
       recoveryInProgress.current = true;
 
-      window.localStorage.removeItem("access_token");
-      setActiveSchoolId(null);
-      queryClient.clear();
+      clearAuthenticatedSession(queryClient);
 
       if (window.location.pathname !== "/auth/login") {
-        window.location.replace("/auth/login");
+        const destination = `${window.location.pathname}${window.location.search}`;
+        window.location.replace(buildLoginUrl(destination));
         return;
       }
 
@@ -151,10 +148,5 @@ function UnauthorizedRecovery() {
     return () => window.removeEventListener("api:unauthorized", handleUnauthorized);
   }, [queryClient]);
 
-  return null;
-}
-
-function ActiveSchoolBootstrap() {
-  useSchoolsRepository();
   return null;
 }

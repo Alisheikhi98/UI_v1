@@ -6,7 +6,6 @@ import {
   Calendar,
   Clock,
   Plus,
-  Trash2,
   Pencil,
   Hash,
   Sparkles,
@@ -18,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -28,16 +26,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useSchoolsRepository } from "@/lib/api/school-queries";
 import {
   type School,
@@ -57,7 +45,6 @@ export const Route = createFileRoute("/dashboard/schools")({
 interface FormState {
   name: string;
   slug: string;
-  status: "active" | "inactive";
   workingDays: string[];
   timing: {
     periodsCount: number;
@@ -73,7 +60,6 @@ const defaultForm = (): FormState => {
   return {
     name: "",
     slug: "",
-    status: "active",
     workingDays: [...DEFAULT_WORKING_DAYS],
     timing,
     periods: calculatePeriods(
@@ -86,10 +72,9 @@ const defaultForm = (): FormState => {
 };
 
 function SchoolsPage() {
-  const { schools, query: schoolsQuery, create, update, remove } = useSchoolsRepository();
+  const { schools, query: schoolsQuery, create, update } = useSchoolsRepository();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<School | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
 
   const stats = useMemo(() => {
     const totalSchools = schools.length;
@@ -126,10 +111,12 @@ function SchoolsPage() {
             مرکز مدیریت پروفایل مدارس، روزهای کاری و برنامه زنگ‌ها
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          افزودن مدرسه جدید
-        </Button>
+        {!schoolsQuery.isPending && !schoolsQuery.isError && schools.length === 0 && (
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            افزودن مدرسه جدید
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -164,12 +151,7 @@ function SchoolsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {schools.map((s) => (
-            <SchoolCard
-              key={s.id}
-              school={s}
-              onEdit={() => openEdit(s)}
-              onDelete={() => setDeleteTarget(s)}
-            />
+            <SchoolCard key={s.id} school={s} onEdit={() => openEdit(s)} />
           ))}
         </div>
       )}
@@ -178,6 +160,7 @@ function SchoolsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         editing={editing}
+        dayOptions={editing?.dayOptions.map((day) => day.label) ?? WEEK_DAYS}
         onSubmit={async (data) => {
           try {
             if (editing) {
@@ -195,39 +178,6 @@ function SchoolsPage() {
           }
         }}
       />
-
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف مدرسه</AlertDialogTitle>
-            <AlertDialogDescription>
-              آیا مطمئن هستید که می‌خواهید مدرسه «{deleteTarget?.name}» را حذف کنید؟ تمام داده‌های
-              وابسته شامل کلاس‌ها، معلمان و برنامه‌های هفتگی این مدرسه ممکن است تحت تاثیر قرار
-              گیرند. این عمل قابل بازگشت نیست.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>انصراف</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (deleteTarget) {
-                  void remove(deleteTarget.id)
-                    .then(() => toast.success("مدرسه با موفقیت حذف شد"))
-                    .catch((error) =>
-                      toast.error("حذف مدرسه امکان‌پذیر نیست", {
-                        description: error instanceof Error ? error.message : undefined,
-                      }),
-                    );
-                  setDeleteTarget(null);
-                }
-              }}
-            >
-              حذف قطعی
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -286,15 +236,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-function SchoolCard({
-  school,
-  onEdit,
-  onDelete,
-}: {
-  school: School;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
+function SchoolCard({ school, onEdit }: { school: School; onEdit: () => void }) {
   return (
     <Card className="group hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
@@ -325,18 +267,10 @@ function SchoolCard({
             <p className="font-medium mt-0.5">{school.timing.periodsCount} زنگ</p>
           </div>
         </div>
-        <div className="flex gap-2 pt-2">
+        <div className="flex pt-2">
           <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={onEdit}>
             <Pencil className="h-3.5 w-3.5" />
             ویرایش
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CardContent>
@@ -348,11 +282,13 @@ function SchoolDialog({
   open,
   onOpenChange,
   editing,
+  dayOptions,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: School | null;
+  dayOptions: readonly string[];
   onSubmit: (data: SchoolFormData) => Promise<void>;
 }) {
   const [form, setForm] = useState<FormState>(defaultForm());
@@ -361,17 +297,19 @@ function SchoolDialog({
 
   useEffect(() => {
     if (open) {
+      const emptyScheduleDefaults = defaultForm();
       setForm(
         editing
           ? {
               name: editing.name,
               slug: editing.slug,
-              status: editing.status,
               workingDays: [...editing.workingDays],
-              timing: { ...editing.timing },
-              periods: [...editing.periods],
+              timing:
+                editing.periods.length > 0 ? { ...editing.timing } : emptyScheduleDefaults.timing,
+              periods:
+                editing.periods.length > 0 ? [...editing.periods] : emptyScheduleDefaults.periods,
             }
-          : defaultForm(),
+          : emptyScheduleDefaults,
       );
       setPeriodsDirty(false);
     }
@@ -434,16 +372,11 @@ function SchoolDialog({
       toast.error("شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد");
       return;
     }
-    if (form.workingDays.length === 0) {
-      toast.error("حداقل یک روز کاری انتخاب کنید");
-      return;
-    }
     setSubmitting(true);
     try {
       await onSubmit({
         name: form.name.trim(),
         slug: form.slug.trim(),
-        status: form.status,
         workingDays: form.workingDays,
         timing: form.timing,
         periods: form.periods,
@@ -454,7 +387,7 @@ function SchoolDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !submitting && onOpenChange(nextOpen)}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -486,34 +419,6 @@ function SchoolDialog({
                   dir="ltr"
                 />
               </Field>
-              <div
-                className="sm:col-span-2 flex items-start justify-between gap-4 rounded-lg border bg-muted/20 p-4"
-                dir="rtl"
-              >
-                <div className="min-w-0 flex-1 space-y-1 text-right">
-                  <Label
-                    htmlFor="school-status"
-                    className="block cursor-pointer text-sm font-medium leading-none"
-                  >
-                    وضعیت فعال
-                  </Label>
-                  <p
-                    id="school-status-description"
-                    className="text-xs leading-5 text-muted-foreground"
-                  >
-                    مدارس غیرفعال در انتخاب‌گرها نمایش داده نمی‌شوند
-                  </p>
-                </div>
-                <Switch
-                  id="school-status"
-                  aria-describedby="school-status-description"
-                  aria-label="وضعیت فعال مدرسه"
-                  className="mt-0.5 shrink-0"
-                  dir="ltr"
-                  checked={form.status === "active"}
-                  onCheckedChange={(c) => setForm({ ...form, status: c ? "active" : "inactive" })}
-                />
-              </div>
             </div>
           </section>
 
@@ -526,7 +431,7 @@ function SchoolDialog({
               روزهایی که مدرسه در آن‌ها فعال است را انتخاب کنید.
             </p>
             <div className="flex flex-wrap gap-2">
-              {WEEK_DAYS.map((day) => {
+              {dayOptions.map((day) => {
                 const active = form.workingDays.includes(day);
                 return (
                   <button

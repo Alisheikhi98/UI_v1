@@ -1,5 +1,12 @@
 import type { School, SchoolFormData } from "@/lib/api/schools-store";
 
+export class SingleSchoolLimitError extends Error {
+  constructor() {
+    super("در نسخه فعلی فقط یک مدرسه قابل ثبت است.");
+    this.name = "SingleSchoolLimitError";
+  }
+}
+
 export interface SchoolPersistenceAdapter {
   getAll(): Promise<School[]>;
   getById(id: number): Promise<School | null>;
@@ -23,7 +30,10 @@ export class SchoolRepository {
     return this.persistence.getById(id);
   }
 
-  create(data: SchoolFormData): Promise<School> {
+  async create(data: SchoolFormData): Promise<School> {
+    if ((await this.persistence.getAll()).length > 0) {
+      throw new SingleSchoolLimitError();
+    }
     return this.persistence.create(data);
   }
 

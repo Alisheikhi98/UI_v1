@@ -1,5 +1,5 @@
 export const repositoryQueryKeys = {
-  schools: (schoolId: string | null) => ["schools", schoolId ?? "none"] as const,
+  schools: () => ["schools"] as const,
   teachers: (schoolId: string | null, params?: unknown) =>
     ["teachers", schoolId ?? "none", params ?? {}] as const,
   teacherAvailability: (schoolId: string | null, teacherId: string) =>

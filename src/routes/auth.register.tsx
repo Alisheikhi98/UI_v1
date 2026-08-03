@@ -1,114 +1,128 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
-import { CalendarDays, Eye, EyeOff, Loader2, Check } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'sonner'
+import { useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { CalendarDays, Check, Eye, EyeOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { PublicOnlyAuth } from "@/components/auth/public-only-auth";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  getAuthFieldErrors,
+  getRegistrationErrorMessage,
+  type AuthFieldErrors,
+} from "@/lib/auth-errors";
+import { registerUser } from "@/lib/api/auth";
+import { validateStoredSession } from "@/lib/auth-session";
 
-export const Route = createFileRoute('/auth/register')({
-  head: () => ({ meta: [{ title: 'ثبت‌نام - آموزش‌یار' }] }),
-  component: RegisterPage,
-})
+export const Route = createFileRoute("/auth/register")({
+  beforeLoad: async ({ context }) => {
+    if (typeof window === "undefined") return;
+    if (await validateStoredSession(context.queryClient)) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
+  head: () => ({ meta: [{ title: "ثبت‌نام - آموزش‌یار" }] }),
+  component: RegisterRoutePage,
+});
+
+function RegisterRoutePage() {
+  return (
+    <PublicOnlyAuth>
+      <RegisterPage />
+    </PublicOnlyAuth>
+  );
+}
+
+const initialForm = {
+  username: "",
+  full_name: "",
+  email: "",
+  phone_number: "",
+  password: "",
+};
+
+function validateRegistration(form: typeof initialForm): AuthFieldErrors {
+  const errors: AuthFieldErrors = {};
+  if (form.username.trim().length < 3) errors.username = "نام کاربری باید حداقل ۳ کاراکتر باشد.";
+  if (form.full_name.trim().length < 3)
+    errors.full_name = "نام و نام خانوادگی باید حداقل ۳ کاراکتر باشد.";
+  if (!/^09\d{9}$/.test(form.phone_number.replace(/[\s\-()]/g, "")))
+    errors.phone_number = "شماره تلفن باید با قالب 09xxxxxxxxx وارد شود.";
+  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
+    errors.email = "فرمت ایمیل معتبر نیست.";
+  if (
+    form.password.length < 8 ||
+    !/[A-Z]/.test(form.password) ||
+    !/[a-z]/.test(form.password) ||
+    !/\d/.test(form.password)
+  ) {
+    errors.password = "رمز عبور باید حداقل ۸ کاراکتر و شامل حروف بزرگ، کوچک و عدد باشد.";
+  }
+  return errors;
+}
 
 function RegisterPage() {
-  const navigate = useNavigate()
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState(initialForm);
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
 
-  const [formData, setFormData] = useState({
-    username: '',
-    full_name: '',
-    email: '',
-    phone_number: '',
-    password: '',
-  })
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const field = event.target.name as keyof typeof initialForm;
+    setFormData((current) => ({ ...current, [field]: event.target.value }));
+    setFieldErrors((errors) => ({ ...errors, [field]: undefined }));
+  };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }))
-  }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    const validationErrors = validateRegistration(formData);
+    setFieldErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) return;
 
+    setIsLoading(true);
     try {
-      if (!formData.username.trim()) {
-        throw new Error('نام کاربری الزامی است')
-      }
-
-      if (!formData.full_name.trim()) {
-        throw new Error('نام و نام خانوادگی الزامی است')
-      }
-
-      if (!formData.phone_number.trim()) {
-        throw new Error('شماره تلفن الزامی است')
-      }
-
-      if (!formData.password.trim()) {
-        throw new Error('رمز عبور الزامی است')
-      }
-
-      if (formData.email.trim()) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(formData.email.trim())) {
-          throw new Error('فرمت ایمیل معتبر نیست')
-        }
-      }
-
-      const payload = {
+      await registerUser({
         username: formData.username.trim(),
         full_name: formData.full_name.trim(),
         phone_number: formData.phone_number.trim(),
         email: formData.email.trim() || null,
         password: formData.password,
-      }
-
-      const res = await fetch('http://localhost:8000/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Register failed')
-      }
-
-      toast.success('ثبت‌نام با موفقیت انجام شد', {
-        description: 'اکنون می‌توانید وارد حساب کاربری خود شوید.',
-      })
-
-      navigate({ to: '/auth/login' })
-    } catch (error: any) {
-      toast.error('ثبت‌نام ناموفق بود', {
-        description: error.message || 'خطایی رخ داده است',
-      })
+      });
+      toast.success("ثبت‌نام با موفقیت انجام شد", {
+        description: "اکنون با نام کاربری و رمز عبور ثبت‌شده وارد شوید.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["auth"] });
+      await navigate({ to: "/auth/login", replace: true });
+    } catch (error) {
+      const apiFieldErrors = getAuthFieldErrors(error);
+      if (Object.keys(apiFieldErrors).length > 0) setFieldErrors(apiFieldErrors);
+      toast.error("ثبت‌نام ناموفق بود", {
+        description: getRegistrationErrorMessage(error),
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const passwordRequirements = [
-    {
-      text: 'حداقل ۸ کاراکتر',
-      met: formData.password.length >= 8,
-    },
-    {
-      text: 'شامل عدد باشد',
-      met: /\d/.test(formData.password),
-    },
-    {
-      text: 'شامل حرف بزرگ باشد',
-      met: /[A-Z]/.test(formData.password),
-    },
-  ]
+    { text: "حداقل ۸ کاراکتر", met: formData.password.length >= 8 },
+    { text: "شامل عدد باشد", met: /\d/.test(formData.password) },
+    { text: "شامل حرف بزرگ باشد", met: /[A-Z]/.test(formData.password) },
+    { text: "شامل حرف کوچک باشد", met: /[a-z]/.test(formData.password) },
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -123,68 +137,53 @@ function RegisterPage() {
             <CalendarDays className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">ایجاد حساب کاربری</CardTitle>
-          <CardDescription>
-            برای شروع، اطلاعات خود را وارد کنید
-          </CardDescription>
+          <CardDescription>برای شروع، اطلاعات خود را وارد کنید</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-
-            <div className="space-y-2">
-              <Label htmlFor="username">نام کاربری</Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                placeholder="ali123"
-                value={formData.username}
-                onChange={handleChange}
-                required
-                autoComplete="username"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="full_name">نام و نام خانوادگی</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                type="text"
-                placeholder="علی رضایی"
-                value={formData.full_name}
-                onChange={handleChange}
-                required
-                autoComplete="name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone_number">شماره تلفن</Label>
-              <Input
-                id="phone_number"
-                name="phone_number"
-                type="tel"
-                placeholder="09123456789"
-                value={formData.phone_number}
-                onChange={handleChange}
-                required
-                autoComplete="tel"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">ایمیل (اختیاری)</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="ali@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                autoComplete="email"
-              />
-            </div>
+            <RegistrationField
+              id="username"
+              label="نام کاربری"
+              placeholder="ali123"
+              value={formData.username}
+              error={fieldErrors.username}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="username"
+            />
+            <RegistrationField
+              id="full_name"
+              label="نام و نام خانوادگی"
+              placeholder="علی رضایی"
+              value={formData.full_name}
+              error={fieldErrors.full_name}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="name"
+            />
+            <RegistrationField
+              id="phone_number"
+              label="شماره تلفن"
+              type="tel"
+              placeholder="09123456789"
+              value={formData.phone_number}
+              error={fieldErrors.phone_number}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="tel"
+            />
+            <RegistrationField
+              id="email"
+              label="ایمیل (اختیاری)"
+              type="email"
+              placeholder="ali@example.com"
+              value={formData.email}
+              error={fieldErrors.email}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="email"
+            />
 
             <div className="space-y-2">
               <Label htmlFor="password">رمز عبور</Label>
@@ -192,11 +191,13 @@ function RegisterPage() {
                 <Input
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   placeholder="رمز عبور خود را وارد کنید"
                   value={formData.password}
                   onChange={handleChange}
-                  required
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? "password-error" : undefined}
+                  disabled={isLoading}
                   autoComplete="new-password"
                 />
                 <Button
@@ -204,7 +205,9 @@ function RegisterPage() {
                   variant="ghost"
                   size="icon"
                   className="absolute left-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  disabled={isLoading}
+                  aria-label={showPassword ? "پنهان‌کردن رمز عبور" : "نمایش رمز عبور"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -213,22 +216,30 @@ function RegisterPage() {
                   )}
                 </Button>
               </div>
+              {fieldErrors.password && (
+                <p id="password-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              {passwordRequirements.map((req, index) => (
+              {passwordRequirements.map((requirement) => (
                 <div
-                  key={index}
+                  key={requirement.text}
                   className={`flex items-center space-x-2 gap-2 text-sm ${
-                    req.met ? 'text-green-600' : 'text-muted-foreground'
+                    requirement.met ? "text-green-600" : "text-muted-foreground"
                   }`}
                 >
-                  <Check className={`h-4 w-4 ${req.met ? 'text-green-600' : 'text-muted-foreground'}`} />
-                  <span>{req.text}</span>
+                  <Check
+                    className={`h-4 w-4 ${
+                      requirement.met ? "text-green-600" : "text-muted-foreground"
+                    }`}
+                  />
+                  <span>{requirement.text}</span>
                 </div>
               ))}
             </div>
-
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
@@ -239,13 +250,19 @@ function RegisterPage() {
                   در حال ثبت‌نام...
                 </>
               ) : (
-                'ثبت‌نام'
+                "ثبت‌نام"
               )}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              قبلاً حساب ساخته‌اید؟{' '}
-              <Link to="/auth/login" className="text-primary hover:underline">
+              قبلاً حساب ساخته‌اید؟{" "}
+              <Link
+                to="/auth/login"
+                aria-disabled={isLoading}
+                tabIndex={isLoading ? -1 : undefined}
+                onClick={(event) => isLoading && event.preventDefault()}
+                className="text-primary hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
+              >
                 ورود
               </Link>
             </p>
@@ -253,5 +270,35 @@ function RegisterPage() {
         </form>
       </Card>
     </div>
-  )
+  );
+}
+
+function RegistrationField({
+  id,
+  label,
+  error,
+  ...inputProps
+}: {
+  id: "username" | "full_name" | "phone_number" | "email";
+  label: string;
+  error?: string;
+} & Omit<React.ComponentProps<typeof Input>, "id" | "name">) {
+  const errorId = `${id}-error`;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        {...inputProps}
+        id={id}
+        name={id}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
+      />
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }

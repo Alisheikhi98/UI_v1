@@ -42,7 +42,6 @@ test("protected 401 responses trigger guarded session recovery", async () => {
   const clientSource = await readSource("../src/lib/api/client.ts");
   const rootSource = await readSource("../src/routes/__root.tsx");
   assert.match(clientSource, /requiresAuth && response\.status === 401/);
-  assert.match(rootSource, /window\.localStorage\.removeItem\("access_token"\)/);
-  assert.match(rootSource, /queryClient\.clear\(\)/);
-  assert.match(rootSource, /window\.location\.replace\("\/auth\/login"\)/);
+  assert.match(rootSource, /clearAuthenticatedSession\(queryClient\)/);
+  assert.match(rootSource, /window\.location\.replace\(buildLoginUrl\(destination\)\)/);
 });

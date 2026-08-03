@@ -86,7 +86,7 @@ test("routes do not import private entity seed arrays", async () => {
 });
 
 test("SchoolRepository is the only owner and localStorage stays inside its adapter", async () => {
-  const values = new Map();
+  const values = new Map([["dev_mock_schools", "[]"]]);
   const storage = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
@@ -94,18 +94,28 @@ test("SchoolRepository is the only owner and localStorage stays inside its adapt
   const repository = new SchoolRepository(new MockSchoolPersistenceAdapter(storage));
 
   const seeded = await repository.getAll();
-  assert.equal(seeded.length, 1);
+  assert.equal(seeded.length, 0);
   assert.equal(values.size, 1);
 
   const created = await repository.create({
     name: "Test School",
     slug: "test-school",
-    status: "active",
     workingDays: ["شنبه"],
     timing: { periodsCount: 1, dayStart: "08:00", classDuration: 45, breakDuration: 0 },
     periods: [{ index: 1, start: "08:00", end: "08:45" }],
   });
   assert.equal((await repository.getById(created.id))?.name, "Test School");
+
+  await assert.rejects(
+    repository.create({
+      name: "Second School",
+      slug: "second-school",
+      workingDays: [],
+      timing: { periodsCount: 1, dayStart: "08:00", classDuration: 45, breakDuration: 0 },
+      periods: [{ index: 1, start: "08:00", end: "08:45" }],
+    }),
+    /فقط یک مدرسه/,
+  );
 
   await repository.update(created.id, { ...created, name: "Updated School" });
   assert.equal((await repository.getById(created.id))?.name, "Updated School");

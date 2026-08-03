@@ -1,9 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Eye, EyeOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PublicOnlyAuth } from "@/components/auth/public-only-auth";
 import {
   Card,
   CardContent,
@@ -13,55 +14,71 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
-import { loginUser } from "@/lib/api/auth";
-import { setActiveSchoolId } from "@/lib/active-school";
-import { useQueryClient } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getLoginErrorMessage } from "@/lib/auth-errors";
+import { loginAndBootstrap, validateStoredSession } from "@/lib/auth-session";
+
+interface LoginSearch {
+  redirect?: string;
+}
+
+function safeDashboardDestination(value: unknown): string | undefined {
+  return typeof value === "string" && value.startsWith("/dashboard") ? value : undefined;
+}
 
 export const Route = createFileRoute("/auth/login")({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    redirect: safeDashboardDestination(search.redirect),
+  }),
+  beforeLoad: async ({ context, search }) => {
+    if (typeof window === "undefined") return;
+    if (await validateStoredSession(context.queryClient)) {
+      throw redirect({ to: (search.redirect ?? "/dashboard") as "/dashboard" });
+    }
+  },
   head: () => ({ meta: [{ title: "ورود - آموزش‌یار" }] }),
-  component: LoginPage,
+  component: LoginRoutePage,
 });
 
-async function authenticate(username: string, password: string) {
-  if (!username.trim()) {
-    throw new Error("Username is required.");
-  }
+function LoginRoutePage() {
+  const search = Route.useSearch();
 
-  if (!password.trim()) {
-    throw new Error("Password is required.");
-  }
-
-  if (import.meta.env.VITE_USE_MOCK_API === "true") return "dev-mock-token";
-  return (await loginUser(username, password)).access_token;
+  return (
+    <PublicOnlyAuth authenticatedDestination={search.redirect}>
+      <LoginPage />
+    </PublicOnlyAuth>
+  );
 }
 
 function LoginPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const search = Route.useSearch();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
+
+    const nextErrors: typeof fieldErrors = {};
+    if (!username.trim()) nextErrors.username = "نام کاربری الزامی است.";
+    if (!password.trim()) nextErrors.password = "رمز عبور الزامی است.";
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setIsLoading(true);
-
     try {
-      const accessToken = await authenticate(username, password);
-      localStorage.setItem("access_token", accessToken);
-      setActiveSchoolId(null);
-      await queryClient.invalidateQueries({ queryKey: ["schools"] });
-
-      toast.success("خوش آمدید!", {
-        description: "با موفقیت وارد شدید.",
-      });
-
-      await navigate({ to: "/dashboard" });
+      await loginAndBootstrap(queryClient, username.trim(), password);
+      toast.success("خوش آمدید!", { description: "هویت شما با موفقیت تأیید شد." });
+      const destination = search.redirect ?? "/dashboard";
+      await navigate({ to: destination as "/dashboard", replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed.");
+      toast.error("ورود ناموفق بود", { description: getLoginErrorMessage(error) });
     } finally {
       setIsLoading(false);
     }
@@ -92,16 +109,32 @@ function LoginPage() {
                 type="text"
                 placeholder="ali123"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
+                onChange={(event) => {
+                  setUsername(event.target.value);
+                  setFieldErrors((errors) => ({ ...errors, username: undefined }));
+                }}
+                aria-invalid={Boolean(fieldErrors.username)}
+                aria-describedby={fieldErrors.username ? "username-error" : undefined}
+                disabled={isLoading}
                 autoComplete="username"
               />
+              {fieldErrors.username && (
+                <p id="username-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.username}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">رمز عبور</Label>
-                <Link to="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                <Link
+                  to="/auth/forgot-password"
+                  aria-disabled={isLoading}
+                  tabIndex={isLoading ? -1 : undefined}
+                  onClick={(event) => isLoading && event.preventDefault()}
+                  className="text-sm text-primary hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                >
                   فراموشی رمز عبور؟
                 </Link>
               </div>
@@ -112,17 +145,23 @@ function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="رمز عبور خود را وارد کنید"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setFieldErrors((errors) => ({ ...errors, password: undefined }));
+                  }}
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? "password-error" : undefined}
+                  disabled={isLoading}
                   autoComplete="current-password"
                 />
-
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="absolute left-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  disabled={isLoading}
+                  aria-label={showPassword ? "پنهان‌کردن رمز عبور" : "نمایش رمز عبور"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -131,10 +170,15 @@ function LoginPage() {
                   )}
                 </Button>
               </div>
+              {fieldErrors.password && (
+                <p id="password-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center space-x-2 gap-2">
-              <Checkbox id="remember" />
+              <Checkbox id="remember" disabled={isLoading} />
               <Label htmlFor="remember" className="text-sm font-normal">
                 مرا برای ۳۰ روز به خاطر بسپار
               </Label>
@@ -155,7 +199,13 @@ function LoginPage() {
 
             <p className="text-center text-sm text-muted-foreground">
               حساب کاربری ندارید؟{" "}
-              <Link to="/auth/register" className="text-primary hover:underline">
+              <Link
+                to="/auth/register"
+                aria-disabled={isLoading}
+                tabIndex={isLoading ? -1 : undefined}
+                onClick={(event) => isLoading && event.preventDefault()}
+                className="text-primary hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
+              >
                 ثبت‌نام کنید
               </Link>
             </p>

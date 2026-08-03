@@ -15,6 +15,7 @@ export interface School {
   name: string;
   slug: string;
   status: "active" | "inactive";
+  dayOptions: SchoolDayOption[];
   workingDays: string[];
   timing: {
     periodsCount: number;
@@ -26,7 +27,13 @@ export interface School {
   createdAt: string;
 }
 
-export type SchoolFormData = Omit<School, "id" | "createdAt">;
+export interface SchoolDayOption {
+  id: number;
+  name: string;
+  label: string;
+}
+
+export type SchoolFormData = Pick<School, "name" | "slug" | "workingDays" | "timing" | "periods">;
 
 interface SchoolRead {
   id: number;
@@ -68,6 +75,14 @@ interface DaySlotEntry {
 
 interface DaySlotDeleteCheckResponse {
   requires_confirmation: boolean;
+}
+
+interface WeeklyDaySlotsResponse {
+  days: Array<{
+    day_id: number;
+    day_name: string;
+    slots: DaySlotResponse[];
+  }>;
 }
 
 export const WEEK_DAYS = BACKEND_WEEKDAY_NAMES.map(getWeekdayDisplayLabel);
@@ -112,18 +127,20 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
-function deriveScheduling(slots: DaySlotResponse[]) {
+function deriveScheduling(week: WeeklyDaySlotsResponse) {
+  const slots = week.days.flatMap((day) => day.slots);
   const activeSlots = slots.filter((slot) => slot.active);
+  const dayOptions = week.days.map((day) => ({
+    id: day.day_id,
+    name: day.day_name,
+    label: getWeekdayDisplayLabel(day.day_name),
+  }));
   if (activeSlots.length === 0) {
     return {
       workingDays: [] as string[],
-      timing: DEFAULT_TIMING,
-      periods: calculatePeriods(
-        DEFAULT_TIMING.periodsCount,
-        DEFAULT_TIMING.dayStart,
-        DEFAULT_TIMING.classDuration,
-        DEFAULT_TIMING.breakDuration,
-      ),
+      dayOptions,
+      timing: { ...DEFAULT_TIMING, periodsCount: 0 },
+      periods: [] as PeriodTime[],
     };
   }
 
@@ -148,7 +165,10 @@ function deriveScheduling(slots: DaySlotResponse[]) {
     : DEFAULT_TIMING.breakDuration;
 
   return {
-    workingDays: workingDayIds.map((dayId) => WEEK_DAYS[dayId - 1]).filter(Boolean),
+    workingDays: workingDayIds
+      .map((dayId) => dayOptions.find((day) => day.id === dayId)?.label)
+      .filter((label): label is string => Boolean(label)),
+    dayOptions,
     timing: {
       periodsCount: periods.length,
       dayStart: firstPeriod?.start ?? DEFAULT_TIMING.dayStart,
@@ -159,42 +179,40 @@ function deriveScheduling(slots: DaySlotResponse[]) {
   };
 }
 
-async function getSchoolDaySlots(schoolId: number) {
-  return apiRequest<DaySlotResponse[]>(`/schools/${schoolId}/day-slots`);
+async function getSchoolWeek(schoolId: number) {
+  return apiRequest<WeeklyDaySlotsResponse>(`/schools/${schoolId}/day-slots/week`);
 }
 
-function toSchool(school: SchoolRead, slots: DaySlotResponse[]): School {
+function toSchool(school: SchoolRead, week: WeeklyDaySlotsResponse): School {
   return {
     id: school.id,
     name: school.name,
     slug: school.slug,
     status: school.active ? "active" : "inactive",
-    ...deriveScheduling(slots),
+    ...deriveScheduling(week),
     createdAt: school.created_at,
   };
 }
 
 async function listAllSchoolRecords() {
-  const firstPage = await apiRequest<PaginatedSchools>("/schools/?page=1&size=100");
-  const pages = await Promise.all(
-    Array.from({ length: Math.max(0, firstPage.pages - 1) }, (_, index) =>
-      apiRequest<PaginatedSchools>(`/schools/?page=${index + 2}&size=100`),
-    ),
-  );
-  return [firstPage, ...pages].flatMap((page) => page.items);
+  const firstPage = await apiRequest<PaginatedSchools>("/schools/?page=1&size=1");
+  return firstPage.items;
 }
 
 async function getSchoolsFromApi(): Promise<School[]> {
   const schools = await listAllSchoolRecords();
   return Promise.all(
-    schools.map(async (school) => toSchool(school, await getSchoolDaySlots(school.id))),
+    schools.map(async (school) => toSchool(school, await getSchoolWeek(school.id))),
   );
 }
 
-function buildDaySlotEntries(data: SchoolFormData): DaySlotEntry[] {
+export function buildDaySlotEntries(
+  data: SchoolFormData,
+  dayOptions: readonly SchoolDayOption[],
+): DaySlotEntry[] {
   return data.workingDays.flatMap((day) => {
-    const dayId = WEEK_DAYS.indexOf(day) + 1;
-    if (dayId === 0) return [];
+    const dayId = dayOptions.find((option) => option.label === day)?.id;
+    if (!dayId) return [];
     return data.periods.map((period) => ({
       day_id: dayId,
       slot_number: period.index,
@@ -204,18 +222,34 @@ function buildDaySlotEntries(data: SchoolFormData): DaySlotEntry[] {
   });
 }
 
-async function saveDaySlots(schoolId: number, data: SchoolFormData) {
-  const desiredEntries = buildDaySlotEntries(data);
-  const existingSlots = await getSchoolDaySlots(schoolId);
-  const existingByKey = new Map(
-    existingSlots.map((slot) => [`${slot.day_id}:${slot.slot_number}`, slot]),
-  );
+export function getObsoleteDaySlots(
+  existingSlots: readonly DaySlotResponse[],
+  desiredEntries: readonly DaySlotEntry[],
+) {
   const desiredKeys = new Set(
     desiredEntries.map((entry) => `${entry.day_id}:${entry.slot_number}`),
   );
-  const obsoleteSlots = existingSlots.filter(
+  return existingSlots.filter(
     (slot) => slot.active && !desiredKeys.has(`${slot.day_id}:${slot.slot_number}`),
   );
+}
+
+async function saveDaySlots(schoolId: number, data: SchoolFormData) {
+  const week = await getSchoolWeek(schoolId);
+  const dayOptions = week.days.map((day) => ({
+    id: day.day_id,
+    name: day.day_name,
+    label: getWeekdayDisplayLabel(day.day_name),
+  }));
+  const desiredEntries = buildDaySlotEntries(data, dayOptions);
+  if (desiredEntries.length !== data.workingDays.length * data.periods.length) {
+    throw new ApiError("یک یا چند روز کاری در تنظیمات فعلی سرور وجود ندارد.", 422);
+  }
+  const existingSlots = week.days.flatMap((day) => day.slots);
+  const existingByKey = new Map(
+    existingSlots.map((slot) => [`${slot.day_id}:${slot.slot_number}`, slot]),
+  );
+  const obsoleteSlots = getObsoleteDaySlots(existingSlots, desiredEntries);
 
   const newEntries = desiredEntries.filter(
     (entry) => !existingByKey.has(`${entry.day_id}:${entry.slot_number}`),
@@ -261,16 +295,12 @@ async function saveDaySlots(schoolId: number, data: SchoolFormData) {
 }
 
 async function createSchoolWithApi(data: SchoolFormData): Promise<School> {
-  if (data.status !== "active") {
-    throw new ApiError("API ایجاد مدرسه از وضعیت غیرفعال پشتیبانی نمی‌کند.", 422);
-  }
-
   const created = await apiRequest<SchoolRead>("/schools/", {
     method: "POST",
     body: JSON.stringify({ name: data.name, slug: data.slug }),
   });
   await saveDaySlots(created.id, data);
-  return toSchool(created, await getSchoolDaySlots(created.id));
+  return toSchool(created, await getSchoolWeek(created.id));
 }
 
 async function updateSchoolWithApi({
@@ -280,17 +310,12 @@ async function updateSchoolWithApi({
   id: number;
   data: SchoolFormData;
 }): Promise<School> {
-  const current = await apiRequest<SchoolRead>(`/schools/${id}`);
-  if (data.status !== (current.active ? "active" : "inactive")) {
-    throw new ApiError("OpenAPI برای تغییر وضعیت مدرسه endpoint تعریف نکرده است.", 422);
-  }
-
   const updated = await apiRequest<SchoolRead>(`/schools/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ name: data.name, slug: data.slug }),
   });
   await saveDaySlots(id, data);
-  return toSchool(updated, await getSchoolDaySlots(id));
+  return toSchool(updated, await getSchoolWeek(id));
 }
 
 async function deleteSchoolWithApi(): Promise<never> {
@@ -301,7 +326,7 @@ const apiSchoolPersistenceAdapter: SchoolPersistenceAdapter = {
   getAll: getSchoolsFromApi,
   async getById(id) {
     const school = await apiRequest<SchoolRead>(`/schools/${id}`);
-    return toSchool(school, await getSchoolDaySlots(id));
+    return toSchool(school, await getSchoolWeek(id));
   },
   create: createSchoolWithApi,
   update: (id, data) => updateSchoolWithApi({ id, data }),

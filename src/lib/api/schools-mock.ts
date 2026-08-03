@@ -10,6 +10,11 @@ const INITIAL_SCHOOLS: readonly School[] = [
     name: "Development School",
     slug: "development-school",
     status: "active",
+    dayOptions: BACKEND_WEEKDAY_NAMES.map((name, index) => ({
+      id: index + 1,
+      name,
+      label: getWeekdayDisplayLabel(name),
+    })),
     workingDays: BACKEND_WEEKDAY_NAMES.slice(0, 5).map(getWeekdayDisplayLabel),
     timing: { periodsCount: 4, dayStart: "08:00", classDuration: 75, breakDuration: 15 },
     periods: [
@@ -51,6 +56,12 @@ export class MockSchoolPersistenceAdapter implements SchoolPersistenceAdapter {
     const school: School = {
       ...clone(data),
       id: schools.reduce((highest, item) => Math.max(highest, item.id), 0) + 1,
+      status: "active",
+      dayOptions: BACKEND_WEEKDAY_NAMES.map((name, index) => ({
+        id: index + 1,
+        name,
+        label: getWeekdayDisplayLabel(name),
+      })),
       createdAt: new Date().toISOString(),
     };
     this.write([...schools, school]);
@@ -62,7 +73,13 @@ export class MockSchoolPersistenceAdapter implements SchoolPersistenceAdapter {
     const current = schools.find((school) => school.id === id);
     if (!current) throw new Error("School not found.");
 
-    const updated: School = { ...clone(data), id, createdAt: current.createdAt };
+    const updated: School = {
+      ...clone(data),
+      id,
+      status: current.status,
+      dayOptions: current.dayOptions,
+      createdAt: current.createdAt,
+    };
     this.write(schools.map((school) => (school.id === id ? updated : school)));
     return clone(updated);
   }

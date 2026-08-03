@@ -32,11 +32,6 @@ function getApiBaseUrl() {
   return baseUrl.replace(/\/$/, "");
 }
 
-function getAccessToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
-}
-
 function validationIssues(body: unknown): ApiValidationIssue[] {
   if (!body || typeof body !== "object" || !("detail" in body)) return [];
   const detail = (body as { detail?: unknown }).detail;
@@ -134,3 +129,4 @@ export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
 export function publicApiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return request<T>(path, init, false);
 }
+import { getAccessToken } from "@/lib/auth-token";
