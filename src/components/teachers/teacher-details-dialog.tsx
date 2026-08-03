@@ -10,11 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  getTeacherErrorMessage,
-  getTeacherFieldErrors,
-  type TeacherFieldErrors,
-} from "@/lib/teacher-errors";
+import { submitTeacherDetails, type TeacherFieldErrors } from "@/lib/teacher-errors";
 
 export interface TeacherDetailsInput {
   name: string;
@@ -41,17 +37,20 @@ export function TeacherDetailsDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<TeacherFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const teacherName = teacher?.name ?? "";
+  const teacherPersonnelCode = teacher?.personnel_code ?? "";
+  const teacherPhone = teacher?.phone ?? "";
 
   useEffect(() => {
     if (!open) return;
     setFormData({
-      name: teacher?.name || "",
-      personnel_code: teacher?.personnel_code || "",
-      phone: teacher?.phone || "",
+      name: teacherName,
+      personnel_code: teacherPersonnelCode,
+      phone: teacherPhone,
     });
     setFieldErrors({});
     setFormError(null);
-  }, [teacher, open]);
+  }, [open, teacherName, teacherPersonnelCode, teacherPhone]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,12 +63,13 @@ export function TeacherDetailsDialog({
     setFieldErrors({});
     setFormError(null);
     try {
-      await onSave({ ...formData, name });
-      onOpenChange(false);
-    } catch (error) {
-      const errors = getTeacherFieldErrors(error);
-      setFieldErrors(errors);
-      if (Object.keys(errors).length === 0) setFormError(getTeacherErrorMessage(error));
+      const result = await submitTeacherDetails(() => onSave({ ...formData, name }));
+      if (result.ok) {
+        onOpenChange(false);
+      } else {
+        setFieldErrors(result.fieldErrors);
+        setFormError(result.formError);
+      }
     } finally {
       setIsSaving(false);
     }

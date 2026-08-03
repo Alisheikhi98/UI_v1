@@ -8,7 +8,7 @@ import type {
   PaginatedResult,
   RepositoryListParams,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Major, Teacher } from "@/lib/types";
 import { publishQuerySnapshot } from "@/lib/query-cache-publication";
 import { isClassAssignmentPartialFailure } from "@/lib/api/class-assignment-reconciliation";
 import { repositoryQueryKeys } from "@/lib/repository-query-keys";
@@ -200,6 +200,14 @@ export function useClassesRepository(params: RepositoryListParams = {}) {
     repositories.classes,
     params,
   );
+}
+
+export function useMajorsRepository() {
+  return useQuery<Major[]>({
+    queryKey: repositoryQueryKeys.majors(),
+    queryFn: ({ signal }) => repositories.majors.repository.list({ signal }),
+    initialData: useMockApi ? repositories.majors.initialData?.items : undefined,
+  });
 }
 
 export function useDaySlotsRepository() {

@@ -224,17 +224,49 @@ test("Teacher dialogs map FastAPI fields and protect pending mutations", async (
     { path: "phone", message: "Phone is invalid" },
   ]);
   assert.deepEqual(getTeacherFieldErrors(validationError), {
-    name: "Name is required",
-    personnel_code: "Code is invalid",
-    phone: "Phone is invalid",
+    name: "نام معلم وارد شده معتبر نیست.",
+    personnel_code: "کد پرسنلی وارد شده معتبر نیست.",
+    phone: "شماره تلفن باید شامل ۷ تا ۲۰ رقم باشد.",
   });
+  const duplicateCode = new ApiError("Teacher code already exists.", 409, {
+    error: "ConflictError",
+    detail: "Teacher code already exists.",
+  });
+  assert.deepEqual(getTeacherFieldErrors(duplicateCode), {
+    personnel_code: "کد پرسنلی وارد شده قبلاً برای معلم دیگری ثبت شده است.",
+  });
+  assert.equal(
+    getTeacherErrorMessage(duplicateCode),
+    "کد پرسنلی وارد شده قبلاً برای معلم دیگری ثبت شده است.",
+  );
+
+  const duplicatePhone = new ApiError("Conflict", 409, {
+    error: "ConflictError",
+    detail: "uq_teachers_active_school_phone",
+  });
+  assert.deepEqual(getTeacherFieldErrors(duplicatePhone), {
+    phone: "شماره تلفن وارد شده قبلاً برای معلم دیگری ثبت شده است.",
+  });
+  assert.equal(
+    getTeacherErrorMessage(duplicatePhone),
+    "شماره تلفن وارد شده قبلاً برای معلم دیگری ثبت شده است.",
+  );
+
+  const ambiguousConflict = new ApiError("Teacher name, code, or phone already exists.", 409);
+  assert.deepEqual(getTeacherFieldErrors(ambiguousConflict), {});
+  assert.equal(
+    getTeacherErrorMessage(ambiguousConflict),
+    "اطلاعات وارد شده با اطلاعات موجود تداخل دارد.",
+  );
   assert.match(getTeacherErrorMessage(new ApiError("limited", 429, undefined, [], 15)), /15/);
 
   const dialogSource = await readSource("../src/components/teachers/teacher-details-dialog.tsx");
   const routeSource = await readSource("../src/routes/dashboard.teachers.tsx");
-  assert.match(dialogSource, /await onSave/);
+  assert.match(dialogSource, /await submitTeacherDetails\(\(\) => onSave/);
   assert.match(dialogSource, /!isSaving && onOpenChange/);
   assert.match(dialogSource, /disabled=\{isSaving\}/);
+  assert.match(dialogSource, /aria-invalid=\{Boolean\(fieldErrors\.personnel_code\)\}/);
+  assert.match(dialogSource, /aria-invalid=\{Boolean\(fieldErrors\.phone\)\}/);
   assert.match(routeSource, /if \(!teacherToDelete \|\| isDeleting\) return/);
   assert.match(routeSource, /search: deferredSearch \|\| undefined/);
 });

@@ -5,6 +5,7 @@ import type {
   CourseDto,
   DeleteCheckDto,
   FastApiPage,
+  MajorDto,
   TeacherAvailabilityDto,
   TeacherCourseGroupDto,
   TeacherDto,
@@ -15,6 +16,7 @@ import {
   mapClassAssignment,
   mapCourse,
   mapCourseCreateInputToDto,
+  mapMajor,
   mapPage,
   mapTeacher,
   mapWeeklyDaySlots,
@@ -43,6 +45,7 @@ import type {
   CourseRepository,
   CourseUpdateInput,
   DaySlotRepository,
+  MajorRepository,
   PaginatedResult,
   RepositoryListParams,
   RepositoryRequestOptions,
@@ -52,7 +55,7 @@ import type {
   TeacherRepository,
   TeacherUpdateInput,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Major, Teacher } from "@/lib/types";
 
 export class BackendCapabilityError extends Error {
   constructor(message: string) {
@@ -247,6 +250,13 @@ export class ApiDaySlotRepository implements DaySlotRepository {
       withSignal(options),
     );
     return mapWeeklyDaySlots(week);
+  }
+}
+
+export class ApiMajorRepository implements MajorRepository {
+  async list(options?: RepositoryRequestOptions): Promise<Major[]> {
+    const majors = await apiRequest<MajorDto[]>("/majors/", withSignal(options));
+    return majors.map(mapMajor);
   }
 }
 

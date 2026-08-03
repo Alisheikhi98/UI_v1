@@ -1,11 +1,12 @@
 import { courseRepository, teacherRepository } from "@/lib/mock-repositories";
 import type {
   DaySlotRepository,
+  MajorRepository,
   RepositoryRequestOptions,
   TeacherAvailabilityRepository,
   TeacherCoursesRepository,
 } from "@/lib/repositories";
-import type { Course, DaySlotGroup } from "@/lib/types";
+import type { Course, DaySlotGroup, Major } from "@/lib/types";
 import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 const mockWeekdayNames = BACKEND_WEEKDAY_NAMES.slice(0, 6).map(getWeekdayDisplayLabel);
@@ -31,6 +32,12 @@ const mockAvailabilityByTeacher = new Map<string, string[]>([
   ["4", ["mock-slot-1", "mock-slot-4"]],
   ["5", []],
 ]);
+
+const mockMajors: readonly Major[] = [
+  { id: "major-1", code: "math", name: "ریاضی فیزیک", active: true },
+  { id: "major-2", code: "exp", name: "علوم تجربی", active: true },
+  { id: "major-3", code: "hum", name: "ادبیات و علوم انسانی", active: true },
+];
 
 export class MockDaySlotRepository implements DaySlotRepository {
   listWeek(): Promise<DaySlotGroup[]> {
@@ -62,5 +69,11 @@ export class MockTeacherCoursesRepository implements TeacherCoursesRepository {
     if (!teacher) return [];
     const courses = await courseRepository.list();
     return courses.items.filter((course) => teacher.courseIds.includes(course.id));
+  }
+}
+
+export class MockMajorRepository implements MajorRepository {
+  list(): Promise<Major[]> {
+    return Promise.resolve(structuredClone([...mockMajors]));
   }
 }

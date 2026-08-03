@@ -40,6 +40,13 @@ export interface Class {
   advisorTeacherId?: string;
 }
 
+export interface Major {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
 export interface Course {
   id: string;
   name: string;

@@ -38,3 +38,13 @@ export function isAssignmentDraftRowDirty(
     initial.weeklyPeriods !== assignment.weeklyPeriods
   );
 }
+
+export function selectCreatedTeacherInDraft(
+  draft: readonly ClassAssignmentDraft[],
+  targetDraftId: string,
+  teacherId: string,
+): ClassAssignmentDraft[] {
+  return draft.map((assignment) =>
+    assignment.draftId === targetDraftId ? { ...assignment, teacherId } : assignment,
+  );
+}

@@ -70,12 +70,18 @@ export interface CourseDto {
   updated_at: string;
 }
 
+export interface MajorDto {
+  id: number;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
 export interface CourseCreateDto {
   name: string;
   major_id: number;
   grade: number;
   category: "general" | "specialized";
-  active: boolean;
 }
 
 export interface TeacherCourseGroupDto {

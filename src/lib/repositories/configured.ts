@@ -3,6 +3,7 @@ import {
   ApiClassRepository,
   ApiCourseRepository,
   ApiDaySlotRepository,
+  ApiMajorRepository,
   ApiTeacherAvailabilityRepository,
   ApiTeacherCoursesRepository,
   ApiTeacherRepository,
@@ -15,10 +16,11 @@ import type {
   PaginatedResult,
   TeacherRepository,
   DaySlotRepository,
+  MajorRepository,
   TeacherAvailabilityRepository,
   TeacherCoursesRepository,
 } from "@/lib/repositories/contracts";
-import type { Class, ClassAssignment, Course, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, Major, Teacher } from "@/lib/types";
 
 export interface RepositoryBinding<T, TRepository> {
   repository: TRepository;
@@ -30,6 +32,7 @@ export interface RepositoryRegistry {
   courses: RepositoryBinding<Course, CourseRepository>;
   classes: RepositoryBinding<Class, ClassRepository>;
   classAssignments: RepositoryBinding<ClassAssignment, ClassAssignmentRepository>;
+  majors: RepositoryBinding<Major, MajorRepository>;
   daySlots: DaySlotRepository;
   teacherAvailability: TeacherAvailabilityRepository;
   teacherCourses: TeacherCoursesRepository;
@@ -56,11 +59,17 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
 const createMockRepositories = async (): Promise<RepositoryRegistry> => {
   const [
     { classAssignmentRepository, classRepository, courseRepository, teacherRepository },
-    { MockDaySlotRepository, MockTeacherAvailabilityRepository, MockTeacherCoursesRepository },
+    {
+      MockDaySlotRepository,
+      MockMajorRepository,
+      MockTeacherAvailabilityRepository,
+      MockTeacherCoursesRepository,
+    },
   ] = await Promise.all([
     import("@/lib/mock-repositories"),
     import("@/lib/mock-related-repositories"),
   ]);
+  const majorRepository = new MockMajorRepository();
 
   return {
     teachers: {
@@ -79,6 +88,10 @@ const createMockRepositories = async (): Promise<RepositoryRegistry> => {
       repository: classAssignmentRepository,
       initialData: initialResult(classAssignmentRepository.snapshot()),
     },
+    majors: {
+      repository: majorRepository,
+      initialData: initialResult(await majorRepository.list()),
+    },
     daySlots: new MockDaySlotRepository(),
     teacherAvailability: new MockTeacherAvailabilityRepository(),
     teacherCourses: new MockTeacherCoursesRepository(),
@@ -90,6 +103,7 @@ const apiRepositories: RepositoryRegistry = {
   courses: { repository: new ApiCourseRepository(getActiveSchoolId) },
   classes: { repository: new ApiClassRepository(getActiveSchoolId) },
   classAssignments: { repository: new ApiClassAssignmentRepository(getActiveSchoolId) },
+  majors: { repository: new ApiMajorRepository() },
   daySlots: new ApiDaySlotRepository(getActiveSchoolId),
   teacherAvailability: new ApiTeacherAvailabilityRepository(getActiveSchoolId),
   teacherCourses: new ApiTeacherCoursesRepository(getActiveSchoolId),

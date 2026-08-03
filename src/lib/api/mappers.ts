@@ -1,4 +1,12 @@
-import type { Class, ClassAssignment, Course, DaySlot, DaySlotGroup, Teacher } from "@/lib/types";
+import type {
+  Class,
+  ClassAssignment,
+  Course,
+  DaySlot,
+  DaySlotGroup,
+  Major,
+  Teacher,
+} from "@/lib/types";
 import type {
   ClassAssignmentDto,
   ClassDto,
@@ -6,6 +14,7 @@ import type {
   CourseDto,
   DaySlotDto,
   FastApiPage,
+  MajorDto,
   TeacherDto,
   WeeklyDaySlotsDto,
 } from "@/lib/api/dtos";
@@ -49,7 +58,7 @@ export const mapCourse = (dto: CourseDto): Course => ({
   name: dto.name,
   active: dto.active,
   gradeId: String(dto.grade),
-  majorId: `major-${dto.major_id}`,
+  majorId: String(dto.major_id),
   category: dto.category,
   code: dto.course_code ?? "",
   weeklyHours: 1,
@@ -61,15 +70,21 @@ export const mapCourseCreateInputToDto = (input: CourseCreateInput): CourseCreat
   major_id: toApiId(input.majorId, "majorId"),
   grade: Number(input.gradeId),
   category: input.category,
-  active: input.active ?? true,
 });
 
 export const mapClass = (dto: ClassDto): Class => ({
   id: String(dto.id),
   name: dto.name,
   gradeId: String(dto.grade),
-  majorId: `major-${dto.major_id}`,
+  majorId: String(dto.major_id),
   studentCapacity: 0,
+});
+
+export const mapMajor = (dto: MajorDto): Major => ({
+  id: String(dto.id),
+  code: dto.code,
+  name: dto.name,
+  active: dto.active,
 });
 
 export const mapClassAssignment = (dto: ClassAssignmentDto): ClassAssignment => ({
