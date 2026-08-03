@@ -1,11 +1,12 @@
 export const repositoryQueryKeys = {
   schools: () => ["schools"] as const,
+  teachersRoot: (schoolId: string | null) => ["teachers", schoolId ?? "none"] as const,
   teachers: (schoolId: string | null, params?: unknown) =>
     ["teachers", schoolId ?? "none", params ?? {}] as const,
   teacherAvailability: (schoolId: string | null, teacherId: string) =>
     ["schools", schoolId ?? "none", "teachers", teacherId, "availability"] as const,
   teacherCourses: (schoolId: string | null, teacherId: string) =>
-    ["teacher-courses", schoolId ?? "none", teacherId] as const,
+    ["schools", schoolId ?? "none", "teachers", teacherId, "courses"] as const,
   courses: (schoolId: string | null, classId?: string) =>
     [
       classId ? "class-compatible-courses" : "courses",
