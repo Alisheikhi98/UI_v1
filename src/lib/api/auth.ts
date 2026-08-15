@@ -22,6 +22,18 @@ export interface RegisterUserInput {
   password: string;
 }
 
+export interface UpdateAuthenticatedUserInput {
+  username?: string;
+  full_name?: string;
+  phone_number?: string;
+  email?: string | null;
+}
+
+export interface ChangePasswordInput {
+  current_password: string;
+  new_password: string;
+}
+
 export function buildLoginForm(username: string, password: string) {
   return new URLSearchParams({ username, password });
 }
@@ -33,6 +45,24 @@ export function buildRegistrationPayload(data: RegisterUserInput): RegisterUserI
     phone_number: data.phone_number,
     email: data.email ?? null,
     password: data.password,
+  };
+}
+
+export function buildProfileUpdatePayload(
+  data: UpdateAuthenticatedUserInput,
+): UpdateAuthenticatedUserInput {
+  return {
+    username: data.username,
+    full_name: data.full_name,
+    phone_number: data.phone_number,
+    email: data.email ?? null,
+  };
+}
+
+export function buildPasswordChangePayload(data: ChangePasswordInput): ChangePasswordInput {
+  return {
+    current_password: data.current_password,
+    new_password: data.new_password,
   };
 }
 
@@ -54,4 +84,18 @@ export function registerUser(data: RegisterUserInput): Promise<AuthenticatedUser
 
 export function getCurrentUser(): Promise<AuthenticatedUser> {
   return apiRequest<AuthenticatedUser>("/users/me");
+}
+
+export function updateCurrentUser(data: UpdateAuthenticatedUserInput): Promise<AuthenticatedUser> {
+  return apiRequest<AuthenticatedUser>("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(buildProfileUpdatePayload(data)),
+  });
+}
+
+export function changeCurrentUserPassword(data: ChangePasswordInput): Promise<void> {
+  return apiRequest<void>("/users/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(buildPasswordChangePayload(data)),
+  });
 }
