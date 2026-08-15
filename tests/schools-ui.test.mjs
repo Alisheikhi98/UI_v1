@@ -7,7 +7,8 @@ import {
   updateBreakDuration,
 } from "../src/lib/school-schedule.ts";
 
-const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const readSource = async (path) =>
+  (await readFile(new URL(path, import.meta.url), "utf8")).replaceAll("\r\n", "\n");
 const periods = [
   { index: 1, start: "08:00", end: "08:45" },
   { index: 2, start: "08:55", end: "09:40" },
