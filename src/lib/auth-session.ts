@@ -1,5 +1,13 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { getCurrentUser, loginUser, type AuthenticatedUser } from "@/lib/api/auth";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  changeCurrentUserPassword,
+  getCurrentUser,
+  loginUser,
+  updateCurrentUser,
+  type AuthenticatedUser,
+  type ChangePasswordInput,
+  type UpdateAuthenticatedUserInput,
+} from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { clearAccessToken, getAccessToken, setAccessToken, useAccessToken } from "@/lib/auth-token";
 import { setActiveSchoolId } from "@/lib/active-school";
@@ -7,7 +15,7 @@ import { setActiveSchoolId } from "@/lib/active-school";
 export const authenticatedUserQueryKey = ["auth", "current-user"] as const;
 export const useMockAuthentication = import.meta.env.VITE_USE_MOCK_API === "true";
 
-const mockUser: AuthenticatedUser = {
+let mockUser: AuthenticatedUser = {
   id: 0,
   username: "dev-user",
   full_name: "کاربر توسعه",
@@ -84,5 +92,39 @@ export function useAuthenticatedUser() {
     queryFn: loadAuthenticatedUser,
     enabled: typeof window !== "undefined" && Boolean(token),
     retry: false,
+  });
+}
+
+export function useUpdateAuthenticatedUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateAuthenticatedUserInput) => {
+      if (useMockAuthentication) {
+        mockUser = { ...mockUser, ...input };
+      } else {
+        await updateCurrentUser(input);
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: authenticatedUserQueryKey,
+        exact: true,
+      });
+      return queryClient.fetchQuery({
+        queryKey: authenticatedUserQueryKey,
+        queryFn: loadAuthenticatedUser,
+        staleTime: 0,
+        retry: false,
+      });
+    },
+  });
+}
+
+export function useChangeAuthenticatedUserPassword() {
+  return useMutation({
+    mutationFn: async (input: ChangePasswordInput) => {
+      if (useMockAuthentication) return;
+      await changeCurrentUserPassword(input);
+    },
   });
 }
