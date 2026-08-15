@@ -1,258 +1,156 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Header } from "@/components/header";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { mockTimeSlots, weekDays, generateMockSchedule } from "@/lib/data";
-import {
-  useClassAssignmentsRepository,
-  useClassesRepository,
-  useCoursesRepository,
-  useTeachersRepository,
-} from "@/lib/mock-queries";
-import { Download, Edit, Eye, GraduationCap, User } from "lucide-react";
 import { toast } from "sonner";
+import { Header } from "@/components/header";
+import { withAppName } from "@/lib/branding";
+import { EntityTimetable } from "@/components/timetable/entity-timetable";
+import { SchoolMasterTimetable } from "@/components/timetable/school-master-timetable";
+import { TimetableEmptyState } from "@/components/timetable/timetable-empty-state";
+import { WeeklyTimetableToolbar } from "@/components/timetable/weekly-timetable-toolbar";
+import {
+  filterTimetableClasses,
+  hasActiveSchoolFilters,
+  type SchoolTimetableFilters,
+  type TimetableViewMode,
+} from "@/lib/timetable";
+import { usePublishedTimetable } from "@/lib/timetable-queries";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/timetable")({
   head: () => ({
     meta: [
-      { title: "برنامه هفتگی - آموزش‌یار" },
-      { name: "description", content: "مشاهده و مدیریت برنامه هفتگی کلاس‌ها" },
+      { title: withAppName("برنامه هفتگی") },
+      {
+        name: "description",
+        content: "مشاهده برنامه نهایی مدرسه، کلاس‌ها و معلمان",
+      },
     ],
   }),
   component: TimetablePage,
 });
 
+const initialFilters: SchoolTimetableFilters = {
+  gradeId: "all",
+  majorId: "all",
+  search: "",
+};
+
 function TimetablePage() {
-  const { items: classes } = useClassesRepository();
-  const { items: courses } = useCoursesRepository();
-  const { items: teachers } = useTeachersRepository();
-  const { items: assignments } = useClassAssignmentsRepository();
-  const [selectedGrade, setSelectedGrade] = useState<string>("10");
-  const [selectedClass, setSelectedClass] = useState<string>("1");
-  const [editMode, setEditMode] = useState(false);
-
-  const schedule = useMemo(() => generateMockSchedule(courses, teachers), [courses, teachers]);
-
-  const uniqueGrades = [...new Set(classes.map((c) => c.gradeId))].sort();
-  const classesForGrade = classes.filter((c) => c.gradeId === selectedGrade);
-  const selectedClassData = classes.find((c) => c.id === selectedClass);
-  const selectedClassTeacher = teachers.find(
-    (teacher) =>
-      teacher.id ===
-      (selectedClassData?.advisorTeacherId ??
-        assignments.find((assignment) => assignment.classId === selectedClass)?.teacherId),
+  const timetableQuery = usePublishedTimetable();
+  const timetable = timetableQuery.data;
+  const [mode, setMode] = useState<TimetableViewMode>("school");
+  const [filters, setFilters] = useState(initialFilters);
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [fullscreen, setFullscreen] = useState(false);
+  const filteredClasses = useMemo(
+    () => filterTimetableClasses(timetable?.classes ?? [], filters),
+    [filters, timetable?.classes],
   );
+  const hasFinalTimetable = (timetable?.entries.length ?? 0) > 0;
+  const selectedClass = timetable?.classes.find((item) => item.id === selectedClassId);
+  const selectedTeacher = timetable?.teachers.find((item) => item.id === selectedTeacherId);
+  const selectedEntityHasLessons = timetable?.entries.some((entry) =>
+    mode === "class"
+      ? entry.classId === selectedClassId
+      : mode === "teacher"
+        ? entry.teacherId === selectedTeacherId
+        : true,
+  );
+  const viewLabel =
+    mode === "school"
+      ? "نمای مدرسه"
+      : mode === "class"
+        ? `نمای کلاس${selectedClass ? ` — ${selectedClass.name}` : ""}`
+        : `نمای معلم${selectedTeacher ? ` — ${selectedTeacher.name}` : ""}`;
 
-  const handleExport = () => {
-    toast.success("در حال صادر کردن برنامه...", {
-      description: "فایل PDF به زودی آماده می‌شود.",
+  const handlePendingExport = (format: "pdf" | "excel") => {
+    toast.info(`خروجی ${format === "pdf" ? "PDF" : "Excel"} هنوز در این نسخه فعال نشده است.`, {
+      description: "این منو برای اتصال آینده به خروجی واقعی آماده شده است.",
     });
   };
 
   return (
-    <div className="flex flex-col">
-      <Header title="برنامه هفتگی" description="مشاهده و مدیریت برنامه کلاس‌ها" />
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Select
-              value={selectedGrade}
-              onValueChange={(value) => {
-                setSelectedGrade(value);
-                const firstClass = classes.find((c) => c.gradeId === value);
-                if (firstClass) setSelectedClass(firstClass.id);
-              }}
-            >
-              <SelectTrigger className="w-36">
-                <GraduationCap className="me-2 h-4 w-4" />
-                <SelectValue placeholder="پایه" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueGrades.map((grade) => (
-                  <SelectItem key={grade} value={grade}>
-                    پایه {grade}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="انتخاب کلاس" />
-              </SelectTrigger>
-              <SelectContent>
-                {classesForGrade.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={editMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setEditMode(!editMode)}
-            >
-              {editMode ? (
-                <>
-                  <Eye className="me-2 h-4 w-4" />
-                  حالت نمایش
-                </>
-              ) : (
-                <>
-                  <Edit className="me-2 h-4 w-4" />
-                  حالت ویرایش
-                </>
-              )}
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="me-2 h-4 w-4" />
-              صادر کردن PDF
-            </Button>
-          </div>
-        </div>
+    <div className="flex flex-col" dir="rtl">
+      {!fullscreen && (
+        <Header title="برنامه هفتگی" description="مشاهده برنامه نهایی مدرسه، کلاس‌ها و معلمان" />
+      )}
 
-        {selectedClassData && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{selectedClassData.name}</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{selectedClassData.studentCapacity} دانش‌آموز</Badge>
-                  <Badge variant="outline">
-                    <User className="me-1 h-3 w-3" />
-                    {selectedClassTeacher?.name ?? ""}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+      <main
+        className={cn(
+          "p-4 sm:p-6",
+          fullscreen && "fixed inset-0 z-50 overflow-auto bg-background p-2 sm:p-4",
         )}
+      >
+        <section
+          id="timetable-print-root"
+          className="overflow-hidden border bg-background shadow-sm sm:rounded-xl"
+          aria-label="برنامه هفتگی نهایی"
+        >
+          <div className="timetable-print-only mb-4 text-center">
+            <h1 className="text-xl font-bold">برنامه هفتگی مدرسه</h1>
+            <p>{timetable?.schoolName}</p>
+            <p>{viewLabel}</p>
+          </div>
 
-        <Card>
-          <CardContent className="p-0">
-            <div className="w-full overflow-x-auto">
-              <div className="min-w-[800px]">
-                <TooltipProvider>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="sticky right-0 z-10 bg-muted/50 border-b border-l p-3 text-right text-sm font-medium text-muted-foreground w-28">
-                          زمان
-                        </th>
-                        {weekDays.map((day) => (
-                          <th
-                            key={day}
-                            className="border-b p-3 text-center text-sm font-medium text-muted-foreground"
-                          >
-                            {day}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockTimeSlots.map((slot) => (
-                        <tr key={slot.id}>
-                          <td className="sticky right-0 z-10 bg-muted/50 border-b border-l p-3 text-sm font-medium text-right">
-                            {slot.label}
-                          </td>
-                          {weekDays.map((day) => {
-                            const entry = schedule[day]?.[slot.id];
-                            if (!entry) {
-                              return (
-                                <td
-                                  key={`${day}-${slot.id}`}
-                                  className={`border-b p-2 text-center ${editMode ? "hover:bg-muted/50 cursor-pointer" : ""}`}
-                                >
-                                  {editMode && (
-                                    <div className="flex items-center justify-center h-16 border-2 border-dashed border-muted-foreground/20 rounded-lg text-muted-foreground text-xs">
-                                      + افزودن
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            }
-                            return (
-                              <td
-                                key={`${day}-${slot.id}`}
-                                className={`border-b p-2 ${editMode ? "cursor-pointer" : ""}`}
-                              >
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div
-                                      className="rounded-lg p-3 h-16 flex flex-col justify-center transition-all hover:scale-[1.02]"
-                                      style={{
-                                        backgroundColor: `${entry.subject.color}15`,
-                                        borderRight: `3px solid ${entry.subject.color}`,
-                                      }}
-                                    >
-                                      <p
-                                        className="text-sm font-medium truncate"
-                                        style={{ color: entry.subject.color }}
-                                      >
-                                        {entry.subject.name}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground truncate">
-                                        {entry.teacher}
-                                      </p>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <div className="space-y-1">
-                                      <p className="font-medium">{entry.subject.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        معلم: {entry.teacher}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        کد: {entry.subject.code}
-                                      </p>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TooltipProvider>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {timetableQuery.isPending ? (
+            <p className="p-12 text-center text-sm text-muted-foreground">
+              در حال دریافت برنامه هفتگی از سرور...
+            </p>
+          ) : timetableQuery.isError || !timetable ? (
+            <TimetableEmptyState kind="load-error" />
+          ) : (
+            <>
+              <WeeklyTimetableToolbar
+                mode={mode}
+                filters={filters}
+                classes={timetable.classes}
+                teachers={timetable.teachers}
+                selectedClassId={selectedClassId}
+                selectedTeacherId={selectedTeacherId}
+                filtersActive={hasActiveSchoolFilters(filters)}
+                fullscreen={fullscreen}
+                onModeChange={setMode}
+                onFiltersChange={setFilters}
+                onResetFilters={() => setFilters(initialFilters)}
+                onClassChange={setSelectedClassId}
+                onTeacherChange={setSelectedTeacherId}
+                onFullscreenToggle={() => setFullscreen((value) => !value)}
+                onPrint={() => window.print()}
+                onExport={handlePendingExport}
+              />
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">راهنمای دروس</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {courses.map((subject) => (
-                <div key={subject.id} className="flex items-center gap-2">
-                  <div
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: subject.color }}
-                  />
-                  <span className="text-sm">{subject.name}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              {!hasFinalTimetable ? (
+                <TimetableEmptyState kind="no-final" />
+              ) : mode === "school" ? (
+                filteredClasses.length > 0 ? (
+                  <SchoolMasterTimetable timetable={timetable} classes={filteredClasses} />
+                ) : (
+                  <TimetableEmptyState kind="no-lessons" />
+                )
+              ) : mode === "class" ? (
+                !selectedClassId ? (
+                  <TimetableEmptyState kind="no-class" />
+                ) : selectedEntityHasLessons ? (
+                  <EntityTimetable timetable={timetable} mode="class" entityId={selectedClassId} />
+                ) : (
+                  <TimetableEmptyState kind="no-lessons" />
+                )
+              ) : !selectedTeacherId ? (
+                <TimetableEmptyState kind="no-teacher" />
+              ) : selectedEntityHasLessons ? (
+                <EntityTimetable
+                  timetable={timetable}
+                  mode="teacher"
+                  entityId={selectedTeacherId}
+                />
+              ) : (
+                <TimetableEmptyState kind="no-lessons" />
+              )}
+            </>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

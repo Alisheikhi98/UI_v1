@@ -16,7 +16,7 @@ const selectedClass = {
   id: "42",
   name: "دهم تجربی",
   gradeId: "10",
-  majorId: "major-7",
+  majorId: "7",
   studentCapacity: 0,
 };
 
@@ -38,7 +38,7 @@ test("Class Management creates the Course payload from the selected Class", () =
   assert.deepEqual(input, {
     name: createdCourse.name,
     gradeId: "10",
-    majorId: "major-7",
+    majorId: "7",
     category: "specialized",
     active: true,
   });
@@ -47,7 +47,6 @@ test("Class Management creates the Course payload from the selected Class", () =
     major_id: 7,
     grade: 10,
     category: "specialized",
-    active: true,
   });
 });
 
@@ -148,7 +147,7 @@ test("an incompatible created Course rejects the workflow instead of reporting s
 test("mock compatible-Course filtering uses stable Class grade and major IDs", async () => {
   const classes = new MockClassRepository([selectedClass]);
   const compatible = structuredClone(createdCourse);
-  const wrongMajor = { ...structuredClone(createdCourse), id: "other", majorId: "major-9" };
+  const wrongMajor = { ...structuredClone(createdCourse), id: "other", majorId: "9" };
   const courses = new MockCourseRepository([compatible, wrongMajor], classes);
 
   const result = await courses.list({ filters: { classId: selectedClass.id } });

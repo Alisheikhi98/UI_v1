@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { submitTeacherDetails, type TeacherFieldErrors } from "@/lib/teacher-errors";
 
 export interface TeacherDetailsInput {
   name: string;
@@ -26,7 +27,7 @@ export function TeacherDetailsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teacher?: TeacherDetailsInput | null;
-  onSave: (data: TeacherDetailsInput) => void | Promise<void>;
+  onSave: (data: TeacherDetailsInput) => Promise<void>;
 }) {
   const [formData, setFormData] = useState<TeacherDetailsInput>({
     name: "",
@@ -34,31 +35,48 @@ export function TeacherDetailsDialog({
     phone: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<TeacherFieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const teacherName = teacher?.name ?? "";
+  const teacherPersonnelCode = teacher?.personnel_code ?? "";
+  const teacherPhone = teacher?.phone ?? "";
 
   useEffect(() => {
     if (!open) return;
     setFormData({
-      name: teacher?.name || "",
-      personnel_code: teacher?.personnel_code || "",
-      phone: teacher?.phone || "",
+      name: teacherName,
+      personnel_code: teacherPersonnelCode,
+      phone: teacherPhone,
     });
-  }, [teacher, open]);
+    setFieldErrors({});
+    setFormError(null);
+  }, [open, teacherName, teacherPersonnelCode, teacherPhone]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = formData.name.trim();
-    if (!name) return;
+    if (!name) {
+      setFieldErrors({ name: "نام معلم الزامی است." });
+      return;
+    }
     setIsSaving(true);
+    setFieldErrors({});
+    setFormError(null);
     try {
-      await onSave({ ...formData, name });
-      onOpenChange(false);
+      const result = await submitTeacherDetails(() => onSave({ ...formData, name }));
+      if (result.ok) {
+        onOpenChange(false);
+      } else {
+        setFieldErrors(result.fieldErrors);
+        setFormError(result.formError);
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSaving && onOpenChange(nextOpen)}>
       <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader className="text-right">
           <DialogTitle>{teacher ? "ویرایش معلم" : "افزودن معلم جدید"}</DialogTitle>
@@ -73,21 +91,41 @@ export function TeacherDetailsDialog({
               <Input
                 id="teacher-name"
                 value={formData.name}
-                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                onChange={(event) => {
+                  setFormData({ ...formData, name: event.target.value });
+                  setFieldErrors((current) => ({ ...current, name: undefined }));
+                }}
                 placeholder="نام معلم را وارد کنید"
                 required
+                disabled={isSaving}
+                aria-invalid={Boolean(fieldErrors.name)}
+                aria-describedby={fieldErrors.name ? "teacher-name-error" : undefined}
               />
+              {fieldErrors.name && (
+                <p id="teacher-name-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="personnel-code">کد پرسنلی (اختیاری)</Label>
               <Input
                 id="personnel-code"
                 value={formData.personnel_code || ""}
-                onChange={(event) =>
-                  setFormData({ ...formData, personnel_code: event.target.value })
-                }
+                onChange={(event) => {
+                  setFormData({ ...formData, personnel_code: event.target.value });
+                  setFieldErrors((current) => ({ ...current, personnel_code: undefined }));
+                }}
                 placeholder="مثلاً ۱۰۲۴۵"
+                disabled={isSaving}
+                aria-invalid={Boolean(fieldErrors.personnel_code)}
+                aria-describedby={fieldErrors.personnel_code ? "personnel-code-error" : undefined}
               />
+              {fieldErrors.personnel_code && (
+                <p id="personnel-code-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.personnel_code}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="teacher-phone">شماره موبایل (اختیاری)</Label>
@@ -95,16 +133,37 @@ export function TeacherDetailsDialog({
                 id="teacher-phone"
                 type="tel"
                 value={formData.phone}
-                onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
+                onChange={(event) => {
+                  setFormData({ ...formData, phone: event.target.value });
+                  setFieldErrors((current) => ({ ...current, phone: undefined }));
+                }}
                 placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                disabled={isSaving}
+                aria-invalid={Boolean(fieldErrors.phone)}
+                aria-describedby={fieldErrors.phone ? "teacher-phone-error" : undefined}
               />
+              {fieldErrors.phone && (
+                <p id="teacher-phone-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.phone}
+                </p>
+              )}
             </div>
+            {formError && (
+              <p role="alert" className="text-sm text-destructive">
+                {formError}
+              </p>
+            )}
           </div>
           <DialogFooter className="flex-row-reverse justify-start gap-2">
             <Button type="submit" disabled={!formData.name.trim() || isSaving}>
               {teacher ? "به‌روزرسانی" : "افزودن معلم"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
               انصراف
             </Button>
           </DialogFooter>

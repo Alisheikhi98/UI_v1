@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
-import { isAssignmentComplete } from "@/lib/class-configuration";
+import { GRADE_OPTIONS, type ClassViewModel, useClassManagementData } from "@/lib/class-management";
+import { withAppName } from "@/lib/branding";
 import {
-  GRADE_OPTIONS,
-  MAJOR_OPTIONS,
-  type ClassViewModel,
-  useClassManagementData,
-} from "@/lib/class-management";
+  getClassErrorMessage,
+  getClassDeleteErrorMessage,
+  getClassFieldErrors,
+  type ClassFieldErrors,
+} from "@/lib/class-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -50,12 +52,13 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Plus,
-  Search,
   Trash2,
   GraduationCap,
   CalendarClock,
   Check,
   Filter,
+  LoaderCircle,
+  RefreshCw,
   UserRoundCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,7 +66,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/classes")({
   head: () => ({
     meta: [
-      { title: "کلاس‌ها - آموزش‌یار" },
+      { title: withAppName("کلاس‌ها") },
       { name: "description", content: "مدیریت کلاس‌ها و بخش‌های مدرسه" },
     ],
   }),
@@ -89,6 +92,7 @@ function EmptyState({ onAddClass }: { onAddClass: () => void }) {
 }
 
 type ClassFormData = Pick<ClassViewModel, "name" | "gradeId" | "majorId">;
+type MajorOption = { value: string; label: string };
 
 const emptyClassForm = (): ClassFormData => ({ name: "", gradeId: "", majorId: "" });
 
@@ -96,19 +100,27 @@ function ClassDialog({
   open,
   onOpenChange,
   onSave,
+  majorOptions,
+  majorsPending,
+  majorsError,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (data: ClassFormData) => Promise<void>;
+  majorOptions: MajorOption[];
+  majorsPending: boolean;
+  majorsError: Error | null;
 }) {
   const [formData, setFormData] = useState<ClassFormData>(emptyClassForm);
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ClassFieldErrors>({});
 
   useEffect(() => {
     if (!open) return;
     setFormData(emptyClassForm());
     setSubmitError(null);
+    setFieldErrors({});
   }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,11 +128,13 @@ function ClassDialog({
     if (isSaving) return;
     setIsSaving(true);
     setSubmitError(null);
+    setFieldErrors({});
     try {
       await onSave(formData);
       onOpenChange(false);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "ذخیره کلاس انجام نشد.");
+      setFieldErrors(getClassFieldErrors(error));
+      setSubmitError(getClassErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -140,16 +154,23 @@ function ClassDialog({
               <Input
                 id="className"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setFieldErrors((current) => ({ ...current, name: undefined }));
+                }}
                 placeholder="مثلاً کلاس دهم الف"
                 required
               />
+              {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
             </div>
             <div className="space-y-2">
               <Label>پایه</Label>
               <Select
                 value={formData.gradeId}
-                onValueChange={(gradeId) => setFormData({ ...formData, gradeId })}
+                onValueChange={(gradeId) => {
+                  setFormData({ ...formData, gradeId });
+                  setFieldErrors((current) => ({ ...current, gradeId: undefined }));
+                }}
                 required
               >
                 <SelectTrigger>
@@ -163,25 +184,40 @@ function ClassDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.gradeId && (
+                <p className="text-xs text-destructive">{fieldErrors.gradeId}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>رشته تحصیلی</Label>
               <Select
                 value={formData.majorId}
-                onValueChange={(majorId) => setFormData({ ...formData, majorId })}
+                onValueChange={(majorId) => {
+                  setFormData({ ...formData, majorId });
+                  setFieldErrors((current) => ({ ...current, majorId: undefined }));
+                }}
                 required
+                disabled={majorsPending || Boolean(majorsError)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="انتخاب رشته" />
+                  <SelectValue
+                    placeholder={majorsPending ? "در حال دریافت رشته‌ها..." : "انتخاب رشته"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {MAJOR_OPTIONS.map((major) => (
+                  {majorOptions.map((major) => (
                     <SelectItem key={major.value} value={major.value}>
                       {major.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {majorsError && (
+                <p className="text-xs text-destructive">دریافت رشته‌های تحصیلی انجام نشد.</p>
+              )}
+              {fieldErrors.majorId && (
+                <p className="text-xs text-destructive">{fieldErrors.majorId}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -194,7 +230,17 @@ function ClassDialog({
             >
               انصراف
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button
+              type="submit"
+              disabled={
+                isSaving ||
+                majorsPending ||
+                Boolean(majorsError) ||
+                !formData.name.trim() ||
+                !formData.gradeId ||
+                !formData.majorId
+              }
+            >
               {isSaving ? "در حال ذخیره..." : "افزودن کلاس"}
             </Button>
           </DialogFooter>
@@ -218,11 +264,13 @@ function RenameClassDialog({
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setName(classItem?.name ?? "");
       setSubmitError(null);
+      setFieldError(null);
     }
   }, [classItem, open]);
 
@@ -239,11 +287,13 @@ function RenameClassDialog({
             if (!name.trim() || isSaving) return;
             setIsSaving(true);
             setSubmitError(null);
+            setFieldError(null);
             try {
               await onSave(name.trim());
               onOpenChange(false);
             } catch (error) {
-              setSubmitError(error instanceof Error ? error.message : "ویرایش کلاس انجام نشد.");
+              setFieldError(getClassFieldErrors(error).name ?? null);
+              setSubmitError(getClassErrorMessage(error));
             } finally {
               setIsSaving(false);
             }
@@ -254,9 +304,13 @@ function RenameClassDialog({
             <Input
               id="rename-class"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setFieldError(null);
+              }}
               autoFocus
             />
+            {fieldError && <p className="text-xs text-destructive">{fieldError}</p>}
           </div>
           <DialogFooter>
             {submitError && <p className="text-sm text-destructive">{submitError}</p>}
@@ -286,11 +340,13 @@ function ClassesPage() {
   const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const {
     classes,
+    majorOptions,
     courses,
     teachers,
     assignments,
     activeClassAssignments,
     classesRepository,
+    majorsRepository,
     coursesRepository,
     teachersRepository,
     activeClassAssignmentsRepository,
@@ -325,7 +381,7 @@ function ClassesPage() {
       toast.success("کلاس با موفقیت اضافه شد");
     } catch (error) {
       toast.error("ایجاد کلاس انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getClassErrorMessage(error),
       });
       throw error;
     }
@@ -337,7 +393,7 @@ function ClassesPage() {
       toast.success("کلاس با موفقیت حذف شد");
     } catch (error) {
       toast.error("حذف کلاس انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getClassErrorMessage(error),
       });
       throw error;
     }
@@ -353,18 +409,13 @@ function ClassesPage() {
       toast.success("نام کلاس به‌روز شد");
     } catch (error) {
       toast.error("ویرایش کلاس انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getClassErrorMessage(error),
       });
       throw error;
     }
   };
   const assignmentCount = (classId: string) =>
     assignments.filter((assignment) => assignment.classId === classId).length;
-  const incompleteCourseCount = (classId: string) =>
-    assignments.filter((assignment) => {
-      if (assignment.classId !== classId) return false;
-      return !isAssignmentComplete(assignment, teachers);
-    }).length;
 
   return (
     <div className="flex flex-col">
@@ -372,15 +423,12 @@ function ClassesPage() {
       <div className="p-6 space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative w-full flex-1 sm:max-w-sm">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="جستجوی کلاس‌ها..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pr-9"
-              />
-            </div>
+            <SearchInput
+              containerClassName="w-full flex-1 sm:max-w-sm"
+              placeholder="جستجوی کلاس‌ها..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full gap-2 sm:w-auto">
@@ -415,7 +463,7 @@ function ClassesPage() {
                 <div className="space-y-2 border-t pt-3">
                   <p className="px-1 text-xs font-semibold text-muted-foreground">رشته تحصیلی</p>
                   <div className="grid gap-1">
-                    {[{ value: "all", label: "همه رشته‌ها" }, ...MAJOR_OPTIONS].map((major) => (
+                    {[{ value: "all", label: "همه رشته‌ها" }, ...majorOptions].map((major) => (
                       <Button
                         key={major.value}
                         type="button"
@@ -452,10 +500,34 @@ function ClassesPage() {
           </Button>
         </div>
 
-        {filteredClasses.length === 0 &&
-        search === "" &&
-        gradeFilter === "all" &&
-        majorFilter === "all" ? (
+        {classesRepository.query.isPending || majorsRepository.isPending ? (
+          <Card className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
+            <LoaderCircle className="mb-3 h-8 w-8 animate-spin text-primary" />
+            <p className="font-medium">در حال دریافت کلاس‌ها...</p>
+          </Card>
+        ) : classesRepository.query.isError || majorsRepository.isError ? (
+          <Card className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
+            <p className="font-medium text-destructive">دریافت کلاس‌ها انجام نشد.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {getClassErrorMessage(classesRepository.query.error ?? majorsRepository.error)}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              onClick={() => {
+                void classesRepository.query.refetch();
+                void majorsRepository.refetch();
+              }}
+            >
+              <RefreshCw className="me-2 h-4 w-4" />
+              تلاش دوباره
+            </Button>
+          </Card>
+        ) : filteredClasses.length === 0 &&
+          search === "" &&
+          gradeFilter === "all" &&
+          majorFilter === "all" ? (
           <EmptyState onAddClass={openAddDialog} />
         ) : (
           <>
@@ -479,7 +551,6 @@ function ClassesPage() {
                     <TableBody>
                       {filteredClasses.map((classItem, index) => {
                         const hasAssignments = assignmentCount(classItem.id) > 0;
-                        const incompleteCourses = incompleteCourseCount(classItem.id);
                         return (
                           <TableRow key={classItem.id}>
                             <TableCell className="text-center font-medium text-muted-foreground">
@@ -510,11 +581,6 @@ function ClassesPage() {
                                   }
                                 />
                                 تنظیم دروس
-                                {incompleteCourses > 0 && (
-                                  <span className="ms-2 text-xs text-destructive">
-                                    {incompleteCourses.toLocaleString("fa-IR")} درس ناقص
-                                  </span>
-                                )}
                               </Button>
                             </TableCell>
                             <TableCell className="text-center">
@@ -569,7 +635,6 @@ function ClassesPage() {
               ) : (
                 filteredClasses.map((classItem) => {
                   const hasAssignments = assignmentCount(classItem.id) > 0;
-                  const incompleteCourses = incompleteCourseCount(classItem.id);
                   return (
                     <Card
                       key={classItem.id}
@@ -611,8 +676,6 @@ function ClassesPage() {
                               }
                             />
                             تنظیم دروس
-                            {incompleteCourses > 0 &&
-                              ` • ${incompleteCourses.toLocaleString("fa-IR")} درس ناقص`}
                           </Button>
                           <div className="grid grid-cols-2 gap-2">
                             <Button
@@ -643,7 +706,14 @@ function ClassesPage() {
         )}
       </div>
 
-      <ClassDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSave} />
+      <ClassDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSave={handleSave}
+        majorOptions={majorOptions}
+        majorsPending={majorsRepository.isPending}
+        majorsError={majorsRepository.error}
+      />
 
       <RenameClassDialog
         open={Boolean(renamingClass)}
@@ -665,8 +735,8 @@ function ClassesPage() {
           <AlertDialogHeader className="text-right">
             <AlertDialogTitle>حذف کلاس {classToDelete?.name}</AlertDialogTitle>
             <AlertDialogDescription>
-              با حذف کلاس «{classToDelete?.name}»، اطلاعات انتخاب معلمان این کلاس نیز حذف می‌شود.{" "}
-              معلمان و درس‌های مشترک حذف نخواهند شد.
+              کلاس «{classToDelete?.name}» فقط در صورتی حذف می‌شود که درس یا برنامه وابسته‌ای نداشته
+              باشد. معلمان و درس‌های مدرسه حذف نخواهند شد.
             </AlertDialogDescription>
             {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           </AlertDialogHeader>
@@ -684,7 +754,7 @@ function ClassesPage() {
                   await handleDelete(classToDelete);
                   setClassToDelete(null);
                 } catch (error) {
-                  setDeleteError(error instanceof Error ? error.message : "حذف کلاس انجام نشد.");
+                  setDeleteError(getClassDeleteErrorMessage(error));
                 } finally {
                   setIsDeletingClass(false);
                 }
@@ -721,7 +791,7 @@ function ClassesPage() {
           await coursesRepository.update({ id, input: course });
         }}
         onCreateTeacher={async (teacher) => {
-          await teachersRepository.create(teacher);
+          return teachersRepository.create(teacher);
         }}
         onUpdateTeacher={async (id, teacher) => {
           await teachersRepository.update({ id, input: teacher });

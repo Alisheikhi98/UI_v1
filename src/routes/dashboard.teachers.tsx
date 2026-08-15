@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDays,
@@ -8,16 +8,17 @@ import {
   MoreHorizontal,
   Phone,
   Plus,
-  Search,
   Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
+import { withAppName } from "@/lib/branding";
 import {
   TeacherDetailsDialog,
   type TeacherDetailsInput,
 } from "@/components/teachers/teacher-details-dialog";
+import { TeacherCourseLabels } from "@/components/teachers/teacher-course-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Select,
   SelectContent,
@@ -54,10 +56,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  useCoursesRepository,
   useDaySlotsRepository,
   useTeacherAvailabilityQuery,
   useTeacherAvailabilityMutation,
+  useTeacherCoursesQuery,
   useTeachersRepository,
 } from "@/lib/mock-queries";
 import type { DaySlotGroup, Teacher } from "@/lib/types";
@@ -70,13 +72,13 @@ import {
   toggleAvailabilitySlot,
   toggleWeekdayAvailability,
 } from "@/lib/teacher-availability";
-import { useMockApi } from "@/lib/repositories/configured";
 import { getWeekdayDisplayLabel } from "@/lib/weekday-labels";
+import { getTeacherErrorMessage } from "@/lib/teacher-errors";
 
 export const Route = createFileRoute("/dashboard/teachers")({
   head: () => ({
     meta: [
-      { title: "معلمان - آموزش‌یار" },
+      { title: withAppName("معلمان") },
       { name: "description", content: "مدیریت معلمان مدرسه" },
     ],
   }),
@@ -94,7 +96,7 @@ function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
         با افزودن اولین معلم، اطلاعات کادر آموزشی مدرسه را ثبت کنید.
       </p>
       <Button className="mt-6" onClick={onAddTeacher}>
-        <Plus className="ml-2 h-4 w-4" />
+        <Plus className="me-2 h-4 w-4" />
         افزودن معلم
       </Button>
     </Card>
@@ -243,8 +245,25 @@ function TeacherAvailabilityDialog({
   );
 }
 
+function TeacherCoursesCell({ teacher }: { teacher: Teacher }) {
+  const coursesQuery = useTeacherCoursesQuery(teacher.id, teacher.status === "active");
+
+  if (teacher.status !== "active") {
+    return <span className="text-xs text-muted-foreground">برای معلم غیرفعال در دسترس نیست</span>;
+  }
+
+  return (
+    <TeacherCourseLabels
+      labels={coursesQuery.data ?? []}
+      loading={coursesQuery.isPending}
+      error={coursesQuery.isError}
+    />
+  );
+}
+
 function TeachersPage() {
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search.trim());
   const [statusFilter, setStatusFilter] = useState("active");
   const teacherActiveFilter =
     statusFilter === "active" ? true : statusFilter === "inactive" ? false : "all";
@@ -253,13 +272,14 @@ function TeachersPage() {
     create,
     update,
     remove,
+    query: teachersQuery,
+    isDeleting,
   } = useTeachersRepository({
+    search: deferredSearch || undefined,
     filters: { active: teacherActiveFilter },
   });
-  const { items: schoolCourses } = useCoursesRepository();
   const daySlotsQuery = useDaySlotsRepository();
   const availabilityMutation = useTeacherAvailabilityMutation();
-  const subjectById = new Map(schoolCourses.map((subject) => [subject.id, subject]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
@@ -267,15 +287,6 @@ function TeachersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const availabilityQuery = useTeacherAvailabilityQuery(availabilityTeacher?.id ?? null);
-
-  const normalizedSearch = search.trim().toLocaleLowerCase("fa");
-  const filteredTeachers = teachers.filter((teacher) => {
-    const matchesSearch =
-      teacher.name.toLocaleLowerCase("fa").includes(normalizedSearch) ||
-      (teacher.personnel_code || "").toLocaleLowerCase("fa").includes(normalizedSearch);
-    const matchesStatus = statusFilter === "all" || teacher.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
 
   const handleSave = async (data: TeacherDetailsInput) => {
     try {
@@ -297,7 +308,7 @@ function TeachersPage() {
       setEditingTeacher(null);
     } catch (error) {
       toast.error("ذخیره اطلاعات معلم انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getTeacherErrorMessage(error),
       });
       throw error;
     }
@@ -309,7 +320,7 @@ function TeachersPage() {
       toast.success("زمان‌های حضور به‌روز شد");
     } catch (error) {
       toast.error("ذخیره زمان‌های حضور انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getTeacherErrorMessage(error),
       });
       throw error;
     }
@@ -336,7 +347,7 @@ function TeachersPage() {
   };
 
   const confirmDelete = async () => {
-    if (!teacherToDelete) return;
+    if (!teacherToDelete || isDeleting) return;
     try {
       await remove(teacherToDelete.id);
       toast.success("معلم با موفقیت حذف شد", {
@@ -346,7 +357,7 @@ function TeachersPage() {
       setDeleteDialogOpen(false);
     } catch (error) {
       toast.error("حذف معلم انجام نشد", {
-        description: error instanceof Error ? error.message : undefined,
+        description: getTeacherErrorMessage(error),
       });
     }
   };
@@ -357,18 +368,15 @@ function TeachersPage() {
       <div className="space-y-6 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative max-w-md flex-1">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="جستجوی نام یا کد پرسنلی..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="pr-9"
-              />
-            </div>
+            <SearchInput
+              containerClassName="max-w-md flex-1"
+              placeholder="جستجوی نام یا کد پرسنلی..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-36">
-                <Filter className="ml-2 h-4 w-4" />
+                <Filter className="me-2 h-4 w-4" />
                 <SelectValue placeholder="وضعیت" />
               </SelectTrigger>
               <SelectContent>
@@ -379,12 +387,25 @@ function TeachersPage() {
             </Select>
           </div>
           <Button onClick={openAddDialog}>
-            <Plus className="ml-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             افزودن معلم
           </Button>
         </div>
 
-        {filteredTeachers.length === 0 && !search && statusFilter === "all" ? (
+        {teachersQuery.isPending ? (
+          <Card className="p-10 text-center text-sm text-muted-foreground">
+            در حال دریافت فهرست معلمان...
+          </Card>
+        ) : teachersQuery.isError ? (
+          <Card className="space-y-3 p-10 text-center">
+            <p className="text-sm text-destructive">
+              {getTeacherErrorMessage(teachersQuery.error)}
+            </p>
+            <Button variant="outline" onClick={() => void teachersQuery.refetch()}>
+              تلاش مجدد
+            </Button>
+          </Card>
+        ) : teachers.length === 0 && !search && statusFilter === "active" ? (
           <EmptyState onAddTeacher={openAddDialog} />
         ) : (
           <Card className="overflow-hidden">
@@ -396,22 +417,22 @@ function TeachersPage() {
                       <TableHead className="w-14 text-center">ردیف</TableHead>
                       <TableHead className="w-px whitespace-nowrap text-center">معلم</TableHead>
                       <TableHead className="text-center">شماره تماس</TableHead>
-                      <TableHead className="text-center">دروس</TableHead>
+                      <TableHead className="w-[22rem] text-center">دروس</TableHead>
                       <TableHead className="text-center">روزهای حضور</TableHead>
                       <TableHead className="text-center">وضعیت</TableHead>
                       <TableHead className="w-20 text-center">عملیات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTeachers.length === 0 ? (
+                    {teachers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                           معلمی با این مشخصات یافت نشد.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredTeachers.map((teacher, index) => (
-                        <TableRow key={teacher.id}>
+                      teachers.map((teacher, index) => (
+                        <TableRow key={teacher.id} className="h-14">
                           <TableCell className="text-center font-medium text-muted-foreground">
                             {index + 1}
                           </TableCell>
@@ -421,7 +442,7 @@ function TeachersPage() {
                               <span className="font-medium text-foreground">{teacher.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-[22rem] max-w-[22rem] py-2">
                             {teacher.phone ? (
                               <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
                                 <Phone className="h-3.5 w-3.5" />
@@ -432,28 +453,14 @@ function TeachersPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="mx-auto flex max-w-64 flex-wrap justify-center gap-1">
-                              {teacher.courseIds.length > 0 ? (
-                                teacher.courseIds.map((subjectId) => {
-                                  const subject = subjectById.get(subjectId);
-                                  return subject ? (
-                                    <Badge key={subjectId} variant="secondary" className="text-xs">
-                                      {subject.name}
-                                    </Badge>
-                                  ) : null;
-                                })
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  {useMockApi ? "بدون درس" : "—"}
-                                </span>
-                              )}
-                            </div>
+                            <TeacherCoursesCell teacher={teacher} />
                           </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => openAvailabilityDialog(teacher)}
+                              disabled={teacher.status !== "active"}
                               aria-label={`ویرایش روزهای حضور ${teacher.name}`}
                               title="ویرایش روزهای حضور"
                               className="text-primary"
@@ -478,16 +485,20 @@ function TeachersPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="text-right">
-                                <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
-                                  <Edit className="ml-2 h-4 w-4" />
+                                <DropdownMenuItem
+                                  onClick={() => openEditDialog(teacher)}
+                                  disabled={teacher.status !== "active"}
+                                >
+                                  <Edit className="me-2 h-4 w-4" />
                                   ویرایش
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-destructive"
                                   onClick={() => openDeleteDialog(teacher)}
+                                  disabled={teacher.status !== "active"}
                                 >
-                                  <Trash2 className="ml-2 h-4 w-4" />
+                                  <Trash2 className="me-2 h-4 w-4" />
                                   حذف
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -532,6 +543,7 @@ function TeachersPage() {
       <Dialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
+          if (!open && isDeleting) return;
           setDeleteDialogOpen(open);
           if (!open) setTeacherToDelete(null);
         }}
@@ -546,10 +558,14 @@ function TeachersPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-row-reverse justify-start gap-2">
-            <Button variant="destructive" onClick={confirmDelete}>
-              حذف معلم
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+              {isDeleting ? "در حال حذف..." : "حذف معلم"}
             </Button>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
               انصراف
             </Button>
           </DialogFooter>

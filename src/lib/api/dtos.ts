@@ -70,12 +70,18 @@ export interface CourseDto {
   updated_at: string;
 }
 
+export interface MajorDto {
+  id: number;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
 export interface CourseCreateDto {
   name: string;
   major_id: number;
   grade: number;
   category: "general" | "specialized";
-  active: boolean;
 }
 
 export interface TeacherCourseGroupDto {
@@ -116,4 +122,64 @@ export interface DeleteCheckDto {
   has_dependencies?: boolean;
   requires_confirmation?: boolean;
   message?: string | null;
+}
+
+export interface ScheduledLessonDto {
+  assignment_id: number;
+  day_slot_id: number;
+  teacher_id: number;
+  class_id: number;
+  course_id: number;
+  day: string;
+  slot: number;
+}
+
+export interface ScheduleResultDto {
+  success: boolean;
+  status: string;
+  code: string;
+  message: string;
+  lessons: ScheduledLessonDto[];
+  total_gap: number;
+  details: Record<string, unknown>;
+  candidate_id: number | null;
+}
+
+export interface ScheduleCandidateSummaryDto {
+  candidate_id: number;
+  status: string;
+  total_gap: number;
+  selected: boolean;
+  created_at: string;
+}
+
+export interface ScheduleCandidateDetailDto extends ScheduleCandidateSummaryDto {
+  lessons: ScheduledLessonDto[];
+}
+
+export interface ScheduleConfirmationDto {
+  success: boolean;
+  candidate_id: number;
+  saved_lessons: number;
+  message: string;
+}
+
+export interface ClassScheduleItemDto {
+  schedule_id: number;
+  day_slot_id: number;
+  day_id: number;
+  day_name: string;
+  slot_number: number;
+  start_time: string | null;
+  end_time: string | null;
+  course_id: number;
+  course_name: string;
+  teacher_id: number | null;
+  teacher_name: string | null;
+}
+
+export interface ClassScheduleDto {
+  class_id: number;
+  class_name: string;
+  items: ClassScheduleItemDto[];
 }

@@ -1,4 +1,4 @@
-import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Major, Teacher } from "@/lib/types";
 
 export interface RepositoryRequestOptions {
   signal?: AbortSignal;
@@ -109,5 +109,9 @@ export interface TeacherAvailabilityRepository {
 }
 
 export interface TeacherCoursesRepository {
-  list(teacherId: string, options?: RepositoryRequestOptions): Promise<Course[]>;
+  list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]>;
+}
+
+export interface MajorRepository {
+  list(options?: RepositoryRequestOptions): Promise<Major[]>;
 }

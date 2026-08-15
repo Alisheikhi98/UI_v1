@@ -8,7 +8,7 @@ import type {
   PaginatedResult,
   RepositoryListParams,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Major, Teacher } from "@/lib/types";
 import { publishQuerySnapshot } from "@/lib/query-cache-publication";
 import { isClassAssignmentPartialFailure } from "@/lib/api/class-assignment-reconciliation";
 import { repositoryQueryKeys } from "@/lib/repository-query-keys";
@@ -45,6 +45,10 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
   queryKey: readonly unknown[],
   binding: RepositoryBinding<T, EntityRepository<T, TCreate, TUpdate>>,
   params: RepositoryListParams = {},
+  synchronization: {
+    invalidationKey?: readonly unknown[];
+    onRemoveSuccess?: (id: string) => void | Promise<void>;
+  } = {},
 ) {
   const { repository } = binding;
   const activeSchoolId = useActiveSchoolId();
@@ -57,9 +61,18 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
     enabled,
   });
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+    const invalidationKey = synchronization.invalidationKey ?? queryKey;
+    await queryClient.invalidateQueries({
+      queryKey: invalidationKey,
+      exact: !synchronization.invalidationKey,
+      refetchType: "none",
+    });
     await queryClient.refetchQueries(
-      { queryKey, exact: true, type: "active" },
+      {
+        queryKey: invalidationKey,
+        exact: !synchronization.invalidationKey,
+        type: "active",
+      },
       { throwOnError: true },
     );
   };
@@ -74,7 +87,10 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
   });
   const remove = useMutation({
     mutationFn: (id: string) => repository.delete(id),
-    onSuccess: refresh,
+    onSuccess: async (_result, id) => {
+      await refresh();
+      await synchronization.onRemoveSuccess?.(id);
+    },
   });
 
   return {
@@ -84,6 +100,9 @@ function useRepository<T extends { id: string }, TCreate, TUpdate>(
     create: create.mutateAsync,
     update: update.mutateAsync,
     remove: remove.mutateAsync,
+    isCreating: create.isPending,
+    isUpdating: update.isPending,
+    isDeleting: remove.isPending,
   };
 }
 
@@ -91,6 +110,7 @@ export function useTeachersRepository(
   params: RepositoryListParams = {},
   options: { includeAvailability?: boolean } = {},
 ) {
+  const queryClient = useQueryClient();
   const filters = params.filters ?? {};
   const effectiveParams: RepositoryListParams = Object.prototype.hasOwnProperty.call(
     filters,
@@ -107,6 +127,19 @@ export function useTeachersRepository(
     repositoryQueryKeys.teachers(schoolId, keyParams(effectiveParams)),
     repositories.teachers,
     effectiveParams,
+    {
+      invalidationKey: repositoryQueryKeys.teachersRoot(schoolId),
+      onRemoveSuccess: (teacherId) => {
+        queryClient.removeQueries({
+          queryKey: repositoryQueryKeys.teacherAvailability(schoolId, teacherId),
+          exact: true,
+        });
+        queryClient.removeQueries({
+          queryKey: repositoryQueryKeys.teacherCourses(schoolId, teacherId),
+          exact: true,
+        });
+      },
+    },
   );
   const availabilityQueries = useQueries({
     queries: base.items.map((teacher) => ({
@@ -125,7 +158,7 @@ export function useTeachersRepository(
 
 export function useTeacherCoursesQuery(teacherId: string | null, enabled = true) {
   const schoolId = useActiveSchoolId();
-  return useQuery<Course[]>({
+  return useQuery<string[]>({
     queryKey: repositoryQueryKeys.teacherCourses(schoolId, teacherId ?? "none"),
     ...createTeacherCoursesQueryOptions(repositories.teacherCourses, teacherId ?? "none"),
     enabled: enabled && Boolean(teacherId) && (useMockApi || schoolId !== null),
@@ -169,6 +202,14 @@ export function useClassesRepository(params: RepositoryListParams = {}) {
   );
 }
 
+export function useMajorsRepository() {
+  return useQuery<Major[]>({
+    queryKey: repositoryQueryKeys.majors(),
+    queryFn: ({ signal }) => repositories.majors.repository.list({ signal }),
+    initialData: useMockApi ? repositories.majors.initialData?.items : undefined,
+  });
+}
+
 export function useDaySlotsRepository() {
   const schoolId = useActiveSchoolId();
   return useQuery<DaySlotGroup[]>({
@@ -197,11 +238,15 @@ export function useTeacherAvailabilityMutation() {
     mutationFn: ({ teacherId, daySlotIds }: { teacherId: string; daySlotIds: readonly string[] }) =>
       repositories.teacherAvailability.replace(teacherId, daySlotIds),
     onSuccess: async (_daySlotIds, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: repositoryQueryKeys.teacherAvailability(schoolId, variables.teacherId),
-        exact: true,
-        refetchType: "active",
-      });
+      const queryKey = repositoryQueryKeys.teacherAvailability(schoolId, variables.teacherId);
+      await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+      await queryClient.refetchQueries(
+        { queryKey, exact: true, type: "active" },
+        { throwOnError: true },
+      );
+      if (!queryClient.getQueryData<string[]>(queryKey)) {
+        throw new Error("پاسخ نهایی زمان‌های حضور از سرور دریافت نشد.");
+      }
     },
   });
 }

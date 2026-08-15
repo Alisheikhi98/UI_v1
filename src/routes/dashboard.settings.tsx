@@ -11,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Building2, User, Lock, Palette, Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { APP_NAME, withAppName } from '@/lib/branding'
 
 export const Route = createFileRoute('/dashboard/settings')({
-  head: () => ({ meta: [{ title: 'تنظیمات - آموزش‌یار' }, { name: 'description', content: 'مدیریت تنظیمات مدرسه و حساب کاربری' }] }),
+  head: () => ({ meta: [{ title: withAppName('تنظیمات') }, { name: 'description', content: 'مدیریت تنظیمات مدرسه و حساب کاربری' }] }),
   component: SettingsPage,
 })
 
@@ -21,7 +22,7 @@ function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const [schoolInfo, setSchoolInfo] = useState({
-    name: 'آموزش‌یار',
+    name: APP_NAME,
     address: 'تهران، خیابان ولیعصر، پلاک ۱۲۳',
     phone: '۰۲۱-۱۲۳۴۵۶۷',
     email: 'admin@school.edu',

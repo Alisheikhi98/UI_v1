@@ -34,7 +34,7 @@ test("canonical entities preserve IDs, relationships, and stable class metadata"
   const classMajors = new Map(classes.map((schoolClass) => [schoolClass.id, schoolClass.majorId]));
 
   assert.deepEqual(
-    selectClassViewModels([...classes].reverse()).map(({ id, majorId }) => [id, majorId]),
+    selectClassViewModels([...classes].reverse(), []).map(({ id, majorId }) => [id, majorId]),
     [...classes].reverse().map(({ id }) => [id, classMajors.get(id)]),
   );
 
@@ -322,7 +322,7 @@ test("FastAPI mappers preserve backend IDs and translate snake_case contracts", 
       created_at: timestamp,
       updated_at: timestamp,
     }).majorId,
-    "major-3",
+    "3",
   );
   assert.equal(
     mapClass({

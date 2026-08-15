@@ -330,6 +330,18 @@ export class MockTeacherRepository
   extends MockEntityRepository<Teacher>
   implements TeacherRepository
 {
+  list(params: RepositoryListParams = {}) {
+    const active = params.filters?.active;
+    const { active: _active, ...filters } = params.filters ?? {};
+    return super.list({
+      ...params,
+      filters: {
+        ...filters,
+        status: active === true ? "active" : active === false ? "inactive" : undefined,
+      },
+    });
+  }
+
   create(input: TeacherCreateInput, options?: RepositoryRequestOptions) {
     return super.create(
       {

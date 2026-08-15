@@ -5,6 +5,7 @@ import type {
   CourseDto,
   DeleteCheckDto,
   FastApiPage,
+  MajorDto,
   TeacherAvailabilityDto,
   TeacherCourseGroupDto,
   TeacherDto,
@@ -15,8 +16,10 @@ import {
   mapClassAssignment,
   mapCourse,
   mapCourseCreateInputToDto,
+  mapMajor,
   mapPage,
   mapTeacher,
+  mapTeacherCourseGroupsToLabels,
   mapWeeklyDaySlots,
   toApiId,
 } from "@/lib/api/mappers";
@@ -43,6 +46,7 @@ import type {
   CourseRepository,
   CourseUpdateInput,
   DaySlotRepository,
+  MajorRepository,
   PaginatedResult,
   RepositoryListParams,
   RepositoryRequestOptions,
@@ -52,7 +56,7 @@ import type {
   TeacherRepository,
   TeacherUpdateInput,
 } from "@/lib/repositories";
-import type { Class, ClassAssignment, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { Class, ClassAssignment, Course, DaySlotGroup, Major, Teacher } from "@/lib/types";
 
 export class BackendCapabilityError extends Error {
   constructor(message: string) {
@@ -222,15 +226,13 @@ export class ApiTeacherCoursesRepository implements TeacherCoursesRepository {
     this.getSchoolId = getSchoolId;
   }
 
-  async list(teacherId: string, options?: RepositoryRequestOptions): Promise<Course[]> {
+  async list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]> {
     const schoolId = requireSchoolId(this.getSchoolId);
     const groups = await apiRequest<TeacherCourseGroupDto[]>(
       `/schools/${schoolId}/teachers/${toApiId(teacherId, "teacherId")}/courses`,
       withSignal(options),
     );
-    const unique = new Map<number, CourseDto>();
-    groups.forEach((group) => group.courses.forEach((course) => unique.set(course.id, course)));
-    return [...unique.values()].map(mapCourse);
+    return mapTeacherCourseGroupsToLabels(groups);
   }
 }
 
@@ -247,6 +249,13 @@ export class ApiDaySlotRepository implements DaySlotRepository {
       withSignal(options),
     );
     return mapWeeklyDaySlots(week);
+  }
+}
+
+export class ApiMajorRepository implements MajorRepository {
+  async list(options?: RepositoryRequestOptions): Promise<Major[]> {
+    const majors = await apiRequest<MajorDto[]>("/majors/", withSignal(options));
+    return majors.map(mapMajor);
   }
 }
 

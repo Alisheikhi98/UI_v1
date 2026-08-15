@@ -13,6 +13,7 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { buildLoginUrl, clearAuthenticatedSession } from "@/lib/auth-session";
+import { APP_NAME } from "@/lib/branding";
 
 function NotFoundComponent() {
   return (
@@ -79,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "آموزش‌یار" },
+      { title: APP_NAME },
       { name: "description", content: "سامانه هوشمند مدیریت برنامه درسی مدارس" },
     ],
     links: [
