@@ -4,24 +4,22 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { mapWeeklyDaySlots } from "../src/lib/api/mappers.ts";
 import { createTeacherCoursesQueryOptions } from "../src/lib/teacher-courses.ts";
+import { createTeacherCourseLabelModel } from "../src/lib/teacher-course-labels.ts";
 import { repositoryQueryKeys } from "../src/lib/repository-query-keys.ts";
 import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "../src/lib/weekday-labels.ts";
 
-test("the initial Teacher list does not create per-Teacher Courses queries", async () => {
-  const path = fileURLToPath(new URL("../src/lib/mock-queries.ts", import.meta.url));
-  const source = await readFile(path, "utf8");
-  const initialListHook = source.slice(
-    source.indexOf("export function useTeachersRepository"),
-    source.indexOf("export function useTeacherCoursesQuery"),
+test("the Teachers table directly requests authoritative Courses for each active row", async () => {
+  const routeSource = await readFile(
+    fileURLToPath(new URL("../src/routes/dashboard.teachers.tsx", import.meta.url)),
+    "utf8",
   );
-
-  assert.doesNotMatch(initialListHook, /teacherCourses\.list/);
-  assert.match(initialListHook, /enabled: Boolean\(options\.includeAvailability\)/);
+  assert.match(routeSource, /useTeacherCoursesQuery\(teacher\.id, teacher\.status === "active"\)/);
+  assert.doesNotMatch(routeSource, /مشاهده دروس|requested|setRequested/);
 });
 
 test("deferred Teacher Courses loading forwards the Teacher ID and AbortSignal", async () => {
   const calls = [];
-  const expectedCourses = [{ id: "course-7", name: "Physics" }];
+  const expectedCourses = ["Physics"];
   const repository = {
     async list(teacherId, options) {
       calls.push({ teacherId, signal: options?.signal });
@@ -36,6 +34,18 @@ test("deferred Teacher Courses loading forwards the Teacher ID and AbortSignal",
 
   assert.equal(courses, expectedCourses);
   assert.deepEqual(calls, [{ teacherId: "teacher-3", signal: controller.signal }]);
+});
+
+test("Teacher Courses reuse cached data and compact overflow counts correctly", () => {
+  const repository = { list: async () => [] };
+  const options = createTeacherCoursesQueryOptions(repository, "teacher-3");
+  assert.equal(options.staleTime, 5 * 60 * 1000);
+
+  assert.deepEqual(createTeacherCourseLabelModel(["ریاضی", "فیزیک", "شیمی", "هندسه", "زیست"]), {
+    visibleLabels: ["ریاضی", "فیزیک", "شیمی"],
+    hiddenLabels: ["هندسه", "زیست"],
+    hiddenCount: 2,
+  });
 });
 
 test("Teacher Courses cache keys cannot leak across schools or Teachers", () => {

@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
 import { GRADE_OPTIONS, type ClassViewModel, useClassManagementData } from "@/lib/class-management";
+import { withAppName } from "@/lib/branding";
 import {
   getClassErrorMessage,
   getClassDeleteErrorMessage,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/class-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -50,7 +52,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Plus,
-  Search,
   Trash2,
   GraduationCap,
   CalendarClock,
@@ -65,7 +66,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/classes")({
   head: () => ({
     meta: [
-      { title: "کلاس‌ها - آموزش‌یار" },
+      { title: withAppName("کلاس‌ها") },
       { name: "description", content: "مدیریت کلاس‌ها و بخش‌های مدرسه" },
     ],
   }),
@@ -422,15 +423,12 @@ function ClassesPage() {
       <div className="p-6 space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative w-full flex-1 sm:max-w-sm">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="جستجوی کلاس‌ها..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pr-9"
-              />
-            </div>
+            <SearchInput
+              containerClassName="w-full flex-1 sm:max-w-sm"
+              placeholder="جستجوی کلاس‌ها..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full gap-2 sm:w-auto">

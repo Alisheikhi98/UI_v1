@@ -9,7 +9,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Table,
   TableBody,
@@ -260,7 +260,7 @@ export function ClassAssignmentsSheet({
           dir="rtl"
           className="flex max-h-[92vh] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)] sm:max-w-5xl"
         >
-          <DialogHeader className="relative shrink-0 items-center border-b bg-muted/20 px-12 py-5 text-center sm:px-14">
+          <DialogHeader className="relative shrink-0 items-center border-b bg-muted/20 px-12 pe-12 py-5 text-center sm:px-14 sm:pe-14">
             <div className="absolute right-5 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
               <GraduationCap className="h-5 w-5" />
             </div>
@@ -725,14 +725,14 @@ function ManagedEntityPicker({
           <Plus className="me-2 h-4 w-4" />
           {createLabel}
         </DropdownMenuItem>
-        <div className="relative p-2" onKeyDown={(event) => event.stopPropagation()}>
-          <Search className="absolute right-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="p-2" onKeyDown={(event) => event.stopPropagation()}>
+          <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onClick={(event) => event.stopPropagation()}
             placeholder={searchPlaceholder}
-            className="h-8 pr-8 text-xs"
+            className="h-8 text-xs"
+            iconClassName="h-3.5 w-3.5"
             dir="rtl"
             autoFocus
           />

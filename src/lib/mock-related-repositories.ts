@@ -6,7 +6,7 @@ import type {
   TeacherAvailabilityRepository,
   TeacherCoursesRepository,
 } from "@/lib/repositories";
-import type { Course, DaySlotGroup, Major } from "@/lib/types";
+import type { DaySlotGroup, Major } from "@/lib/types";
 import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 const mockWeekdayNames = BACKEND_WEEKDAY_NAMES.slice(0, 6).map(getWeekdayDisplayLabel);
@@ -64,11 +64,13 @@ export class MockTeacherAvailabilityRepository implements TeacherAvailabilityRep
 }
 
 export class MockTeacherCoursesRepository implements TeacherCoursesRepository {
-  async list(teacherId: string): Promise<Course[]> {
+  async list(teacherId: string): Promise<string[]> {
     const teacher = await teacherRepository.getById(teacherId);
     if (!teacher) return [];
     const courses = await courseRepository.list();
-    return courses.items.filter((course) => teacher.courseIds.includes(course.id));
+    return courses.items
+      .filter((course) => teacher.courseIds.includes(course.id))
+      .map((course) => course.name);
   }
 }
 

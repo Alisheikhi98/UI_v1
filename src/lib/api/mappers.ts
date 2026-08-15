@@ -16,6 +16,7 @@ import type {
   FastApiPage,
   MajorDto,
   TeacherDto,
+  TeacherCourseGroupDto,
   WeeklyDaySlotsDto,
 } from "@/lib/api/dtos";
 import type { CourseCreateInput, PaginatedResult } from "@/lib/repositories";
@@ -47,6 +48,10 @@ export const mapTeacher = (dto: TeacherDto): Teacher => ({
   courseIds: [],
   status: dto.active ? "active" : "inactive",
 });
+
+export const mapTeacherCourseGroupsToLabels = (groups: TeacherCourseGroupDto[]): string[] => [
+  ...new Set(groups.map((group) => group.display_name.trim() || "درس بدون نام")),
+];
 
 const courseColor = (id: number) => {
   const palette = ["#1E40AF", "#059669", "#7C3AED", "#DC2626", "#CA8A04", "#0891B2"];

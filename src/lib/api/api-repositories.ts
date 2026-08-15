@@ -19,6 +19,7 @@ import {
   mapMajor,
   mapPage,
   mapTeacher,
+  mapTeacherCourseGroupsToLabels,
   mapWeeklyDaySlots,
   toApiId,
 } from "@/lib/api/mappers";
@@ -225,15 +226,13 @@ export class ApiTeacherCoursesRepository implements TeacherCoursesRepository {
     this.getSchoolId = getSchoolId;
   }
 
-  async list(teacherId: string, options?: RepositoryRequestOptions): Promise<Course[]> {
+  async list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]> {
     const schoolId = requireSchoolId(this.getSchoolId);
     const groups = await apiRequest<TeacherCourseGroupDto[]>(
       `/schools/${schoolId}/teachers/${toApiId(teacherId, "teacherId")}/courses`,
       withSignal(options),
     );
-    const unique = new Map<number, CourseDto>();
-    groups.forEach((group) => group.courses.forEach((course) => unique.set(course.id, course)));
-    return [...unique.values()].map(mapCourse);
+    return mapTeacherCourseGroupsToLabels(groups);
   }
 }
 

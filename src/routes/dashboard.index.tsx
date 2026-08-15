@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { mockActivities, mockAlerts } from "@/lib/data";
+import { withAppName } from "@/lib/branding";
 import {
   useClassesRepository,
   useCoursesRepository,
@@ -63,7 +64,7 @@ function getAlertIcon(type: string) {
 }
 
 export const Route = createFileRoute("/dashboard/")({
-  head: () => ({ meta: [{ title: "داشبورد - آموزش‌یار" }] }),
+  head: () => ({ meta: [{ title: withAppName("داشبورد") }] }),
   component: DashboardPage,
 });
 

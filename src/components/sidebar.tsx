@@ -14,6 +14,7 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AuthenticatedUser } from "@/lib/api/auth";
+import { APP_NAME } from "@/lib/branding";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
@@ -73,7 +74,7 @@ export function Sidebar({
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <CalendarDays className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-semibold text-sidebar-foreground">آموزش‌یار</span>
+            <span className="text-lg font-semibold text-sidebar-foreground">{APP_NAME}</span>
           </div>
 
           {/* Navigation */}

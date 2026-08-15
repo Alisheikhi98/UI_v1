@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/header";
+import { withAppName } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -29,23 +31,13 @@ import {
 } from "@/components/ui/select";
 import { useCoursesRepository, useTeachersRepository } from "@/lib/mock-queries";
 import type { Course, Teacher } from "@/lib/types";
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  BookOpen,
-  Clock,
-  User,
-  Loader2,
-} from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Trash2, BookOpen, Clock, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/subjects")({
   head: () => ({
     meta: [
-      { title: "دروس - آموزش‌یار" },
+      { title: withAppName("دروس") },
       { name: "description", content: "مدیریت دروس برنامه درسی" },
     ],
   }),
@@ -313,15 +305,12 @@ function SubjectsPage() {
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="جستجوی دروس..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pr-9"
-            />
-          </div>
+          <SearchInput
+            containerClassName="max-w-sm flex-1"
+            placeholder="جستجوی دروس..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <Button onClick={openAddDialog}>
             <Plus className="me-2 h-4 w-4" />
             افزودن درس

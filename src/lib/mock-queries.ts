@@ -158,7 +158,7 @@ export function useTeachersRepository(
 
 export function useTeacherCoursesQuery(teacherId: string | null, enabled = true) {
   const schoolId = useActiveSchoolId();
-  return useQuery<Course[]>({
+  return useQuery<string[]>({
     queryKey: repositoryQueryKeys.teacherCourses(schoolId, teacherId ?? "none"),
     ...createTeacherCoursesQueryOptions(repositories.teacherCourses, teacherId ?? "none"),
     enabled: enabled && Boolean(teacherId) && (useMockApi || schoolId !== null),

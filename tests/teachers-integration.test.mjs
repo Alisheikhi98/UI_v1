@@ -177,7 +177,7 @@ test("Teacher Availability persists only authoritative day-slot IDs", async () =
   assert.deepEqual(payloads, [{ day_slot_ids: [12, 15] }]);
 });
 
-test("Teacher Courses remain deferred, scoped, and authoritative", async () => {
+test("Teacher Courses use authoritative display names and remain scoped", async () => {
   let requestCount = 0;
   globalThis.fetch = async () => {
     requestCount += 1;
@@ -207,14 +207,14 @@ test("Teacher Courses remain deferred, scoped, and authoritative", async () => {
 
   const repository = new ApiTeacherCoursesRepository(() => "9");
   assert.equal(requestCount, 0);
-  const courses = await repository.list("41");
+  const courseLabels = await repository.list("41");
   assert.equal(requestCount, 1);
-  assert.equal(courses[0].id, "77");
+  assert.deepEqual(courseLabels, ["ریاضی"]);
 
   const routeSource = await readSource("../src/routes/dashboard.teachers.tsx");
   assert.doesNotMatch(routeSource, /useCoursesRepository/);
-  assert.match(routeSource, /requested && teacher\.status === "active"/);
-  assert.match(routeSource, /coursesQuery\.data\.length === 0/);
+  assert.doesNotMatch(routeSource, /مشاهده دروس|requested|setRequested/);
+  assert.match(routeSource, /teacher\.status === "active"/);
 });
 
 test("Teacher dialogs map FastAPI fields and protect pending mutations", async () => {

@@ -7,11 +7,14 @@ import {
   Clock,
   Plus,
   Pencil,
-  Hash,
+  Fingerprint,
   Sparkles,
   RotateCcw,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +40,12 @@ import {
 } from "@/lib/api/schools-store";
 import { cn } from "@/lib/utils";
 import { setActiveSchoolId } from "@/lib/active-school";
+import {
+  getBreakDuration,
+  getScheduleValidationError,
+  shiftTimeByMinutes,
+  updateBreakDuration,
+} from "@/lib/school-schedule";
 
 export const Route = createFileRoute("/dashboard/schools")({
   component: SchoolsPage,
@@ -79,15 +88,12 @@ function SchoolsPage() {
   const stats = useMemo(() => {
     const totalSchools = schools.length;
     const activeDaysSet = new Set<string>();
-    let totalPeriods = 0;
     schools.forEach((s) => {
       s.workingDays.forEach((d) => activeDaysSet.add(d));
-      totalPeriods += s.timing.periodsCount;
     });
     return {
       totalSchools,
       activeDays: activeDaysSet.size,
-      dailyPeriods: totalSchools ? Math.round(totalPeriods / totalSchools) : 0,
     };
   }, [schools]);
 
@@ -102,82 +108,80 @@ function SchoolsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">مدیریت مدارس</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            مرکز مدیریت پروفایل مدارس، روزهای کاری و برنامه زنگ‌ها
-          </p>
-        </div>
-        {!schoolsQuery.isPending && !schoolsQuery.isError && schools.length === 0 && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            افزودن مدرسه جدید
-          </Button>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={Building2} label="مجموع مدارس" value={stats.totalSchools} tone="primary" />
-        <StatCard
-          icon={Calendar}
-          label="روزهای کاری فعال"
-          value={stats.activeDays}
-          tone="success"
-        />
-        <StatCard
-          icon={Clock}
-          label="میانگین زنگ‌های روزانه"
-          value={stats.dailyPeriods}
-          tone="warning"
-        />
-      </div>
-
-      {/* List / Empty */}
-      {schoolsQuery.isPending ? (
-        <div className="text-center text-muted-foreground py-12">در حال بارگذاری…</div>
-      ) : schoolsQuery.isError ? (
-        <div className="space-y-3 py-12 text-center">
-          <p className="text-sm text-destructive">{schoolsQuery.error.message}</p>
-          <Button variant="outline" size="sm" onClick={() => schoolsQuery.refetch()}>
-            تلاش مجدد
-          </Button>
-        </div>
-      ) : schools.length === 0 ? (
-        <EmptyState onCreate={openCreate} />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {schools.map((s) => (
-            <SchoolCard key={s.id} school={s} onEdit={() => openEdit(s)} />
-          ))}
-        </div>
-      )}
-
-      <SchoolDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editing={editing}
-        dayOptions={editing?.dayOptions.map((day) => day.label) ?? WEEK_DAYS}
-        onSubmit={async (data) => {
-          try {
-            if (editing) {
-              await update({ id: editing.id, data });
-              toast.success("مدرسه با موفقیت به‌روزرسانی شد");
-            } else {
-              await create(data);
-              toast.success("مدرسه جدید با موفقیت اضافه شد");
-            }
-            setDialogOpen(false);
-          } catch (error) {
-            toast.error(editing ? "خطا در ویرایش مدرسه" : "خطا در ایجاد مدرسه", {
-              description: error instanceof Error ? error.message : undefined,
-            });
-          }
-        }}
+    <div className="flex flex-col" dir="rtl">
+      <Header
+        title="مدرسه"
+        description="مشخصات مدرسه، روزهای کاری و برنامه زمانی زنگ‌ها را مدیریت کنید."
       />
+      <main className="space-y-6 p-4 sm:p-6">
+        <div className="flex justify-end">
+          {!schoolsQuery.isPending && !schoolsQuery.isError && schools.length === 0 && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              افزودن مدرسه جدید
+            </Button>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard
+            icon={Building2}
+            label="مجموع مدارس"
+            value={stats.totalSchools}
+            tone="primary"
+          />
+          <StatCard
+            icon={Calendar}
+            label="روزهای کاری فعال"
+            value={stats.activeDays}
+            tone="success"
+          />
+        </div>
+
+        {/* List / Empty */}
+        {schoolsQuery.isPending ? (
+          <div className="text-center text-muted-foreground py-12">در حال بارگذاری…</div>
+        ) : schoolsQuery.isError ? (
+          <div className="space-y-3 py-12 text-center">
+            <p className="text-sm text-destructive">اطلاعات مدرسه دریافت نشد. دوباره تلاش کنید.</p>
+            <Button variant="outline" size="sm" onClick={() => schoolsQuery.refetch()}>
+              تلاش مجدد
+            </Button>
+          </div>
+        ) : schools.length === 0 ? (
+          <EmptyState onCreate={openCreate} />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {schools.map((s) => (
+              <SchoolCard key={s.id} school={s} onEdit={() => openEdit(s)} />
+            ))}
+          </div>
+        )}
+
+        <SchoolDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          editing={editing}
+          dayOptions={editing?.dayOptions.map((day) => day.label) ?? WEEK_DAYS}
+          onSubmit={async (data) => {
+            try {
+              if (editing) {
+                await update({ id: editing.id, data });
+                toast.success("مدرسه با موفقیت به‌روزرسانی شد");
+              } else {
+                await create(data);
+                toast.success("مدرسه جدید با موفقیت اضافه شد");
+              }
+              setDialogOpen(false);
+            } catch {
+              toast.error(editing ? "خطا در ویرایش مدرسه" : "خطا در ایجاد مدرسه", {
+                description: "ارتباط با سرور برقرار نشد. دوباره تلاش کنید.",
+              });
+            }
+          }}
+        />
+      </main>
     </div>
   );
 }
@@ -191,12 +195,11 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  tone: "primary" | "success" | "warning";
+  tone: "primary" | "success";
 }) {
   const tones = {
     primary: "bg-primary/10 text-primary",
     success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   };
   return (
     <Card className="relative overflow-hidden">
@@ -247,7 +250,10 @@ function SchoolCard({ school, onEdit }: { school: School; onEdit: () => void }) 
             </div>
             <div>
               <CardTitle className="text-base">{school.name}</CardTitle>
-              <CardDescription className="text-xs mt-0.5">شناسه: {school.slug}</CardDescription>
+              <CardDescription className="mt-0.5 flex items-center gap-1 text-xs">
+                <Fingerprint className="h-3.5 w-3.5" aria-hidden="true" />
+                شناسه: {school.slug}
+              </CardDescription>
             </div>
           </div>
           <Badge variant={school.status === "active" ? "default" : "secondary"}>
@@ -294,6 +300,7 @@ function SchoolDialog({
   const [form, setForm] = useState<FormState>(defaultForm());
   const [submitting, setSubmitting] = useState(false);
   const [periodsDirty, setPeriodsDirty] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -312,6 +319,7 @@ function SchoolDialog({
           : emptyScheduleDefaults,
       );
       setPeriodsDirty(false);
+      setScheduleError(null);
     }
   }, [open, editing]);
 
@@ -356,7 +364,30 @@ function SchoolDialog({
       ),
     }));
     setPeriodsDirty(false);
+    setScheduleError(null);
     toast.success("جدول زنگ‌ها بازسازی شد");
+  };
+
+  const updatePeriods = (periods: PeriodTime[]) => {
+    const error = getScheduleValidationError(periods);
+    if (error) {
+      setScheduleError(error);
+      return;
+    }
+    setForm((current) => ({ ...current, periods }));
+    setPeriodsDirty(true);
+    setScheduleError(null);
+  };
+
+  const updateBreak = (breakIndex: number, duration: number) => {
+    const result = updateBreakDuration(form.periods, breakIndex, duration);
+    if (result.error) {
+      setScheduleError(result.error);
+      return;
+    }
+    setForm((current) => ({ ...current, periods: result.periods }));
+    setPeriodsDirty(true);
+    setScheduleError(null);
   };
 
   const handleSubmit = async () => {
@@ -370,6 +401,12 @@ function SchoolDialog({
     }
     if (!/^[a-z0-9-]+$/.test(form.slug.trim())) {
       toast.error("شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد");
+      return;
+    }
+    const periodsError = getScheduleValidationError(form.periods);
+    if (periodsError) {
+      setScheduleError(periodsError);
+      toast.error(periodsError);
       return;
     }
     setSubmitting(true);
@@ -388,13 +425,13 @@ function SchoolDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !submitting && onOpenChange(nextOpen)}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent dir="rtl" className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader className="w-full text-right sm:text-right">
+          <DialogTitle className="flex items-center gap-2 text-right">
             <Building2 className="h-5 w-5 text-primary" />
             {editing ? "ویرایش مدرسه" : "ایجاد مدرسه جدید"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription dir="rtl" className="text-right leading-relaxed">
             مشخصات مدرسه، روزهای کاری و برنامه زمانی زنگ‌ها را تنظیم کنید.
           </DialogDescription>
         </DialogHeader>
@@ -411,7 +448,7 @@ function SchoolDialog({
                   placeholder="مثلاً: دبیرستان شهید بهشتی"
                 />
               </Field>
-              <Field label="شناسه مدرسه *" icon={Hash}>
+              <Field label="شناسه مدرسه *" icon={Fingerprint}>
                 <Input
                   value={form.slug}
                   onChange={(e) => setForm({ ...form, slug: e.target.value })}
@@ -445,7 +482,7 @@ function SchoolDialog({
                         : "bg-background border-border hover:bg-muted",
                     )}
                   >
-                    {active && <CheckCircle2 className="h-3.5 w-3.5 inline-block ml-1" />}
+                    {active && <CheckCircle2 className="me-1 inline-block h-3.5 w-3.5" />}
                     {day}
                   </button>
                 );
@@ -458,8 +495,11 @@ function SchoolDialog({
           {/* Timing */}
           <section className="space-y-4">
             <SectionTitle icon={Clock} title="تنظیمات زمانی و زنگ‌ها" />
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="تعداد زنگ‌ها">
+            <div
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(90px,0.7fr)_minmax(190px,1.25fr)_minmax(140px,1fr)_minmax(180px,1.15fr)] lg:gap-3"
+              data-testid="school-timing-settings-grid"
+            >
+              <Field label="تعداد زنگ‌ها" className="min-w-0" labelClassName="min-h-10 items-end">
                 <Input
                   type="number"
                   min={1}
@@ -476,16 +516,62 @@ function SchoolDialog({
                   }
                 />
               </Field>
-              <Field label="ساعت شروع روز">
-                <Input
-                  type="time"
-                  value={form.timing.dayStart}
-                  onChange={(e) =>
-                    setForm({ ...form, timing: { ...form.timing, dayStart: e.target.value } })
-                  }
-                />
+              <Field label="ساعت شروع روز" className="min-w-0" labelClassName="min-h-10 items-end">
+                <div className="flex h-10 min-w-0 items-center overflow-hidden rounded-md border bg-background">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-9 shrink-0 rounded-none"
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        timing: {
+                          ...current.timing,
+                          dayStart: shiftTimeByMinutes(current.timing.dayStart, 15),
+                        },
+                      }))
+                    }
+                    aria-label="۱۵ دقیقه دیرتر"
+                    title="۱۵ دقیقه دیرتر"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="time"
+                    step={900}
+                    value={form.timing.dayStart}
+                    onChange={(e) =>
+                      setForm({ ...form, timing: { ...form.timing, dayStart: e.target.value } })
+                    }
+                    className="h-10 min-w-0 flex-1 rounded-none border-y-0 px-1 text-center shadow-none focus-visible:ring-0"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-9 shrink-0 rounded-none"
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        timing: {
+                          ...current.timing,
+                          dayStart: shiftTimeByMinutes(current.timing.dayStart, -15),
+                        },
+                      }))
+                    }
+                    aria-label="۱۵ دقیقه زودتر"
+                    title="۱۵ دقیقه زودتر"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
               </Field>
-              <Field label="مدت هر زنگ (دقیقه)">
+              <Field
+                label="مدت هر زنگ (دقیقه)"
+                className="min-w-0"
+                labelClassName="min-h-10 items-end"
+              >
                 <Input
                   type="number"
                   min={5}
@@ -501,7 +587,11 @@ function SchoolDialog({
                   }
                 />
               </Field>
-              <Field label="مدت زنگ تفریح (دقیقه)">
+              <Field
+                label="مدت پیش‌فرض زنگ تفریح (دقیقه)"
+                className="min-w-0"
+                labelClassName="min-h-10 items-end"
+              >
                 <Input
                   type="number"
                   min={0}
@@ -538,7 +628,7 @@ function SchoolDialog({
               </div>
               <div className="space-y-2">
                 {form.periods.map((p, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+                  <div key={p.index} className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="w-16 justify-center shrink-0">
                       زنگ {p.index.toLocaleString("fa-IR")}
                     </Badge>
@@ -546,10 +636,10 @@ function SchoolDialog({
                       type="time"
                       value={p.start}
                       onChange={(e) => {
-                        const periods = [...form.periods];
-                        periods[idx] = { ...periods[idx], start: e.target.value };
-                        setForm({ ...form, periods });
-                        setPeriodsDirty(true);
+                        const periods = form.periods.map((period, periodIndex) =>
+                          periodIndex === idx ? { ...period, start: e.target.value } : period,
+                        );
+                        updatePeriods(periods);
                       }}
                       className="max-w-[120px]"
                     />
@@ -558,21 +648,40 @@ function SchoolDialog({
                       type="time"
                       value={p.end}
                       onChange={(e) => {
-                        const periods = [...form.periods];
-                        periods[idx] = { ...periods[idx], end: e.target.value };
-                        setForm({ ...form, periods });
-                        setPeriodsDirty(true);
+                        const periods = form.periods.map((period, periodIndex) =>
+                          periodIndex === idx ? { ...period, end: e.target.value } : period,
+                        );
+                        updatePeriods(periods);
                       }}
                       className="max-w-[120px]"
                     />
                     {idx < form.periods.length - 1 && (
-                      <Badge variant="secondary" className="text-xs mr-auto">
-                        استراحت {form.timing.breakDuration.toLocaleString("fa-IR")} دقیقه
-                      </Badge>
+                      <div className="ms-auto flex items-center gap-2 rounded-md bg-muted/60 px-2 py-1">
+                        <Label htmlFor={`break-${idx}`} className="whitespace-nowrap text-xs">
+                          استراحت {(idx + 1).toLocaleString("fa-IR")}
+                        </Label>
+                        <Input
+                          id={`break-${idx}`}
+                          data-testid={`break-duration-${idx + 1}`}
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={getBreakDuration(form.periods, idx) ?? 0}
+                          onChange={(event) => updateBreak(idx, Number(event.target.value))}
+                          className="h-8 w-20 text-center"
+                          aria-label={`مدت استراحت ${(idx + 1).toLocaleString("fa-IR")} به دقیقه`}
+                        />
+                        <span className="text-xs text-muted-foreground">دقیقه</span>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
+              {scheduleError && (
+                <p role="alert" className="text-xs text-destructive">
+                  {scheduleError}
+                </p>
+              )}
               {periodsDirty && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   ⚠ زمان‌ها به‌صورت دستی ویرایش شده‌اند. برای بازگرداندن به مقادیر خودکار، دکمه
@@ -614,15 +723,19 @@ function SectionTitle({
 function Field({
   label,
   icon: Icon,
+  className,
+  labelClassName,
   children,
 }: {
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
+  className?: string;
+  labelClassName?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium flex items-center gap-1.5">
+    <div className={cn("space-y-1.5", className)}>
+      <Label className={cn("flex items-center gap-1.5 text-xs font-medium", labelClassName)}>
         {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
         {label}
       </Label>

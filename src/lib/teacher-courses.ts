@@ -6,5 +6,6 @@ export function createTeacherCoursesQueryOptions(
 ) {
   return {
     queryFn: ({ signal }: RepositoryRequestOptions = {}) => repository.list(teacherId, { signal }),
+    staleTime: 5 * 60 * 1000,
   };
 }

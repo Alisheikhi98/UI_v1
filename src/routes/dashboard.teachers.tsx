@@ -5,20 +5,20 @@ import {
   Edit,
   Filter,
   GraduationCap,
-  Loader2,
   MoreHorizontal,
   Phone,
   Plus,
-  Search,
   Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
+import { withAppName } from "@/lib/branding";
 import {
   TeacherDetailsDialog,
   type TeacherDetailsInput,
 } from "@/components/teachers/teacher-details-dialog";
+import { TeacherCourseLabels } from "@/components/teachers/teacher-course-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Select,
   SelectContent,
@@ -77,7 +78,7 @@ import { getTeacherErrorMessage } from "@/lib/teacher-errors";
 export const Route = createFileRoute("/dashboard/teachers")({
   head: () => ({
     meta: [
-      { title: "معلمان - آموزش‌یار" },
+      { title: withAppName("معلمان") },
       { name: "description", content: "مدیریت معلمان مدرسه" },
     ],
   }),
@@ -95,7 +96,7 @@ function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
         با افزودن اولین معلم، اطلاعات کادر آموزشی مدرسه را ثبت کنید.
       </p>
       <Button className="mt-6" onClick={onAddTeacher}>
-        <Plus className="ml-2 h-4 w-4" />
+        <Plus className="me-2 h-4 w-4" />
         افزودن معلم
       </Button>
     </Card>
@@ -245,50 +246,18 @@ function TeacherAvailabilityDialog({
 }
 
 function TeacherCoursesCell({ teacher }: { teacher: Teacher }) {
-  const [requested, setRequested] = useState(false);
-  const coursesQuery = useTeacherCoursesQuery(teacher.id, requested && teacher.status === "active");
+  const coursesQuery = useTeacherCoursesQuery(teacher.id, teacher.status === "active");
 
   if (teacher.status !== "active") {
     return <span className="text-xs text-muted-foreground">برای معلم غیرفعال در دسترس نیست</span>;
   }
 
-  if (!requested) {
-    return (
-      <Button variant="ghost" size="sm" onClick={() => setRequested(true)}>
-        مشاهده دروس
-      </Button>
-    );
-  }
-
-  if (coursesQuery.isPending) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        در حال دریافت
-      </span>
-    );
-  }
-
-  if (coursesQuery.isError) {
-    return (
-      <Button variant="ghost" size="sm" onClick={() => void coursesQuery.refetch()}>
-        تلاش مجدد
-      </Button>
-    );
-  }
-
-  if (coursesQuery.data.length === 0) {
-    return <span className="text-xs text-muted-foreground">بدون درس</span>;
-  }
-
   return (
-    <div className="mx-auto flex max-w-64 flex-wrap justify-center gap-1">
-      {coursesQuery.data.map((course) => (
-        <Badge key={course.id} variant="secondary" className="text-xs">
-          {course.name}
-        </Badge>
-      ))}
-    </div>
+    <TeacherCourseLabels
+      labels={coursesQuery.data ?? []}
+      loading={coursesQuery.isPending}
+      error={coursesQuery.isError}
+    />
   );
 }
 
@@ -399,18 +368,15 @@ function TeachersPage() {
       <div className="space-y-6 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative max-w-md flex-1">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="جستجوی نام یا کد پرسنلی..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="pr-9"
-              />
-            </div>
+            <SearchInput
+              containerClassName="max-w-md flex-1"
+              placeholder="جستجوی نام یا کد پرسنلی..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-36">
-                <Filter className="ml-2 h-4 w-4" />
+                <Filter className="me-2 h-4 w-4" />
                 <SelectValue placeholder="وضعیت" />
               </SelectTrigger>
               <SelectContent>
@@ -421,7 +387,7 @@ function TeachersPage() {
             </Select>
           </div>
           <Button onClick={openAddDialog}>
-            <Plus className="ml-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             افزودن معلم
           </Button>
         </div>
@@ -451,7 +417,7 @@ function TeachersPage() {
                       <TableHead className="w-14 text-center">ردیف</TableHead>
                       <TableHead className="w-px whitespace-nowrap text-center">معلم</TableHead>
                       <TableHead className="text-center">شماره تماس</TableHead>
-                      <TableHead className="text-center">دروس</TableHead>
+                      <TableHead className="w-[22rem] text-center">دروس</TableHead>
                       <TableHead className="text-center">روزهای حضور</TableHead>
                       <TableHead className="text-center">وضعیت</TableHead>
                       <TableHead className="w-20 text-center">عملیات</TableHead>
@@ -466,7 +432,7 @@ function TeachersPage() {
                       </TableRow>
                     ) : (
                       teachers.map((teacher, index) => (
-                        <TableRow key={teacher.id}>
+                        <TableRow key={teacher.id} className="h-14">
                           <TableCell className="text-center font-medium text-muted-foreground">
                             {index + 1}
                           </TableCell>
@@ -476,7 +442,7 @@ function TeachersPage() {
                               <span className="font-medium text-foreground">{teacher.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-[22rem] max-w-[22rem] py-2">
                             {teacher.phone ? (
                               <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
                                 <Phone className="h-3.5 w-3.5" />
@@ -523,7 +489,7 @@ function TeachersPage() {
                                   onClick={() => openEditDialog(teacher)}
                                   disabled={teacher.status !== "active"}
                                 >
-                                  <Edit className="ml-2 h-4 w-4" />
+                                  <Edit className="me-2 h-4 w-4" />
                                   ویرایش
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -532,7 +498,7 @@ function TeachersPage() {
                                   onClick={() => openDeleteDialog(teacher)}
                                   disabled={teacher.status !== "active"}
                                 >
-                                  <Trash2 className="ml-2 h-4 w-4" />
+                                  <Trash2 className="me-2 h-4 w-4" />
                                   حذف
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

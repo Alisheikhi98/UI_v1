@@ -109,7 +109,7 @@ export interface TeacherAvailabilityRepository {
 }
 
 export interface TeacherCoursesRepository {
-  list(teacherId: string, options?: RepositoryRequestOptions): Promise<Course[]>;
+  list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]>;
 }
 
 export interface MajorRepository {

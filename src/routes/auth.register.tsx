@@ -20,6 +20,7 @@ import {
   getRegistrationErrorMessage,
   type AuthFieldErrors,
 } from "@/lib/auth-errors";
+import { withAppName } from "@/lib/branding";
 import { registerUser } from "@/lib/api/auth";
 import { validateStoredSession } from "@/lib/auth-session";
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/auth/register")({
       throw redirect({ to: "/dashboard" });
     }
   },
-  head: () => ({ meta: [{ title: "ثبت‌نام - آموزش‌یار" }] }),
+  head: () => ({ meta: [{ title: withAppName("ثبت‌نام") }] }),
   component: RegisterRoutePage,
 });
 
@@ -199,12 +200,13 @@ function RegisterPage() {
                   aria-describedby={fieldErrors.password ? "password-error" : undefined}
                   disabled={isLoading}
                   autoComplete="new-password"
+                  className="pe-10"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute left-0 top-0 h-full px-3 hover:bg-transparent"
+                  className="absolute end-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword((visible) => !visible)}
                   disabled={isLoading}
                   aria-label={showPassword ? "پنهان‌کردن رمز عبور" : "نمایش رمز عبور"}
@@ -246,7 +248,7 @@ function RegisterPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   در حال ثبت‌نام...
                 </>
               ) : (
