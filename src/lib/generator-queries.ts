@@ -1,12 +1,17 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActiveSchoolId } from "@/lib/active-school";
 import { scheduleApi } from "@/lib/api/schedule-api";
-import { useClassAssignmentsRepository, useDaySlotsRepository } from "@/lib/mock-queries";
+import { ApiError } from "@/lib/api/client";
+import { useDaySlotsRepository } from "@/lib/mock-queries";
 import { repositories, useMockApi } from "@/lib/repositories/configured";
 import { repositoryQueryKeys } from "@/lib/repository-query-keys";
 import { listAllEntities } from "@/lib/repository-list";
 import { deriveGeneratorReadiness } from "@/lib/scheduler";
-import { fetchPublishedClassSchedules } from "@/lib/timetable-queries";
+import {
+  fetchPublishedClassSchedules,
+  useScheduleAssignmentReferences,
+} from "@/lib/timetable-queries";
+import type { ScheduleGenerationSettings } from "@/lib/scheduler";
 import type { Class, Teacher } from "@/lib/types";
 
 export function useGeneratorReadiness() {
@@ -25,8 +30,9 @@ export function useGeneratorReadiness() {
   const classItems = classes.data ?? [];
   const teacherItems = teachers.data ?? [];
   const classIds = classItems.map((item) => item.id);
-  const assignments = useClassAssignmentsRepository({ filters: { classIds } });
-  const teacherIds = [...new Set(assignments.items.map((item) => item.teacherId))];
+  const assignments = useScheduleAssignmentReferences(classIds);
+  const assignmentItems = assignments.data?.items ?? [];
+  const teacherIds = [...new Set(assignmentItems.map((item) => item.teacherId))];
   const availabilityQueries = useQueries({
     queries: teacherIds.map((teacherId) => ({
       queryKey: repositoryQueryKeys.teacherAvailability(schoolId, teacherId),
@@ -43,20 +49,20 @@ export function useGeneratorReadiness() {
     classes.isPending ||
     teachers.isPending ||
     daySlots.isPending ||
-    (classIds.length > 0 && assignments.query.isPending) ||
+    (classIds.length > 0 && assignments.isPending) ||
     availabilityQueries.some((query) => query.isPending);
   const error =
     classes.error ??
     teachers.error ??
     daySlots.error ??
-    assignments.query.error ??
+    assignments.error ??
     availabilityQueries.find((query) => query.error)?.error ??
     null;
 
   return {
     data: deriveGeneratorReadiness({
       classes: classItems,
-      assignments: assignments.items,
+      assignments: assignmentItems,
       teachers: teacherItems,
       daySlotGroups: daySlots.data ?? [],
       availabilityByTeacher,
@@ -66,6 +72,8 @@ export function useGeneratorReadiness() {
     classes: classItems,
     teachers: teacherItems,
     daySlotGroups: daySlots.data ?? [],
+    assignments: assignmentItems,
+    assignmentCourseReferences: assignments.data?.courseReferences ?? [],
   };
 }
 
@@ -78,6 +86,9 @@ export function useScheduleCandidate(candidateId: string | null) {
       return scheduleApi.getCandidate(schoolId, candidateId, { signal });
     },
     enabled: !useMockApi && schoolId !== null && candidateId !== null,
+    staleTime: 60_000,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 2,
   });
 }
 
@@ -85,10 +96,10 @@ export function useGenerateSchedule() {
   const schoolId = useActiveSchoolId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (settings: ScheduleGenerationSettings) => {
       if (useMockApi) throw new Error("تولید برنامه واقعی در حالت آزمایشی در دسترس نیست.");
       if (!schoolId) throw new Error("مدرسه فعال مشخص نشده است.");
-      return scheduleApi.generate(schoolId);
+      return scheduleApi.generate(schoolId, settings);
     },
     onSuccess: async (result) => {
       if (!schoolId || !result.success || !result.candidateId) return;
@@ -97,6 +108,21 @@ export function useGenerateSchedule() {
         queryFn: ({ signal }) =>
           scheduleApi.getCandidate(schoolId, result.candidateId!, { signal }),
       });
+      await queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.scheduleCandidates(schoolId),
+        exact: true,
+      });
+    },
+  });
+}
+
+export function useRepairScheduleAvailability() {
+  const schoolId = useActiveSchoolId();
+  return useMutation({
+    mutationFn: async (settings: ScheduleGenerationSettings) => {
+      if (useMockApi) throw new Error("تعمیر برنامه در حالت آزمایشی در دسترس نیست.");
+      if (!schoolId) throw new Error("مدرسه فعال مشخص نشده است.");
+      return scheduleApi.repairAvailability(schoolId, settings);
     },
   });
 }
@@ -129,6 +155,10 @@ export function useConfirmSchedule(classIds: readonly string[]) {
       if (!confirmedCandidate.selected) {
         throw new Error("The server did not mark the schedule candidate as selected.");
       }
+      await queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.scheduleCandidates(schoolId),
+        exact: true,
+      });
       return confirmation;
     },
   });

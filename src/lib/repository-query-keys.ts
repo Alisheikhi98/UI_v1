@@ -20,10 +20,23 @@ export const repositoryQueryKeys = {
     ["class-assignments", schoolId ?? "none", [...classIds].sort()] as const,
   assignmentsRoot: (schoolId: string | null) => ["class-assignments", schoolId ?? "none"] as const,
   daySlots: (schoolId: string | null) => ["schools", schoolId ?? "none", "day-slots"] as const,
+  schoolStatistics: (schoolId: string | null) =>
+    ["schools", schoolId ?? "none", "statistics"] as const,
+  scheduleCandidates: (schoolId: string | null) =>
+    ["schools", schoolId ?? "none", "schedule-candidates"] as const,
   scheduleCandidate: (schoolId: string | null, candidateId: string) =>
     ["schools", schoolId ?? "none", "schedule-candidates", candidateId] as const,
+  scheduleAssignmentReferencesRoot: (schoolId: string | null) =>
+    ["schools", schoolId ?? "none", "schedule-assignment-references"] as const,
+  scheduleAssignmentReferences: (schoolId: string | null, classIds: readonly string[]) =>
+    [
+      ...repositoryQueryKeys.scheduleAssignmentReferencesRoot(schoolId),
+      [...classIds].sort(),
+    ] as const,
   finalTimetableRoot: (schoolId: string | null) =>
     ["schools", schoolId ?? "none", "final-timetable"] as const,
+  publishedClassSchedule: (schoolId: string | null, classId: string) =>
+    ["schools", schoolId ?? "none", "final-timetable", "class", classId] as const,
   finalTimetable: (schoolId: string | null, classIds: readonly string[]) =>
     ["schools", schoolId ?? "none", "final-timetable", [...classIds].sort()] as const,
 };

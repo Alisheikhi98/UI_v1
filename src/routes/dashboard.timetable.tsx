@@ -1,20 +1,32 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
 import { withAppName } from "@/lib/branding";
+import { Button } from "@/components/ui/button";
 import { EntityTimetable } from "@/components/timetable/entity-timetable";
+import { FullscreenTimetableOverview } from "@/components/timetable/fullscreen-timetable-overview";
 import { SchoolMasterTimetable } from "@/components/timetable/school-master-timetable";
 import { TimetableEmptyState } from "@/components/timetable/timetable-empty-state";
+import { TimetableHistorySheet } from "@/components/timetable/timetable-history-sheet";
+import { TimetableSummary } from "@/components/timetable/timetable-summary";
+import { TimetableViewHeader } from "@/components/timetable/timetable-view-header";
 import { WeeklyTimetableToolbar } from "@/components/timetable/weekly-timetable-toolbar";
+import { useActiveSchoolId } from "@/lib/active-school";
+import { downloadWeeklyPlanExcel, getWeeklyPlanExcelErrorMessage } from "@/lib/api/timetable-excel";
 import {
   filterTimetableClasses,
   hasActiveSchoolFilters,
   type SchoolTimetableFilters,
   type TimetableViewMode,
 } from "@/lib/timetable";
+import {
+  createTimetableExportModel,
+  getTimetablePdfErrorMessage,
+  printTimetablePdf,
+} from "@/lib/timetable-export";
 import { usePublishedTimetable } from "@/lib/timetable-queries";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/timetable")({
   head: () => ({
@@ -36,6 +48,7 @@ const initialFilters: SchoolTimetableFilters = {
 };
 
 function TimetablePage() {
+  const schoolId = useActiveSchoolId();
   const timetableQuery = usePublishedTimetable();
   const timetable = timetableQuery.data;
   const [mode, setMode] = useState<TimetableViewMode>("school");
@@ -43,6 +56,10 @@ function TimetablePage() {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [exportPending, setExportPending] = useState<"pdf" | "excel" | null>(null);
+  const exportInFlight = useRef(false);
+  const closeFullscreen = useCallback(() => setFullscreen(false), []);
   const filteredClasses = useMemo(
     () => filterTimetableClasses(timetable?.classes ?? [], filters),
     [filters, timetable?.classes],
@@ -63,28 +80,74 @@ function TimetablePage() {
       : mode === "class"
         ? `نمای کلاس${selectedClass ? ` — ${selectedClass.name}` : ""}`
         : `نمای معلم${selectedTeacher ? ` — ${selectedTeacher.name}` : ""}`;
-
-  const handlePendingExport = (format: "pdf" | "excel") => {
-    toast.info(`خروجی ${format === "pdf" ? "PDF" : "Excel"} هنوز در این نسخه فعال نشده است.`, {
-      description: "این منو برای اتصال آینده به خروجی واقعی آماده شده است.",
+  const exportModel = useMemo(() => {
+    if (!timetable || !hasFinalTimetable) return null;
+    return createTimetableExportModel({
+      timetable,
+      mode,
+      visibleClasses: filteredClasses,
+      selectedClassId,
+      selectedTeacherId,
     });
+  }, [filteredClasses, hasFinalTimetable, mode, selectedClassId, selectedTeacherId, timetable]);
+  const pdfExportDisabled = !schoolId || !exportModel || timetableQuery.isPending;
+  const excelExportDisabled =
+    timetableQuery.isPending ||
+    !hasFinalTimetable ||
+    !schoolId ||
+    (mode === "class" && !selectedClassId) ||
+    (mode === "teacher" && !selectedTeacherId);
+
+  const handleExport = async (format: "pdf" | "excel") => {
+    if (exportPending || exportInFlight.current) return;
+    if (format === "pdf" && pdfExportDisabled) return;
+    if (format === "excel" && excelExportDisabled) return;
+    exportInFlight.current = true;
+    setExportPending(format);
+    try {
+      if (format === "excel") {
+        if (!schoolId) return;
+        await downloadWeeklyPlanExcel({
+          mode,
+          schoolId,
+          classId: selectedClassId,
+          teacherId: selectedTeacherId,
+        });
+      } else {
+        if (!exportModel) return;
+        await printTimetablePdf(exportModel);
+      }
+    } catch (error) {
+      toast.error(
+        format === "excel"
+          ? getWeeklyPlanExcelErrorMessage(error)
+          : getTimetablePdfErrorMessage(error),
+      );
+    } finally {
+      exportInFlight.current = false;
+      setExportPending(null);
+    }
   };
 
   return (
-    <div className="flex flex-col" dir="rtl">
-      {!fullscreen && (
-        <Header title="برنامه هفتگی" description="مشاهده برنامه نهایی مدرسه، کلاس‌ها و معلمان" />
-      )}
+    <div
+      className="weekly-timetable-page flex flex-col"
+      dir="rtl"
+      aria-hidden={fullscreen || undefined}
+      inert={fullscreen || undefined}
+    >
+      <Header title="برنامه هفتگی" description="برنامه نهایی و ثبت‌شده مدرسه" />
 
-      <main
-        className={cn(
-          "p-4 sm:p-6",
-          fullscreen && "fixed inset-0 z-50 overflow-auto bg-background p-2 sm:p-4",
-        )}
-      >
+      <main className="timetable-page-main p-4 sm:p-6">
+        <div className="mb-3 flex justify-end print:hidden">
+          <Button type="button" variant="outline" onClick={() => setHistoryOpen(true)}>
+            <History className="h-4 w-4" />
+            تاریخچه برنامه‌ها
+          </Button>
+        </div>
         <section
           id="timetable-print-root"
-          className="overflow-hidden border bg-background shadow-sm sm:rounded-xl"
+          className="isolate overflow-hidden border bg-background shadow-sm sm:rounded-xl"
           aria-label="برنامه هفتگی نهایی"
         >
           <div className="timetable-print-only mb-4 text-center">
@@ -109,7 +172,7 @@ function TimetablePage() {
                 selectedClassId={selectedClassId}
                 selectedTeacherId={selectedTeacherId}
                 filtersActive={hasActiveSchoolFilters(filters)}
-                fullscreen={fullscreen}
+                fullscreen={false}
                 onModeChange={setMode}
                 onFiltersChange={setFilters}
                 onResetFilters={() => setFilters(initialFilters)}
@@ -117,8 +180,25 @@ function TimetablePage() {
                 onTeacherChange={setSelectedTeacherId}
                 onFullscreenToggle={() => setFullscreen((value) => !value)}
                 onPrint={() => window.print()}
-                onExport={handlePendingExport}
+                onExport={(format) => void handleExport(format)}
+                pdfExportDisabled={pdfExportDisabled}
+                excelExportDisabled={excelExportDisabled}
+                exportPending={exportPending}
               />
+
+              {hasFinalTimetable && (
+                <>
+                  <TimetableViewHeader
+                    mode={mode}
+                    schoolName={timetable.schoolName}
+                    selectedClassName={selectedClass?.name}
+                    selectedTeacherName={selectedTeacher?.name}
+                  />
+                  {mode === "school" && filteredClasses.length > 0 && (
+                    <TimetableSummary timetable={timetable} classes={filteredClasses} />
+                  )}
+                </>
+              )}
 
               {!hasFinalTimetable ? (
                 <TimetableEmptyState kind="no-final" />
@@ -151,6 +231,16 @@ function TimetablePage() {
           )}
         </section>
       </main>
+
+      {fullscreen && timetable && hasFinalTimetable && (
+        <FullscreenTimetableOverview
+          timetable={timetable}
+          onClose={closeFullscreen}
+          onPrint={() => window.print()}
+        />
+      )}
+
+      <TimetableHistorySheet open={historyOpen} onOpenChange={setHistoryOpen} />
     </div>
   );
 }

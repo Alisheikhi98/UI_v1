@@ -408,110 +408,209 @@ function TeachersPage() {
         ) : teachers.length === 0 && !search && statusFilter === "active" ? (
           <EmptyState onAddTeacher={openAddDialog} />
         ) : (
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[960px] text-center">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-14 text-center">ردیف</TableHead>
-                      <TableHead className="w-px whitespace-nowrap text-center">معلم</TableHead>
-                      <TableHead className="text-center">شماره تماس</TableHead>
-                      <TableHead className="w-[22rem] text-center">دروس</TableHead>
-                      <TableHead className="text-center">روزهای حضور</TableHead>
-                      <TableHead className="text-center">وضعیت</TableHead>
-                      <TableHead className="w-20 text-center">عملیات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {teachers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                          معلمی با این مشخصات یافت نشد.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      teachers.map((teacher, index) => (
-                        <TableRow key={teacher.id} className="h-14">
-                          <TableCell className="text-center font-medium text-muted-foreground">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="w-px whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-2">
-                              <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <span className="font-medium text-foreground">{teacher.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="w-[22rem] max-w-[22rem] py-2">
-                            {teacher.phone ? (
-                              <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
-                                <Phone className="h-3.5 w-3.5" />
-                                <span dir="ltr">{teacher.phone}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">ثبت نشده</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <TeacherCoursesCell teacher={teacher} />
-                          </TableCell>
-                          <TableCell>
+          <>
+            <div className="grid gap-3 md:hidden" data-testid="teachers-mobile-list">
+              {teachers.length === 0 ? (
+                <Card className="p-8 text-center text-sm text-muted-foreground">
+                  معلمی با این مشخصات یافت نشد.
+                </Card>
+              ) : (
+                teachers.map((teacher, index) => (
+                  <Card key={teacher.id}>
+                    <CardContent className="space-y-4 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <GraduationCap className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{teacher.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              معلم شماره {(index + 1).toLocaleString("fa-IR")}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={teacher.status === "active" ? "default" : "secondary"}
+                          className="shrink-0"
+                        >
+                          {teacher.status === "active" ? "فعال" : "غیرفعال"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4 shrink-0" />
+                        {teacher.phone ? (
+                          <span className="truncate" dir="ltr">
+                            {teacher.phone}
+                          </span>
+                        ) : (
+                          <span>شماره تماس ثبت نشده است.</span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 space-y-2 border-y py-3">
+                        <p className="text-xs font-medium text-muted-foreground">دروس</p>
+                        <TeacherCoursesCell teacher={teacher} />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          className="min-w-0 flex-1"
+                          onClick={() => openAvailabilityDialog(teacher)}
+                          disabled={teacher.status !== "active"}
+                        >
+                          <CalendarDays className="me-2 h-4 w-4" />
+                          روزهای حضور
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="icon"
-                              onClick={() => openAvailabilityDialog(teacher)}
-                              disabled={teacher.status !== "active"}
-                              aria-label={`ویرایش روزهای حضور ${teacher.name}`}
-                              title="ویرایش روزهای حضور"
-                              className="text-primary"
+                              className="h-10 w-10 shrink-0"
+                              aria-label={`عملیات ${teacher.name}`}
                             >
-                              <CalendarDays className="h-5 w-5" />
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={teacher.status === "active" ? "default" : "secondary"}>
-                              {teacher.status === "active" ? "فعال" : "غیرفعال"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  aria-label={`عملیات ${teacher.name}`}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="text-right">
-                                <DropdownMenuItem
-                                  onClick={() => openEditDialog(teacher)}
-                                  disabled={teacher.status !== "active"}
-                                >
-                                  <Edit className="me-2 h-4 w-4" />
-                                  ویرایش
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => openDeleteDialog(teacher)}
-                                  disabled={teacher.status !== "active"}
-                                >
-                                  <Trash2 className="me-2 h-4 w-4" />
-                                  حذف
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="text-right">
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(teacher)}
+                              disabled={teacher.status !== "active"}
+                            >
+                              <Edit className="me-2 h-4 w-4" />
+                              ویرایش
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => openDeleteDialog(teacher)}
+                              disabled={teacher.status !== "active"}
+                            >
+                              <Trash2 className="me-2 h-4 w-4" />
+                              حذف
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+
+            <Card className="hidden overflow-hidden md:block">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[960px] text-center">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-14 text-center">ردیف</TableHead>
+                        <TableHead className="w-px whitespace-nowrap text-center">معلم</TableHead>
+                        <TableHead className="text-center">شماره تماس</TableHead>
+                        <TableHead className="w-[22rem] text-center">دروس</TableHead>
+                        <TableHead className="text-center">روزهای حضور</TableHead>
+                        <TableHead className="text-center">وضعیت</TableHead>
+                        <TableHead className="w-20 text-center">عملیات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teachers.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={7}
+                            className="py-10 text-center text-muted-foreground"
+                          >
+                            معلمی با این مشخصات یافت نشد.
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                      ) : (
+                        teachers.map((teacher, index) => (
+                          <TableRow key={teacher.id} className="h-14">
+                            <TableCell className="text-center font-medium text-muted-foreground">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="w-px whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-2">
+                                <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className="font-medium text-foreground">{teacher.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="w-[22rem] max-w-[22rem] py-2">
+                              {teacher.phone ? (
+                                <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                                  <Phone className="h-3.5 w-3.5" />
+                                  <span dir="ltr">{teacher.phone}</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">ثبت نشده</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <TeacherCoursesCell teacher={teacher} />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openAvailabilityDialog(teacher)}
+                                disabled={teacher.status !== "active"}
+                                aria-label={`ویرایش روزهای حضور ${teacher.name}`}
+                                title="ویرایش روزهای حضور"
+                                className="text-primary"
+                              >
+                                <CalendarDays className="h-5 w-5" />
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={teacher.status === "active" ? "default" : "secondary"}
+                              >
+                                {teacher.status === "active" ? "فعال" : "غیرفعال"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`عملیات ${teacher.name}`}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="text-right">
+                                  <DropdownMenuItem
+                                    onClick={() => openEditDialog(teacher)}
+                                    disabled={teacher.status !== "active"}
+                                  >
+                                    <Edit className="me-2 h-4 w-4" />
+                                    ویرایش
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => openDeleteDialog(teacher)}
+                                    disabled={teacher.status !== "active"}
+                                  >
+                                    <Trash2 className="me-2 h-4 w-4" />
+                                    حذف
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
 

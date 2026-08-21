@@ -134,6 +134,11 @@ export interface ScheduledLessonDto {
   slot: number;
 }
 
+export interface ScheduleRequestDto {
+  minimize_gaps: boolean;
+  max_same_course_slots_per_day: number | null;
+}
+
 export interface ScheduleResultDto {
   success: boolean;
   status: string;
@@ -142,6 +147,9 @@ export interface ScheduleResultDto {
   lessons: ScheduledLessonDto[];
   total_gap: number;
   details: Record<string, unknown>;
+}
+
+export interface ScheduleCandidateResultDto extends ScheduleResultDto {
   candidate_id: number | null;
 }
 
@@ -151,6 +159,15 @@ export interface ScheduleCandidateSummaryDto {
   total_gap: number;
   selected: boolean;
   created_at: string;
+}
+
+export interface SchoolStatisticsDto {
+  active_teacher_count: number;
+  active_class_count: number;
+  active_day_count: number;
+  active_weekly_slot_count: number;
+  assigned_weekly_slot_count: number;
+  empty_weekly_slot_count: number;
 }
 
 export interface ScheduleCandidateDetailDto extends ScheduleCandidateSummaryDto {

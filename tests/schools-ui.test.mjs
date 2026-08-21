@@ -1,8 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "bun:test";
 import {
+  applyPeriodTimeDrafts,
+  createPeriodTimeDrafts,
   getBreakDuration,
   getScheduleValidationError,
+  getTimeInputState,
+  periodTimeDraftKey,
   shiftTimeByMinutes,
   updateBreakDuration,
 } from "../src/lib/school-schedule.ts";
@@ -103,5 +107,95 @@ describe("Independent School breaks", () => {
     expect(source).toContain("start_time: period.start");
     expect(source).toContain("end_time: period.end");
     expect(source).toContain("await getSchoolWeek(id)");
+  });
+});
+
+describe("School period time editing", () => {
+  const typingPeriods = [
+    { index: 1, start: "08:00", end: "08:45" },
+    { index: 2, start: "09:00", end: "09:45" },
+    { index: 3, start: "10:00", end: "11:05" },
+    { index: 4, start: "11:15", end: "12:00" },
+  ];
+  const period4Start = periodTimeDraftKey(4, "start");
+
+  test("partial manual values remain incomplete and never become overlap inputs", () => {
+    const committed = createPeriodTimeDrafts(typingPeriods);
+    for (const raw of ["1", "11", "11:", "11:2"]) {
+      const drafts = { ...committed, [period4Start]: raw };
+      expect(getTimeInputState(raw)).toBe("incomplete");
+      expect(applyPeriodTimeDrafts(typingPeriods, drafts)).toBeNull();
+      expect(getScheduleValidationError(typingPeriods)).toBeNull();
+    }
+  });
+
+  test("accepts 11:20 after Period 3 ends at 11:05 and rejects the real 11:00 overlap", () => {
+    const drafts = createPeriodTimeDrafts(typingPeriods);
+    const valid = applyPeriodTimeDrafts(typingPeriods, { ...drafts, [period4Start]: "11:20" });
+    const overlapping = applyPeriodTimeDrafts(typingPeriods, {
+      ...drafts,
+      [period4Start]: "11:00",
+    });
+
+    expect(valid?.[3].start).toBe("11:20");
+    expect(getScheduleValidationError(valid ?? [])).toBeNull();
+    expect(overlapping).not.toBeNull();
+    expect(getScheduleValidationError(overlapping ?? [])).toContain("هم‌پوشانی");
+  });
+
+  test("distinguishes incomplete edits from complete invalid hours and minutes", () => {
+    expect(getTimeInputState("")).toBe("incomplete");
+    expect(getTimeInputState("11:2")).toBe("incomplete");
+    expect(getTimeInputState("25:00")).toBe("invalid");
+    expect(getTimeInputState("11:60")).toBe("invalid");
+    expect(getTimeInputState("11:20")).toBe("valid");
+  });
+
+  test("backspace and select-all replacement preserve the committed schedule until valid", () => {
+    const drafts = createPeriodTimeDrafts(typingPeriods);
+    const afterBackspace = { ...drafts, [period4Start]: "11:2" };
+    expect(applyPeriodTimeDrafts(typingPeriods, afterBackspace)).toBeNull();
+    expect(typingPeriods[3].start).toBe("11:15");
+
+    const replacement = applyPeriodTimeDrafts(typingPeriods, {
+      ...afterBackspace,
+      [period4Start]: "11:20",
+    });
+    expect(replacement?.[3].start).toBe("11:20");
+  });
+
+  test("blur, Enter, Tab, and arrow behavior are connected to commit-safe handlers", async () => {
+    const source = await readSource("../src/routes/dashboard.schools.tsx");
+    expect(source).toContain('commitPeriodTimeOnBlur(p, "start")');
+    expect(source).toContain('commitPeriodTimeOnBlur(p, "end")');
+    expect(source).toContain('event.key === "ArrowUp" || event.key === "ArrowDown"');
+    expect(source).toContain('event.key === "Enter"');
+    expect(source).toContain("event.currentTarget.blur()");
+    expect(source).toContain('inputMode="numeric"');
+    expect(source).toContain("INCOMPLETE_TIME_MESSAGE");
+    expect(shiftTimeByMinutes("07:45", 15)).toBe("08:00");
+    expect(shiftTimeByMinutes("08:00", -15)).toBe("07:45");
+  });
+
+  test("time editing keeps independent break values and save uses complete drafts", async () => {
+    const drafts = createPeriodTimeDrafts(periods);
+    const updated = applyPeriodTimeDrafts(periods, {
+      ...drafts,
+      [periodTimeDraftKey(4, "start")]: "11:00",
+    });
+    expect(updated).not.toBeNull();
+    expect(getBreakDuration(updated ?? [], 0)).toBe(10);
+    expect(getBreakDuration(updated ?? [], 1)).toBe(10);
+    expect(getBreakDuration(updated ?? [], 2)).toBe(25);
+
+    const [route, store] = await Promise.all([
+      readSource("../src/routes/dashboard.schools.tsx"),
+      readSource("../src/lib/api/schools-store.ts"),
+    ]);
+    expect(route).toContain("applyPeriodTimeDrafts(form.periods, periodTimeDrafts)");
+    expect(route).toContain("periods,");
+    expect(store).toContain("start_time: period.start");
+    expect(store).toContain("end_time: period.end");
+    expect(store).toContain("await getSchoolWeek(id)");
   });
 });

@@ -1,5 +1,6 @@
 import { resolveGradeName, resolveMajorName } from "@/lib/class-management-selectors";
-import type { PublishedClassSchedule } from "@/lib/scheduler";
+import type { PublishedClassSchedule, ScheduleCandidateDetail } from "@/lib/scheduler";
+import type { ScheduleAssignmentCourseReference } from "@/lib/repositories";
 import type { Class, DaySlotGroup, Major, Teacher } from "@/lib/types";
 import { getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
@@ -67,6 +68,143 @@ function displayTime(startTime: string | null, endTime: string | null) {
   if (!startTime || !endTime) return "زمان ثبت نشده";
   return `${startTime.slice(0, 5)} تا ${endTime.slice(0, 5)}`;
 }
+
+function historicalDayKey(dayName: string) {
+  return `historical-day-${dayName
+    .trim()
+    .toLocaleLowerCase("en-US")
+    .replaceAll(/[^a-z0-9]+/g, "-")}`;
+}
+
+export function normalizeCandidateTimetable({
+  candidate,
+  schoolName,
+  classes,
+  teachers,
+  assignmentCourseReferences,
+  daySlotGroups,
+}: {
+  candidate: Pick<ScheduleCandidateDetail, "id" | "lessons">;
+  schoolName: string;
+  classes: readonly Class[];
+  teachers: readonly Teacher[];
+  assignmentCourseReferences: readonly ScheduleAssignmentCourseReference[];
+  daySlotGroups: readonly DaySlotGroup[];
+}): NormalizedTimetable {
+  const classIds = new Set(candidate.lessons.map((lesson) => lesson.classId));
+  const teacherIds = new Set(candidate.lessons.map((lesson) => lesson.teacherId));
+  const classesById = new Map(classes.map((item) => [item.id, item]));
+  const teachersById = new Map(teachers.map((item) => [item.id, item]));
+  const courseReferences = new Map(
+    assignmentCourseReferences.map((reference) => [reference.assignmentId, reference]),
+  );
+  const slotsById = new Map(
+    daySlotGroups.flatMap((group) =>
+      group.slots.map((slot) => [slot.id, { group, slot }] as const),
+    ),
+  );
+  const activeDaySlotGroups = daySlotGroups
+    .map((group) => ({ ...group, slots: group.slots.filter((slot) => slot.active) }))
+    .filter((group) => group.slots.length > 0);
+  const daysByName = new Map<string, TimetableDay>();
+  const dayOrder: string[] = [];
+
+  activeDaySlotGroups.forEach((group) => {
+    const key = group.dayName.trim().toLocaleLowerCase("en-US");
+    if (daysByName.has(key)) return;
+    daysByName.set(key, {
+      id: String(group.dayId),
+      backendName: group.dayName,
+      label: getWeekdayDisplayLabel(group.dayName),
+    });
+    dayOrder.push(key);
+  });
+
+  candidate.lessons.forEach((lesson) => {
+    const slot = slotsById.get(lesson.daySlotId);
+    const backendName = slot?.group.dayName ?? lesson.day;
+    const key = backendName.trim().toLocaleLowerCase("en-US");
+    if (daysByName.has(key)) return;
+    daysByName.set(key, {
+      id: historicalDayKey(backendName),
+      backendName,
+      label: getWeekdayDisplayLabel(backendName),
+    });
+    dayOrder.push(key);
+  });
+
+  const periodTimes = new Map<number, { startTime: string | null; endTime: string | null }>();
+  activeDaySlotGroups.forEach((group) =>
+    group.slots.forEach((slot) => {
+      if (!periodTimes.has(slot.slotNumber)) {
+        periodTimes.set(slot.slotNumber, {
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        });
+      }
+    }),
+  );
+  const slotNumbers = [
+    ...new Set([
+      ...activeDaySlotGroups.flatMap((group) => group.slots.map((slot) => slot.slotNumber)),
+      ...candidate.lessons.map((lesson) => lesson.slot),
+    ]),
+  ].sort((left, right) => left - right);
+
+  return {
+    id: `candidate-${candidate.id}`,
+    schoolName,
+    days: dayOrder.map((key) => daysByName.get(key)!),
+    periods: slotNumbers.map((slotNumber) => {
+      const time = periodTimes.get(slotNumber);
+      return {
+        id: periodId(slotNumber),
+        slotNumber,
+        label: `زنگ ${slotNumber.toLocaleString("fa-IR")}`,
+        time: time ? displayTime(time.startTime, time.endTime) : "زمان تاریخی در دسترس نیست",
+      };
+    }),
+    classes: [...classIds].map((id) => {
+      const item = classesById.get(id);
+      return {
+        id,
+        name: item?.name ?? "کلاس حذف‌شده",
+        shortName: item?.name ?? "کلاس حذف‌شده",
+        gradeId: item?.gradeId ?? "unknown",
+        gradeLabel: "",
+        majorId: item?.majorId ?? "unknown",
+        majorLabel: "",
+      };
+    }),
+    teachers: [...teacherIds].map((id) => ({
+      id,
+      name: teachersById.get(id)?.name ?? "معلم حذف‌شده",
+    })),
+    entries: candidate.lessons.map((lesson, index) => {
+      const slot = slotsById.get(lesson.daySlotId);
+      const dayName = slot?.group.dayName ?? lesson.day;
+      const day = daysByName.get(dayName.trim().toLocaleLowerCase("en-US"));
+      const courseReference = courseReferences.get(lesson.assignmentId);
+      const courseName =
+        courseReference?.courseId === lesson.courseId && courseReference.courseName.trim()
+          ? courseReference.courseName
+          : "درس حذف‌شده";
+      return {
+        id: `candidate-${candidate.id}-lesson-${index}`,
+        dayId: day?.id ?? historicalDayKey(dayName),
+        periodId: periodId(lesson.slot),
+        classId: lesson.classId,
+        teacherId: lesson.teacherId,
+        courseId: lesson.courseId,
+        courseName,
+      };
+    }),
+  };
+}
+
+// Historical and freshly generated candidates share the same server shape.
+// Keep this name for the timetable history feature without coupling Generator exports to history.
+export const normalizeHistoricalCandidate = normalizeCandidateTimetable;
 
 export function normalizePublishedTimetable({
   schoolId,

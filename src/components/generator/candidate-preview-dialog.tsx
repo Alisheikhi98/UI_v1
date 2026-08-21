@@ -8,27 +8,21 @@ import {
 } from "@/components/ui/dialog";
 import { TimetablePreview } from "@/components/generator/timetable-preview";
 import { scheduleStatusLabel, type ScheduleCandidateDetail } from "@/lib/scheduler";
-import type { Class, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { NormalizedTimetable } from "@/lib/timetable";
 
 export function CandidatePreviewDialog({
   candidate,
   open,
   loading,
   error,
-  daySlotGroups,
-  classes,
-  teachers,
-  courses,
+  timetable,
   onOpenChange,
 }: {
   candidate: ScheduleCandidateDetail | null;
   open: boolean;
   loading: boolean;
   error: boolean;
-  daySlotGroups: DaySlotGroup[];
-  classes: Class[];
-  teachers: Teacher[];
-  courses: Course[];
+  timetable: NormalizedTimetable | null;
   onOpenChange: (open: boolean) => void;
 }) {
   return (
@@ -62,14 +56,8 @@ export function CandidatePreviewDialog({
               دریافت جزئیات برنامه با خطا مواجه شد.
             </p>
           )}
-          {candidate && !loading && !error && (
-            <TimetablePreview
-              candidate={candidate}
-              daySlotGroups={daySlotGroups}
-              classes={classes}
-              teachers={teachers}
-              courses={courses}
-            />
+          {candidate && timetable && !loading && !error && (
+            <TimetablePreview timetable={timetable} />
           )}
         </div>
       </DialogContent>

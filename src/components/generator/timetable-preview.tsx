@@ -1,54 +1,30 @@
 import { useMemo } from "react";
-import type { ScheduleCandidateDetail } from "@/lib/scheduler";
-import type { Class, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { NormalizedTimetable } from "@/lib/timetable";
 import { cn } from "@/lib/utils";
-import { getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 export function TimetablePreview({
-  candidate,
-  daySlotGroups,
-  classes,
-  teachers,
-  courses,
+  timetable,
   compact = false,
 }: {
-  candidate: ScheduleCandidateDetail;
-  daySlotGroups: DaySlotGroup[];
-  classes: Class[];
-  teachers: Teacher[];
-  courses: Course[];
+  timetable: NormalizedTimetable;
   compact?: boolean;
 }) {
-  const scheduledClassIds = useMemo(
-    () => new Set(candidate.lessons.map((lesson) => lesson.classId)),
-    [candidate.lessons],
-  );
-  const scheduledClasses = useMemo(
-    () => classes.filter((item) => scheduledClassIds.has(item.id)),
-    [classes, scheduledClassIds],
+  const entries = useMemo(
+    () =>
+      new Map(
+        timetable.entries.map((entry) => [
+          `${entry.dayId}:${entry.periodId}:${entry.classId}`,
+          entry,
+        ]),
+      ),
+    [timetable.entries],
   );
   const teacherNames = useMemo(
-    () => new Map(teachers.map((teacher) => [teacher.id, teacher.name])),
-    [teachers],
-  );
-  const courseNames = useMemo(
-    () => new Map(courses.map((course) => [course.id, course.name])),
-    [courses],
-  );
-  const activeDays = useMemo(
-    () =>
-      daySlotGroups
-        .map((group) => ({
-          ...group,
-          slots: group.slots
-            .filter((slot) => slot.active)
-            .sort((left, right) => left.slotNumber - right.slotNumber),
-        }))
-        .filter((group) => group.slots.length > 0),
-    [daySlotGroups],
+    () => new Map(timetable.teachers.map((teacher) => [teacher.id, teacher.name])),
+    [timetable.teachers],
   );
 
-  if (scheduledClasses.length === 0 || activeDays.length === 0) {
+  if (timetable.classes.length === 0 || timetable.days.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
         اطلاعاتی برای نمایش پیش‌نمایش برنامه مدرسه وجود ندارد.
@@ -71,7 +47,7 @@ export function TimetablePreview({
             <th className="sticky right-20 top-0 z-40 w-24 min-w-24 border-b border-l bg-muted px-2 py-2.5 text-center font-semibold">
               زنگ
             </th>
-            {scheduledClasses.map((classItem) => (
+            {timetable.classes.map((classItem) => (
               <th
                 key={classItem.id}
                 className="sticky top-0 z-30 min-w-36 border-b border-l bg-muted px-3 py-2.5 text-center font-semibold"
@@ -82,22 +58,22 @@ export function TimetablePreview({
           </tr>
         </thead>
         <tbody>
-          {activeDays.map((day, dayIndex) =>
-            day.slots.map((slot, slotIndex) => (
+          {timetable.days.map((day, dayIndex) =>
+            timetable.periods.map((period, periodIndex) => (
               <tr
-                key={`${day.dayId}-${slot.id}`}
+                key={`${day.id}-${period.id}`}
                 className={dayIndex % 2 === 0 ? "bg-background" : "bg-muted/20"}
               >
-                {slotIndex === 0 && (
+                {periodIndex === 0 && (
                   <th
-                    rowSpan={day.slots.length}
+                    rowSpan={timetable.periods.length}
                     className={cn(
                       "sticky right-0 z-20 w-20 min-w-20 border-b border-l px-2 text-center align-middle font-semibold",
                       dayIndex % 2 === 0 ? "bg-background" : "bg-muted",
                     )}
-                    data-testid={`candidate-day-group-${day.dayId}`}
+                    data-testid={`candidate-day-group-${day.id}`}
                   >
-                    {getWeekdayDisplayLabel(day.dayName)}
+                    {day.label}
                   </th>
                 )}
                 <th
@@ -106,19 +82,13 @@ export function TimetablePreview({
                     dayIndex % 2 === 0 ? "bg-background" : "bg-muted",
                   )}
                 >
-                  <span className="block font-medium">
-                    زنگ {slot.slotNumber.toLocaleString("fa-IR")}
+                  <span className="block font-medium">{period.label}</span>
+                  <span className="mt-0.5 block whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                    {period.time}
                   </span>
-                  {slot.startTime && slot.endTime && (
-                    <span className="mt-0.5 block whitespace-nowrap text-[10px] font-normal text-muted-foreground">
-                      {slot.startTime.slice(0, 5)} تا {slot.endTime.slice(0, 5)}
-                    </span>
-                  )}
                 </th>
-                {scheduledClasses.map((classItem) => {
-                  const lesson = candidate.lessons.find(
-                    (item) => item.classId === classItem.id && item.daySlotId === slot.id,
-                  );
+                {timetable.classes.map((classItem) => {
+                  const entry = entries.get(`${day.id}:${period.id}:${classItem.id}`);
                   return (
                     <td
                       key={classItem.id}
@@ -127,13 +97,13 @@ export function TimetablePreview({
                         compact ? "h-14 py-1.5" : "h-16 py-2",
                       )}
                     >
-                      {lesson ? (
+                      {entry ? (
                         <div className="leading-tight">
                           <p className="truncate font-semibold text-foreground">
-                            {courseNames.get(lesson.courseId) ?? "درس ثبت‌شده"}
+                            {entry.courseName}
                           </p>
                           <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                            {teacherNames.get(lesson.teacherId) ?? "معلم ثبت‌شده"}
+                            {teacherNames.get(entry.teacherId) ?? "معلم حذف‌شده"}
                           </p>
                         </div>
                       ) : (

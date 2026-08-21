@@ -18,6 +18,7 @@ import {
   mapCourseCreateInputToDto,
   mapMajor,
   mapPage,
+  mapScheduleAssignmentCourseReference,
   mapTeacher,
   mapTeacherCourseGroupsToLabels,
   mapWeeklyDaySlots,
@@ -50,6 +51,7 @@ import type {
   PaginatedResult,
   RepositoryListParams,
   RepositoryRequestOptions,
+  ScheduleAssignmentSnapshot,
   TeacherAvailabilityRepository,
   TeacherCoursesRepository,
   TeacherCreateInput,
@@ -442,16 +444,31 @@ export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
   }
 
   async list(params: RepositoryListParams = {}): Promise<PaginatedResult<ClassAssignment>> {
+    const snapshot = await this.listScheduleSnapshot(params);
+    const { courseReferences: _courseReferences, ...result } = snapshot;
+    return result;
+  }
+
+  async listScheduleSnapshot(
+    params: RepositoryListParams = {},
+  ): Promise<ScheduleAssignmentSnapshot> {
     const classId = asOptionalString(params.filters?.classId);
     const classIds = [...asStringArray(params.filters?.classIds), ...(classId ? [classId] : [])];
     if (classIds.length === 0) {
       throw new Error("Class assignment queries require a classId or classIds filter.");
     }
     const pages = await Promise.all(
-      [...new Set(classIds)].map((classId) => this.loadForClass(classId, params)),
+      [...new Set(classIds)].map((classId) => this.loadDtosForClass(classId, params)),
     );
-    const items = pages.flat();
-    return { items, total: items.length, page: 1, pageSize: Math.max(1, items.length) };
+    const rows = pages.flat();
+    const items = rows.map(mapClassAssignment);
+    return {
+      items,
+      total: items.length,
+      page: 1,
+      pageSize: Math.max(1, items.length),
+      courseReferences: rows.map(mapScheduleAssignmentCourseReference),
+    };
   }
 
   async getById(): Promise<ClassAssignment | null> {
@@ -520,12 +537,19 @@ export class ApiClassAssignmentRepository implements ClassAssignmentRepository {
     classId: string,
     options?: RepositoryRequestOptions,
   ): Promise<ClassAssignment[]> {
+    const rows = await this.loadDtosForClass(classId, options);
+    return rows.map(mapClassAssignment);
+  }
+
+  private loadDtosForClass(
+    classId: string,
+    options?: RepositoryRequestOptions,
+  ): Promise<ClassAssignmentDto[]> {
     const schoolId = requireSchoolId(this.getSchoolId);
-    const rows = await apiRequest<ClassAssignmentDto[]>(
+    return apiRequest<ClassAssignmentDto[]>(
       classAssignmentsPath(schoolId, classId),
       withSignal(options),
     );
-    return rows.map(mapClassAssignment);
   }
 
   private async getAssignmentForClass(

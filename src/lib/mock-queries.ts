@@ -186,10 +186,33 @@ export function useCoursesRepository(params: RepositoryListParams = {}) {
       });
     },
   });
+  const refreshScheduleReferences = () =>
+    queryClient.invalidateQueries({
+      queryKey: repositoryQueryKeys.scheduleAssignmentReferencesRoot(schoolId),
+    });
 
   return {
     ...base,
-    create: classId ? compatibleCreate.mutateAsync : base.create,
+    create: async (input: Parameters<typeof repositories.courses.repository.create>[0]) => {
+      const created = await (classId ? compatibleCreate.mutateAsync(input) : base.create(input));
+      await refreshScheduleReferences();
+      return created;
+    },
+    update: async ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: Parameters<typeof repositories.courses.repository.update>[1];
+    }) => {
+      const updated = await base.update({ id, input });
+      await refreshScheduleReferences();
+      return updated;
+    },
+    remove: async (id: string) => {
+      await base.remove(id);
+      await refreshScheduleReferences();
+    },
   };
 }
 
@@ -302,13 +325,19 @@ export function useClassAssignmentsRepository(params: RepositoryListParams = {})
       classId: string;
       assignments: readonly ClassAssignmentReplacementInput[];
     }) => repository.replaceForClass(classId, assignments),
-    onSuccess: (serverAssignments, variables) => {
+    onSuccess: async (serverAssignments, variables) => {
       publishClassSnapshots(variables.classId, serverAssignments);
+      await queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.scheduleAssignmentReferencesRoot(schoolId),
+      });
     },
-    onError: (error, variables) => {
+    onError: async (error, variables) => {
       if (isClassAssignmentPartialFailure(error) && error.refetchError === undefined) {
         publishClassSnapshots(variables.classId, error.serverAssignments);
       }
+      await queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.scheduleAssignmentReferencesRoot(schoolId),
+      });
     },
   });
 

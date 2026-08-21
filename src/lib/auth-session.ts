@@ -11,6 +11,7 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { clearAccessToken, getAccessToken, setAccessToken, useAccessToken } from "@/lib/auth-token";
 import { setActiveSchoolId } from "@/lib/active-school";
+import { clearAllGeneratorPreviewReferences } from "@/lib/generator-preview-session";
 
 export const authenticatedUserQueryKey = ["auth", "current-user"] as const;
 export const useMockAuthentication = import.meta.env.VITE_USE_MOCK_API === "true";
@@ -37,6 +38,7 @@ export async function loadAuthenticatedUser(): Promise<AuthenticatedUser> {
 export function clearAuthenticatedSession(queryClient: QueryClient) {
   clearAccessToken();
   setActiveSchoolId(null);
+  clearAllGeneratorPreviewReferences();
   queryClient.clear();
 }
 

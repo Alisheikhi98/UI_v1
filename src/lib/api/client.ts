@@ -1,3 +1,5 @@
+import { getAccessToken } from "@/lib/auth-token";
+
 export interface ApiValidationIssue {
   path: string;
   message: string;
@@ -75,12 +77,16 @@ function getErrorMessage(body: unknown, status: number, issues: ApiValidationIss
   return statusMessages[status] ?? `Request failed with status ${status}.`;
 }
 
-async function request<T>(path: string, init: RequestInit, requiresAuth: boolean): Promise<T> {
+async function fetchResponse(
+  path: string,
+  init: RequestInit,
+  requiresAuth: boolean,
+): Promise<Response> {
   const token = getAccessToken();
   if (requiresAuth && !token) throw new ApiError("Please sign in before continuing.", 401);
 
   const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
@@ -95,15 +101,14 @@ async function request<T>(path: string, init: RequestInit, requiresAuth: boolean
     );
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  const body =
-    response.status === 204
-      ? undefined
-      : contentType.includes("application/json")
-        ? await response.json()
-        : await response.text();
-
   if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+    const body =
+      response.status === 204
+        ? undefined
+        : contentType.includes("application/json")
+          ? await response.json()
+          : await response.text();
     const issues = validationIssues(body);
     const retryAfter = Number(response.headers.get("Retry-After"));
     const error = new ApiError(
@@ -119,7 +124,17 @@ async function request<T>(path: string, init: RequestInit, requiresAuth: boolean
     throw error;
   }
 
-  return body as T;
+  return response;
+}
+
+async function request<T>(path: string, init: RequestInit, requiresAuth: boolean): Promise<T> {
+  const response = await fetchResponse(path, init, requiresAuth);
+  if (response.status === 204) return undefined as T;
+
+  const contentType = response.headers.get("content-type") ?? "";
+  return (
+    contentType.includes("application/json") ? await response.json() : await response.text()
+  ) as T;
 }
 
 export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -129,4 +144,8 @@ export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
 export function publicApiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return request<T>(path, init, false);
 }
-import { getAccessToken } from "@/lib/auth-token";
+
+/** Returns an authenticated successful response for non-JSON resources such as downloads. */
+export function apiResponse(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetchResponse(path, init, true);
+}

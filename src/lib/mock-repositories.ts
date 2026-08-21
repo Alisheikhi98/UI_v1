@@ -448,6 +448,22 @@ export class MockClassAssignmentRepository
     this.references = references;
   }
 
+  async listScheduleSnapshot(params: RepositoryListParams) {
+    const [assignments, courses] = await Promise.all([
+      this.list(params),
+      this.references.courses.list({ signal: params.signal }),
+    ]);
+    const courseNames = new Map(courses.items.map((course) => [course.id, course.name]));
+    return {
+      ...assignments,
+      courseReferences: assignments.items.map((assignment) => ({
+        assignmentId: assignment.id,
+        courseId: assignment.courseId,
+        courseName: courseNames.get(assignment.courseId) ?? "",
+      })),
+    };
+  }
+
   async replaceForClass(
     classId: string,
     assignments: readonly ClassAssignmentReplacementInput[],

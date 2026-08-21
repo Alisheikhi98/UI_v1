@@ -87,7 +87,18 @@ export type ClassAssignmentReplacementInput = Omit<ClassAssignment, "id"> & {
   id?: string;
 };
 
+export interface ScheduleAssignmentCourseReference {
+  assignmentId: string;
+  courseId: string;
+  courseName: string;
+}
+
+export interface ScheduleAssignmentSnapshot extends PaginatedResult<ClassAssignment> {
+  courseReferences: ScheduleAssignmentCourseReference[];
+}
+
 export interface ClassAssignmentRepository extends EntityRepository<ClassAssignment> {
+  listScheduleSnapshot(params: RepositoryListParams): Promise<ScheduleAssignmentSnapshot>;
   replaceForClass(
     classId: string,
     assignments: readonly ClassAssignmentReplacementInput[],

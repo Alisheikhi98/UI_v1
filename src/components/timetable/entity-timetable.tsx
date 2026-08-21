@@ -23,23 +23,23 @@ export function EntityTimetable({
 
   return (
     <div
-      className="timetable-scroll max-h-[calc(100vh-16rem)] overflow-auto"
+      className="timetable-scroll timetable-scroll-shell min-h-0 max-h-[calc(100dvh-16rem)] overflow-auto"
       data-testid={`${mode}-timetable-scroll`}
       dir="rtl"
     >
       <table
-        className="w-full min-w-[760px] border-separate border-spacing-0"
+        className="entity-timetable-table w-full min-w-[720px] border-separate border-spacing-0"
         data-testid={`${mode}-timetable`}
       >
         <thead>
           <tr>
-            <th className="sticky right-0 top-0 z-30 w-28 min-w-28 border-b border-l bg-muted p-3 text-center">
+            <th className="timetable-sticky-entity-period sticky right-0 top-0 z-30 w-28 min-w-28 border-b border-l bg-muted/95 p-3 text-center backdrop-blur">
               زنگ
             </th>
             {timetable.days.map((day) => (
               <th
                 key={day.id}
-                className="sticky top-0 z-20 min-w-32 border-b border-l bg-muted p-3 text-center"
+                className="sticky top-0 z-20 min-w-32 border-b border-l bg-muted/95 p-3 text-center backdrop-blur"
               >
                 {day.label}
               </th>
@@ -49,7 +49,7 @@ export function EntityTimetable({
         <tbody>
           {timetable.periods.map((period) => (
             <tr key={period.id}>
-              <th className="sticky right-0 z-10 border-b border-l bg-background p-3 text-center">
+              <th className="timetable-sticky-entity-period sticky right-0 z-10 border-b border-l bg-background p-3 text-center">
                 <span className="block text-sm font-medium">{period.label}</span>
                 <span className="mt-1 block whitespace-nowrap text-[10px] font-normal text-muted-foreground">
                   {period.time}
@@ -58,7 +58,10 @@ export function EntityTimetable({
               {timetable.days.map((day) => {
                 const entry = entryBySlot.get(`${day.id}:${period.id}`);
                 return (
-                  <td key={day.id} className="h-20 border-b border-l p-2 text-center">
+                  <td
+                    key={day.id}
+                    className="h-20 border-b border-l p-2 text-center transition-colors hover:bg-accent/35"
+                  >
                     <TimetableCell
                       entry={entry}
                       secondaryText={entry ? secondaryText(entry) : undefined}

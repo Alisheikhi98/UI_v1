@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
 import { GRADE_OPTIONS, type ClassViewModel, useClassManagementData } from "@/lib/class-management";
 import { withAppName } from "@/lib/branding";
+import {
+  createClassTimetableFeedbackController,
+  type ClassTimetableFeedback,
+} from "@/lib/class-timetable-feedback";
 import {
   getClassErrorMessage,
   getClassDeleteErrorMessage,
@@ -50,6 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePublishedClassScheduleCheck } from "@/lib/timetable-queries";
 import {
   Plus,
   Trash2,
@@ -88,6 +93,63 @@ function EmptyState({ onAddClass }: { onAddClass: () => void }) {
         افزودن کلاس
       </Button>
     </Card>
+  );
+}
+
+function ViewTimetableAction({
+  classItem,
+  feedback,
+  isChecking,
+  showLabel = false,
+  onClick,
+}: {
+  classItem: ClassViewModel;
+  feedback: ClassTimetableFeedback | null;
+  isChecking: boolean;
+  showLabel?: boolean;
+  onClick: (classItem: ClassViewModel) => void;
+}) {
+  const message = feedback?.classId === classItem.id ? feedback.message : null;
+
+  return (
+    <Popover open={Boolean(message)}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant={showLabel ? "outline" : "ghost"}
+              size={showLabel ? "default" : "icon"}
+              className={showLabel ? "w-full" : undefined}
+              aria-label={`مشاهده برنامه ${classItem.name}`}
+              aria-busy={isChecking || undefined}
+              disabled={isChecking}
+              onClick={() => onClick(classItem)}
+            >
+              {isChecking ? (
+                <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <CalendarClock className={showLabel ? "me-2 h-4 w-4" : "h-4 w-4"} />
+              )}
+              {showLabel && "مشاهده برنامه"}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>مشاهده برنامه</TooltipContent>
+      </Tooltip>
+      <PopoverContent
+        side="bottom"
+        align="center"
+        sideOffset={6}
+        dir="rtl"
+        role="status"
+        aria-live="polite"
+        className="w-auto max-w-[min(14rem,calc(100vw-2rem))] px-3 py-2 text-center text-xs text-muted-foreground shadow-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        {message}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -337,6 +399,7 @@ function RenameClassDialog({
 
 function ClassesPage() {
   const navigate = useNavigate();
+  const publishedClassSchedule = usePublishedClassScheduleCheck();
   const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const {
     classes,
@@ -359,6 +422,18 @@ function ClassesPage() {
   const [classToDelete, setClassToDelete] = useState<ClassViewModel | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [checkingTimetableClassId, setCheckingTimetableClassId] = useState<string | null>(null);
+  const [timetableFeedback, setTimetableFeedback] = useState<ClassTimetableFeedback | null>(null);
+  const timetableFeedbackController = useRef(
+    createClassTimetableFeedbackController(setTimetableFeedback),
+  );
+
+  useEffect(
+    () => () => {
+      timetableFeedbackController.current.dispose();
+    },
+    [],
+  );
   const filteredClasses = classes.filter((c) => {
     const normalizedSearch = search.toLowerCase();
     const matchesSearch =
@@ -416,11 +491,43 @@ function ClassesPage() {
   };
   const assignmentCount = (classId: string) =>
     assignments.filter((assignment) => assignment.classId === classId).length;
+  const handleViewTimetable = async (classItem: ClassViewModel) => {
+    if (checkingTimetableClassId === classItem.id) return;
+    if (!publishedClassSchedule.canCheck) {
+      timetableFeedbackController.current.show({
+        classId: classItem.id,
+        message: "وضعیت برنامه قابل بررسی نیست.",
+      });
+      return;
+    }
+
+    setCheckingTimetableClassId(classItem.id);
+    try {
+      const isPublished = await publishedClassSchedule.check(classItem.id);
+      if (!isPublished) {
+        timetableFeedbackController.current.show({
+          classId: classItem.id,
+          message: "برنامه هنوز آماده نیست.",
+        });
+        return;
+      }
+
+      timetableFeedbackController.current.clear();
+      await navigate({ to: "/dashboard/timetable" });
+    } catch {
+      timetableFeedbackController.current.show({
+        classId: classItem.id,
+        message: "وضعیت برنامه قابل بررسی نیست.",
+      });
+    } finally {
+      setCheckingTimetableClassId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col">
       <Header title="کلاس‌ها" description="مدیریت کلاس‌ها و بخش‌های مدرسه" />
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <SearchInput
@@ -584,20 +691,12 @@ function ClassesPage() {
                               </Button>
                             </TableCell>
                             <TableCell className="text-center">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label="مشاهده برنامه"
-                                    onClick={() => navigate({ to: "/dashboard/timetable" })}
-                                  >
-                                    <CalendarClock className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>مشاهده برنامه</TooltipContent>
-                              </Tooltip>
+                              <ViewTimetableAction
+                                classItem={classItem}
+                                feedback={timetableFeedback}
+                                isChecking={checkingTimetableClassId === classItem.id}
+                                onClick={(item) => void handleViewTimetable(item)}
+                              />
                             </TableCell>
                             <TableCell className="text-center">
                               <Tooltip>
@@ -678,13 +777,15 @@ function ClassesPage() {
                             تنظیم دروس
                           </Button>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => navigate({ to: "/dashboard/timetable" })}
-                            >
-                              <CalendarClock className="me-2 h-4 w-4" /> مشاهده برنامه
-                            </Button>
+                            <TooltipProvider>
+                              <ViewTimetableAction
+                                classItem={classItem}
+                                feedback={timetableFeedback}
+                                isChecking={checkingTimetableClassId === classItem.id}
+                                showLabel
+                                onClick={(item) => void handleViewTimetable(item)}
+                              />
+                            </TooltipProvider>
                             <Button
                               type="button"
                               variant="outline"

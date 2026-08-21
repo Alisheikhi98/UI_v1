@@ -1,15 +1,9 @@
-import { Bell } from "lucide-react";
+import { PhoneCall } from "lucide-react";
+import { ContactChannels } from "@/components/contact-channels";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { CONTACT_INFO } from "@/lib/contact-info";
 
 interface HeaderProps {
   title: string;
@@ -18,13 +12,15 @@ interface HeaderProps {
 
 export function Header({ title, description }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex flex-col">
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    <header className="sticky top-0 z-30 flex min-h-16 items-start justify-between gap-2 border-b border-border bg-background/95 py-3 ps-16 pe-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:items-center sm:px-6">
+      <div className="min-w-0 flex-1">
+        <h1 className="text-lg font-semibold leading-6 text-foreground sm:text-xl">{title}</h1>
+        {description && (
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground sm:text-sm">{description}</p>
+        )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-4">
         {/* Search */}
         <SearchInput
           containerClassName="hidden md:block"
@@ -33,40 +29,32 @@ export function Header({ title, description }: HeaderProps) {
           className="w-64"
         />
 
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <Badge className="absolute -left-1 -top-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
-                ۳
-              </Badge>
-              <span className="sr-only">اعلان‌ها</span>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={CONTACT_INFO.title}
+              title={CONTACT_INFO.title}
+            >
+              <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-80">
-            <DropdownMenuLabel>اعلان‌ها</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <p className="text-sm font-medium">تداخل برنامه شناسایی شد</p>
-              <p className="text-xs text-muted-foreground">
-                شنبه ۱۰:۰۰ - فیزیک و ریاضی همزمان شده‌اند
+          </PopoverTrigger>
+          <PopoverContent
+            dir="rtl"
+            align="start"
+            sideOffset={8}
+            className="w-[calc(100vw-2rem)] max-w-80 rounded-2xl p-3"
+          >
+            <div className="px-1 pb-3 pt-1">
+              <p className="font-semibold">{CONTACT_INFO.title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                برای ارتباط با تیم چیدمان، یکی از شناسه‌های بله را کپی کنید.
               </p>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <p className="text-sm font-medium">ترم جدید به زودی شروع می‌شود</p>
-              <p className="text-xs text-muted-foreground">
-                ۵ روز تا نهایی‌سازی برنامه‌ها باقی مانده
-              </p>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <p className="text-sm font-medium">برنامه‌های پایه ۹ تکمیل شد</p>
-              <p className="text-xs text-muted-foreground">
-                تمام کلاس‌ها برنامه هفتگی دریافت کردند
-              </p>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </div>
+            <ContactChannels />
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   );

@@ -17,6 +17,134 @@ export interface ScheduleGenerationResult {
   candidateId: string | null;
   totalGap: number;
   lessons: ScheduledLesson[];
+  diagnostics: ScheduleDiagnostic[];
+}
+
+export interface ScheduleAvailabilityAddition {
+  teacherId: string;
+  daySlotId: string;
+  day: string;
+  slot: number;
+}
+
+export interface ScheduleRepairResult {
+  success: boolean;
+  status: string;
+  code: string;
+  totalGap: number;
+  lessons: ScheduledLesson[];
+  repairType: "teacher_availability_additions" | null;
+  minimumChanges: number | null;
+  minimumChangesProven: boolean | null;
+  proposedAvailabilityAdditions: ScheduleAvailabilityAddition[];
+}
+
+export type ScheduleDiagnostic =
+  | {
+      type: "assignment-shortage";
+      assignmentId: string;
+      teacherId: string;
+      courseId: string;
+      classId: string;
+      requiredSlots: number;
+      assignedSlots: number;
+      unmetSlots: number;
+    }
+  | {
+      type: "teacher-conflict";
+      teacherId: string;
+      day: string;
+      slot: number;
+      lessons: Array<{ courseId: string; classId: string }>;
+    }
+  | {
+      type: "class-conflict";
+      classId: string;
+      day: string;
+      slot: number;
+      lessons: Array<{ courseId: string; teacherId: string }>;
+    }
+  | {
+      type: "daily-course-limit";
+      classId: string;
+      courseId: string;
+      day: string;
+      excessSlots: number;
+      configuredLimit: number;
+    }
+  | {
+      type: "aggregate";
+      conflictType:
+        | "assignment-shortage"
+        | "teacher-conflict"
+        | "class-conflict"
+        | "daily-course-limit";
+      count: number;
+    }
+  | { type: "unknown" };
+
+export interface ScheduleGenerationSettings {
+  minimizeGaps: boolean;
+  maxSameCourseSlotsPerDay: number | null;
+}
+
+export const DEFAULT_SCHEDULE_GENERATION_SETTINGS: ScheduleGenerationSettings = {
+  minimizeGaps: true,
+  maxSameCourseSlotsPerDay: null,
+};
+
+export function getMaximumPeriodsPerDay(daySlotGroups: readonly DaySlotGroup[]) {
+  return daySlotGroups.reduce(
+    (maximum, group) => Math.max(maximum, group.slots.filter((slot) => slot.active).length),
+    0,
+  );
+}
+
+export function parseScheduleGenerationSettings({
+  minimizeGaps,
+  maxSameCourseSlotsPerDay,
+  maximumPeriodsPerDay,
+}: {
+  minimizeGaps: boolean;
+  maxSameCourseSlotsPerDay: string;
+  maximumPeriodsPerDay: number;
+}): { settings: ScheduleGenerationSettings | null; error: string | null } {
+  const value = maxSameCourseSlotsPerDay.trim();
+
+  if (value === "") {
+    return {
+      settings: { minimizeGaps, maxSameCourseSlotsPerDay: null },
+      error: null,
+    };
+  }
+
+  if (!/^\d+$/.test(value)) {
+    return { settings: null, error: "تعداد تکرار باید یک عدد صحیح مثبت باشد." };
+  }
+
+  const numericValue = Number(value);
+  if (!Number.isSafeInteger(numericValue) || numericValue < 1) {
+    return { settings: null, error: "حداقل تعداد تکرار در روز ۱ است." };
+  }
+
+  if (maximumPeriodsPerDay < 1) {
+    return {
+      settings: null,
+      error: "برای تعیین این محدودیت، ابتدا زنگ‌های مدرسه را ثبت کنید.",
+    };
+  }
+
+  if (numericValue > maximumPeriodsPerDay) {
+    return {
+      settings: null,
+      error: `حداکثر مقدار مجاز با توجه به زنگ‌های مدرسه ${maximumPeriodsPerDay.toLocaleString("fa-IR")} است.`,
+    };
+  }
+
+  return {
+    settings: { minimizeGaps, maxSameCourseSlotsPerDay: numericValue },
+    error: null,
+  };
 }
 
 export interface ScheduleCandidateSummary {

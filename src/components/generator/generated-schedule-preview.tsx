@@ -1,59 +1,63 @@
-import { CalendarDays, CheckCircle2, ExternalLink } from "lucide-react";
+import { CalendarDays, CheckCircle2, ExternalLink, X } from "lucide-react";
 import { TimetablePreview } from "@/components/generator/timetable-preview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ScheduleCandidateDetail } from "@/lib/scheduler";
-import type { Class, Course, DaySlotGroup, Teacher } from "@/lib/types";
+import type { NormalizedTimetable } from "@/lib/timetable";
+import { formatGeneratorPreviewTime } from "@/lib/generator-preview-session";
 
 export function GeneratedSchedulePreview({
-  schedule,
-  daySlotGroups,
-  classes,
-  teachers,
-  courses,
+  timetable,
   onOpenFullPreview,
   onConfirm,
   onOpenWeeklyTimetable,
   confirming,
   confirmed,
   confirmationReady,
+  generatedAt,
+  onDismiss,
 }: {
-  schedule: ScheduleCandidateDetail;
-  daySlotGroups: DaySlotGroup[];
-  classes: Class[];
-  teachers: Teacher[];
-  courses: Course[];
+  timetable: NormalizedTimetable;
   onOpenFullPreview: () => void;
   onConfirm: () => void;
   onOpenWeeklyTimetable: () => void;
   confirming: boolean;
   confirmed: boolean;
   confirmationReady: boolean;
+  generatedAt: string;
+  onDismiss: () => void;
 }) {
   return (
     <section aria-labelledby="generated-preview-title">
       <Card className="overflow-hidden border-primary/20">
         <CardHeader className="gap-4 pb-4">
-          <div>
-            <CardTitle id="generated-preview-title" className="flex items-center gap-2 text-lg">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              پیش‌نمایش برنامه مدرسه
-            </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              نمایی فشرده از برنامه پیشنهادی همه کلاس‌های مدرسه
-            </p>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle id="generated-preview-title" className="flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+                برنامه تولیدشده
+              </CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                تولید شده در {formatGeneratorPreviewTime(generatedAt)}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                نمایی فشرده از برنامه پیشنهادی همه کلاس‌های مدرسه
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={onDismiss}
+              aria-label="بستن پیش‌نمایش برنامه"
+            >
+              <X aria-hidden="true" />
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-0">
           <div className="border-y">
-            <TimetablePreview
-              candidate={schedule}
-              daySlotGroups={daySlotGroups}
-              classes={classes}
-              teachers={teachers}
-              courses={courses}
-              compact
-            />
+            <TimetablePreview timetable={timetable} compact />
           </div>
 
           <div className="flex flex-col gap-3 px-5 pb-5 sm:flex-row sm:items-center sm:justify-between">

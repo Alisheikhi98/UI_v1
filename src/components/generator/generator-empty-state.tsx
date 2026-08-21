@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCcw, SearchX } from "lucide-react";
+import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -7,7 +7,7 @@ export function GeneratorEmptyState({
   onRetry,
   message,
 }: {
-  kind: "no-data" | "failed" | "no-feasible";
+  kind: "no-data" | "failed";
   onRetry?: () => void;
   message?: string;
 }) {
@@ -23,12 +23,6 @@ export function GeneratorEmptyState({
       title: "تولید برنامه با خطا مواجه شد.",
       description: "دوباره تلاش کنید یا اطلاعات ورودی را بررسی کنید.",
       action: "تلاش دوباره",
-    },
-    "no-feasible": {
-      icon: SearchX,
-      title: "با تنظیمات فعلی برنامه قابل اجرا پیدا نشد.",
-      description: "محدودیت‌ها و اطلاعات کلاس‌ها و معلمان را بررسی کنید.",
-      action: "بررسی محدودیت‌ها",
     },
   }[kind];
   const Icon = content.icon;

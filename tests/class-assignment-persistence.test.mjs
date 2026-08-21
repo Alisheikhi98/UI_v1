@@ -12,7 +12,10 @@ import {
 } from "../src/lib/api/class-assignment-requests.ts";
 import { initializeClassAssignmentDraft } from "../src/lib/class-assignment-draft.ts";
 import { canLoadClassAssignments } from "../src/lib/class-assignment-query.ts";
-import { mapClassAssignment } from "../src/lib/api/mappers.ts";
+import {
+  mapClassAssignment,
+  mapScheduleAssignmentCourseReference,
+} from "../src/lib/api/mappers.ts";
 
 const desiredAssignment = {
   classId: "12",
@@ -142,7 +145,7 @@ test("assignment requests use one school/class scope and the exact FastAPI paylo
 });
 
 test("backend assignment IDs and foreign keys map to canonical string IDs", () => {
-  const mapped = mapClassAssignment({
+  const dto = {
     id: 901,
     school_id: 7,
     class_id: 12,
@@ -154,7 +157,8 @@ test("backend assignment IDs and foreign keys map to canonical string IDs", () =
     active: true,
     created_at: "2026-07-31T00:00:00Z",
     updated_at: "2026-07-31T00:00:00Z",
-  });
+  };
+  const mapped = mapClassAssignment(dto);
 
   assert.deepEqual(mapped, {
     id: "901",
@@ -162,6 +166,11 @@ test("backend assignment IDs and foreign keys map to canonical string IDs", () =
     courseId: "34",
     teacherId: "56",
     weeklyPeriods: 4,
+  });
+  assert.deepEqual(mapScheduleAssignmentCourseReference(dto), {
+    assignmentId: "901",
+    courseId: "34",
+    courseName: "فیزیک",
   });
 });
 

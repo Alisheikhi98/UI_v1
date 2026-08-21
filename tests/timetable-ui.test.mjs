@@ -5,6 +5,12 @@ import {
   getTeacherEntries,
   normalizePublishedTimetable,
 } from "../src/lib/timetable.ts";
+import {
+  calculateTimetableFitScale,
+  getNextTimetableZoom,
+  MAX_TIMETABLE_SCALE,
+  MIN_TIMETABLE_SCALE,
+} from "../src/lib/timetable-viewport.ts";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -124,9 +130,10 @@ describe("Weekly Timetable UI", () => {
     expect(routeSource).not.toContain("demoFinalTimetable");
     expect(routeSource).toContain("<SchoolMasterTimetable");
     expect(routeSource).toContain("<EntityTimetable");
-    expect(toolbarSource).toContain('<TabsTrigger value="school">مدرسه</TabsTrigger>');
-    expect(toolbarSource).toContain('<TabsTrigger value="class">کلاس</TabsTrigger>');
-    expect(toolbarSource).toContain('<TabsTrigger value="teacher">معلم</TabsTrigger>');
+    expect(toolbarSource).toContain('value="school"');
+    expect(toolbarSource).toContain('value="class"');
+    expect(toolbarSource).toContain('value="teacher"');
+    expect(toolbarSource).toContain('aria-label="نوع نمایش برنامه هفتگی"');
   });
 
   test("school master table is data-driven, grouped by day, scrollable, and sticky", async () => {
@@ -139,31 +146,149 @@ describe("Weekly Timetable UI", () => {
     expect(source).toContain("overflow-auto");
     expect(source).toContain("sticky top-0");
     expect(source).toContain("sticky right-0");
-    expect(source).toContain("right-24");
+    expect(source).toContain("right-[4.5rem]");
+    expect(source).toContain('period.slotNumber.toLocaleString("fa-IR")');
+    expect(source).toContain("w-[4.5rem] min-w-[4.5rem]");
+    expect(source).toContain("w-[3.25rem] min-w-[3.25rem]");
   });
 
   test("each occupied cell displays the course and its contextual teacher or class", async () => {
     const source = await readSource("../src/components/timetable/timetable-cell.tsx");
     expect(source).toContain("entry.courseName");
     expect(source).toContain("secondaryText");
+    expect(source).toContain('aria-label="زنگ خالی"');
   });
 
-  test("print, fullscreen, and honest pending download actions are wired", async () => {
-    const [routeSource, toolbarSource, stylesSource] = await Promise.all([
+  test("toolbar keeps contextual School, Class, and Teacher controls in one responsive group", async () => {
+    const source = await readSource("../src/components/timetable/weekly-timetable-toolbar.tsx");
+    expect(source).toContain("timetable-toolbar-primary");
+    expect(source).toContain("timetable-context-controls");
+    expect(source).toContain('htmlFor="timetable-grade-filter"');
+    expect(source).toContain('htmlFor="timetable-major-filter"');
+    expect(source).toContain('htmlFor="timetable-class-select"');
+    expect(source).toContain('htmlFor="timetable-teacher-select"');
+    expect(source.match(/<SelectItem value="all">همه<\/SelectItem>/g)).toHaveLength(2);
+    expect(source).not.toContain("همه پایه‌ها");
+    expect(source).not.toContain("همه رشته‌ها");
+    expect(source).toContain("پاک کردن فیلترها");
+    expect(source).toContain("filtersActive &&");
+  });
+
+  test("School summary and contextual view headings derive only from normalized timetable data", async () => {
+    const [routeSource, summarySource, headingSource] = await Promise.all([
       readSource("../src/routes/dashboard.timetable.tsx"),
+      readSource("../src/components/timetable/timetable-summary.tsx"),
+      readSource("../src/components/timetable/timetable-view-header.tsx"),
+    ]);
+    expect(routeSource).toContain("<TimetableSummary");
+    expect(routeSource).toContain("<TimetableViewHeader");
+    expect(summarySource).toContain("timetable.entries");
+    expect(summarySource).toContain("timetable.days.length");
+    expect(summarySource).toContain("timetable.periods.length");
+    expect(summarySource).toContain("جلسه برنامه‌ریزی‌شده");
+    expect(headingSource).toContain("برنامه جامع مدرسه");
+    expect(headingSource).toContain("برنامه کلاس");
+    expect(headingSource).toContain("برنامه هفتگی");
+  });
+
+  test("master timetable visually groups days and highlights rows and Class columns without changing data", async () => {
+    const [source, styles] = await Promise.all([
+      readSource("../src/components/timetable/school-master-timetable.tsx"),
+      readSource("../src/styles.css"),
+    ]);
+    expect(source).toContain("data-day-start={periodIndex === 0}");
+    expect(source).toContain("highlightedClassId");
+    expect(source).toContain("data-class-column");
+    expect(styles).toContain('.school-master-table tbody tr[data-day-start="true"]');
+    expect(styles).toContain("@media (hover: hover) and (pointer: fine)");
+  });
+
+  test("print, fullscreen, and real timetable download actions are wired", async () => {
+    const [routeSource, fullscreenSource, toolbarSource, stylesSource] = await Promise.all([
+      readSource("../src/routes/dashboard.timetable.tsx"),
+      readSource("../src/components/timetable/fullscreen-timetable-overview.tsx"),
       readSource("../src/components/timetable/weekly-timetable-toolbar.tsx"),
       readSource("../src/styles.css"),
     ]);
 
     expect(routeSource).toContain("onPrint={() => window.print()}");
-    expect(routeSource).toContain('fullscreen && "fixed inset-0 z-50');
+    expect(routeSource).toContain("<FullscreenTimetableOverview");
+    expect(routeSource).toContain("aria-hidden={fullscreen || undefined}");
+    expect(fullscreenSource).toContain("fixed inset-0 z-[100]");
+    expect(fullscreenSource).toContain('useState<ZoomMode>("fit")');
+    expect(fullscreenSource).toContain('event.key === "Escape"');
+    expect(fullscreenSource).toContain('document.body.style.overflow = "hidden"');
+    expect(fullscreenSource).toContain("previousFocusRef.current?.focus()");
+    expect(fullscreenSource).toContain("new ResizeObserver");
+    expect(fullscreenSource).toContain("orientationchange");
+    expect(fullscreenSource).toContain("classes={timetable.classes}");
+    expect(fullscreenSource).toContain("<SchoolMasterTimetable");
     expect(toolbarSource).toContain('onExport("pdf")');
     expect(toolbarSource).toContain('onExport("excel")');
-    expect(toolbarSource).toContain("به‌زودی");
+    expect(toolbarSource).toContain("دانلود PDF");
+    expect(toolbarSource).toContain("دانلود Excel");
+    expect(toolbarSource).not.toContain("به‌زودی");
+    expect(routeSource).toContain("createTimetableExportModel");
+    expect(routeSource).toContain("downloadWeeklyPlanExcel");
+    expect(routeSource).toContain("printTimetablePdf");
     expect(routeSource).not.toContain("toast.success");
     expect(stylesSource).toContain("@media print");
     expect(stylesSource).toContain("#timetable-print-root");
     expect(stylesSource).toContain(".print-hidden");
+    expect(stylesSource).toContain("html.timetable-fullscreen-active");
+    expect(stylesSource).toContain("#timetable-fullscreen-print-root");
+  });
+
+  test("Fit preserves proportions, respects the readability floor, and reports overflow honestly", () => {
+    expect(
+      calculateTimetableFitScale({
+        availableWidth: 800,
+        availableHeight: 600,
+        timetableWidth: 1000,
+        timetableHeight: 500,
+      }),
+    ).toEqual({ scale: 0.8, fitsAtReadableScale: true });
+
+    expect(
+      calculateTimetableFitScale({
+        availableWidth: 300,
+        availableHeight: 200,
+        timetableWidth: 1200,
+        timetableHeight: 800,
+      }),
+    ).toEqual({ scale: MIN_TIMETABLE_SCALE, fitsAtReadableScale: false });
+  });
+
+  test("manual zoom uses bounded, predictable steps and can return to Fit", async () => {
+    const source = await readSource(
+      "../src/components/timetable/fullscreen-timetable-overview.tsx",
+    );
+    expect(getNextTimetableZoom(0.8, "in")).toBe(0.9);
+    expect(getNextTimetableZoom(0.8, "out")).toBe(0.7);
+    expect(getNextTimetableZoom(MAX_TIMETABLE_SCALE, "in")).toBe(MAX_TIMETABLE_SCALE);
+    expect(getNextTimetableZoom(MIN_TIMETABLE_SCALE, "out")).toBe(MIN_TIMETABLE_SCALE);
+    expect(source).toContain('setZoomMode("manual")');
+    expect(source).toContain('onClick={() => setZoomMode("fit")}');
+    expect(source).toContain("disabled={activeScale <= MIN_TIMETABLE_SCALE + 0.001}");
+    expect(source).toContain("disabled={activeScale >= MAX_TIMETABLE_SCALE - 0.001}");
+  });
+
+  test("fullscreen stays a dedicated School overview while normal page state remains mounted", async () => {
+    const [routeSource, fullscreenSource] = await Promise.all([
+      readSource("../src/routes/dashboard.timetable.tsx"),
+      readSource("../src/components/timetable/fullscreen-timetable-overview.tsx"),
+    ]);
+    expect(routeSource).toContain("mode={mode}");
+    expect(routeSource).toContain("filters={filters}");
+    expect(routeSource).toContain("selectedClassId={selectedClassId}");
+    expect(routeSource).toContain("selectedTeacherId={selectedTeacherId}");
+    expect(routeSource).not.toContain('fullscreen && "fixed inset-0');
+    expect(fullscreenSource).not.toContain("WeeklyTimetableToolbar");
+    expect(fullscreenSource).not.toContain("TimetableSummary");
+    expect(fullscreenSource).not.toContain("filters");
+    expect(fullscreenSource).toContain("createPortal");
+    expect(fullscreenSource).toContain("جا دادن در صفحه");
+    expect(fullscreenSource).toContain("برای مشاهده بهتر برنامه، گوشی را افقی کنید.");
   });
 
   test("empty states cover missing final schedule and empty selections", async () => {

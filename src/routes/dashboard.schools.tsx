@@ -41,8 +41,15 @@ import {
 import { cn } from "@/lib/utils";
 import { setActiveSchoolId } from "@/lib/active-school";
 import {
+  applyPeriodTimeDrafts,
+  createPeriodTimeDrafts,
   getBreakDuration,
   getScheduleValidationError,
+  getTimeInputState,
+  INCOMPLETE_TIME_MESSAGE,
+  periodTimeDraftKey,
+  type PeriodTimeDrafts,
+  type PeriodTimeField,
   shiftTimeByMinutes,
   updateBreakDuration,
 } from "@/lib/school-schedule";
@@ -301,23 +308,26 @@ function SchoolDialog({
   const [submitting, setSubmitting] = useState(false);
   const [periodsDirty, setPeriodsDirty] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [periodTimeDrafts, setPeriodTimeDrafts] = useState<PeriodTimeDrafts>(() =>
+    createPeriodTimeDrafts(defaultForm().periods),
+  );
 
   useEffect(() => {
     if (open) {
       const emptyScheduleDefaults = defaultForm();
-      setForm(
-        editing
-          ? {
-              name: editing.name,
-              slug: editing.slug,
-              workingDays: [...editing.workingDays],
-              timing:
-                editing.periods.length > 0 ? { ...editing.timing } : emptyScheduleDefaults.timing,
-              periods:
-                editing.periods.length > 0 ? [...editing.periods] : emptyScheduleDefaults.periods,
-            }
-          : emptyScheduleDefaults,
-      );
+      const nextForm = editing
+        ? {
+            name: editing.name,
+            slug: editing.slug,
+            workingDays: [...editing.workingDays],
+            timing:
+              editing.periods.length > 0 ? { ...editing.timing } : emptyScheduleDefaults.timing,
+            periods:
+              editing.periods.length > 0 ? [...editing.periods] : emptyScheduleDefaults.periods,
+          }
+        : emptyScheduleDefaults;
+      setForm(nextForm);
+      setPeriodTimeDrafts(createPeriodTimeDrafts(nextForm.periods));
       setPeriodsDirty(false);
       setScheduleError(null);
     }
@@ -326,15 +336,14 @@ function SchoolDialog({
   // Auto-generate periods when timing changes (unless user manually edited)
   useEffect(() => {
     if (!periodsDirty) {
-      setForm((f) => ({
-        ...f,
-        periods: calculatePeriods(
-          f.timing.periodsCount,
-          f.timing.dayStart,
-          f.timing.classDuration,
-          f.timing.breakDuration,
-        ),
-      }));
+      const periods = calculatePeriods(
+        form.timing.periodsCount,
+        form.timing.dayStart,
+        form.timing.classDuration,
+        form.timing.breakDuration,
+      );
+      setForm((current) => ({ ...current, periods }));
+      setPeriodTimeDrafts(createPeriodTimeDrafts(periods));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -354,29 +363,63 @@ function SchoolDialog({
   };
 
   const regenerate = () => {
-    setForm((f) => ({
-      ...f,
-      periods: calculatePeriods(
-        f.timing.periodsCount,
-        f.timing.dayStart,
-        f.timing.classDuration,
-        f.timing.breakDuration,
-      ),
-    }));
+    const periods = calculatePeriods(
+      form.timing.periodsCount,
+      form.timing.dayStart,
+      form.timing.classDuration,
+      form.timing.breakDuration,
+    );
+    setForm((current) => ({ ...current, periods }));
+    setPeriodTimeDrafts(createPeriodTimeDrafts(periods));
     setPeriodsDirty(false);
     setScheduleError(null);
     toast.success("جدول زنگ‌ها بازسازی شد");
   };
 
-  const updatePeriods = (periods: PeriodTime[]) => {
+  const commitTimeDrafts = (drafts: PeriodTimeDrafts) => {
+    const periods = applyPeriodTimeDrafts(form.periods, drafts);
+    if (!periods) return false;
     const error = getScheduleValidationError(periods);
     if (error) {
       setScheduleError(error);
-      return;
+      return false;
     }
     setForm((current) => ({ ...current, periods }));
     setPeriodsDirty(true);
     setScheduleError(null);
+    return true;
+  };
+
+  const updatePeriodTime = (period: PeriodTime, field: PeriodTimeField, value: string) => {
+    const key = periodTimeDraftKey(period.index, field);
+    const drafts = { ...periodTimeDrafts, [key]: value };
+    setPeriodTimeDrafts(drafts);
+    const inputState = getTimeInputState(value);
+    if (inputState === "incomplete") {
+      setScheduleError(null);
+      return;
+    }
+    if (inputState === "invalid") {
+      setScheduleError(INCOMPLETE_TIME_MESSAGE);
+      return;
+    }
+    commitTimeDrafts(drafts);
+  };
+
+  const commitPeriodTimeOnBlur = (period: PeriodTime, field: PeriodTimeField) => {
+    const value = periodTimeDrafts[periodTimeDraftKey(period.index, field)] ?? period[field];
+    if (getTimeInputState(value) !== "valid") {
+      setScheduleError(INCOMPLETE_TIME_MESSAGE);
+      return;
+    }
+    commitTimeDrafts(periodTimeDrafts);
+  };
+
+  const stepPeriodTime = (period: PeriodTime, field: PeriodTimeField, direction: 1 | -1) => {
+    const key = periodTimeDraftKey(period.index, field);
+    const rawValue = periodTimeDrafts[key] ?? period[field];
+    const baseValue = getTimeInputState(rawValue) === "valid" ? rawValue : period[field];
+    updatePeriodTime(period, field, shiftTimeByMinutes(baseValue, direction));
   };
 
   const updateBreak = (breakIndex: number, duration: number) => {
@@ -386,6 +429,13 @@ function SchoolDialog({
       return;
     }
     setForm((current) => ({ ...current, periods: result.periods }));
+    const nextPeriod = result.periods[breakIndex + 1];
+    if (nextPeriod) {
+      setPeriodTimeDrafts((current) => ({
+        ...current,
+        [periodTimeDraftKey(nextPeriod.index, "start")]: nextPeriod.start,
+      }));
+    }
     setPeriodsDirty(true);
     setScheduleError(null);
   };
@@ -403,7 +453,13 @@ function SchoolDialog({
       toast.error("شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد");
       return;
     }
-    const periodsError = getScheduleValidationError(form.periods);
+    const periods = applyPeriodTimeDrafts(form.periods, periodTimeDrafts);
+    if (!periods) {
+      setScheduleError(INCOMPLETE_TIME_MESSAGE);
+      toast.error(INCOMPLETE_TIME_MESSAGE);
+      return;
+    }
+    const periodsError = getScheduleValidationError(periods);
     if (periodsError) {
       setScheduleError(periodsError);
       toast.error(periodsError);
@@ -416,7 +472,7 @@ function SchoolDialog({
         slug: form.slug.trim(),
         workingDays: form.workingDays,
         timing: form.timing,
-        periods: form.periods,
+        periods,
       });
     } finally {
       setSubmitting(false);
@@ -633,26 +689,44 @@ function SchoolDialog({
                       زنگ {p.index.toLocaleString("fa-IR")}
                     </Badge>
                     <Input
-                      type="time"
-                      value={p.start}
-                      onChange={(e) => {
-                        const periods = form.periods.map((period, periodIndex) =>
-                          periodIndex === idx ? { ...period, start: e.target.value } : period,
-                        );
-                        updatePeriods(periods);
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="HH:MM"
+                      dir="ltr"
+                      value={periodTimeDrafts[periodTimeDraftKey(p.index, "start")] ?? p.start}
+                      onChange={(event) => updatePeriodTime(p, "start", event.target.value)}
+                      onBlur={() => commitPeriodTimeOnBlur(p, "start")}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                          event.preventDefault();
+                          stepPeriodTime(p, "start", event.key === "ArrowUp" ? 1 : -1);
+                        } else if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
                       }}
+                      aria-label={`زمان شروع زنگ ${p.index.toLocaleString("fa-IR")}`}
                       className="max-w-[120px]"
                     />
                     <span className="text-muted-foreground text-sm">تا</span>
                     <Input
-                      type="time"
-                      value={p.end}
-                      onChange={(e) => {
-                        const periods = form.periods.map((period, periodIndex) =>
-                          periodIndex === idx ? { ...period, end: e.target.value } : period,
-                        );
-                        updatePeriods(periods);
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="HH:MM"
+                      dir="ltr"
+                      value={periodTimeDrafts[periodTimeDraftKey(p.index, "end")] ?? p.end}
+                      onChange={(event) => updatePeriodTime(p, "end", event.target.value)}
+                      onBlur={() => commitPeriodTimeOnBlur(p, "end")}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                          event.preventDefault();
+                          stepPeriodTime(p, "end", event.key === "ArrowUp" ? 1 : -1);
+                        } else if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
                       }}
+                      aria-label={`زمان پایان زنگ ${p.index.toLocaleString("fa-IR")}`}
                       className="max-w-[120px]"
                     />
                     {idx < form.periods.length - 1 && (

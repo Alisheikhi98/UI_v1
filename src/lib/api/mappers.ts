@@ -19,7 +19,11 @@ import type {
   TeacherCourseGroupDto,
   WeeklyDaySlotsDto,
 } from "@/lib/api/dtos";
-import type { CourseCreateInput, PaginatedResult } from "@/lib/repositories";
+import type {
+  CourseCreateInput,
+  PaginatedResult,
+  ScheduleAssignmentCourseReference,
+} from "@/lib/repositories";
 
 export function toApiId(id: string, field: string): number {
   const numeric = Number(id.startsWith("major-") ? id.slice(6) : id);
@@ -98,6 +102,14 @@ export const mapClassAssignment = (dto: ClassAssignmentDto): ClassAssignment => 
   courseId: String(dto.course_id),
   teacherId: String(dto.teacher_id),
   weeklyPeriods: dto.slots_per_week,
+});
+
+export const mapScheduleAssignmentCourseReference = (
+  dto: ClassAssignmentDto,
+): ScheduleAssignmentCourseReference => ({
+  assignmentId: String(dto.id),
+  courseId: String(dto.course_id),
+  courseName: dto.course_name,
 });
 
 export const mapDaySlot = (dto: DaySlotDto): DaySlot => ({

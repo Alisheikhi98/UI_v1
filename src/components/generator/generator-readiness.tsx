@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ClipboardCheck, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,15 @@ export function GeneratorReadiness({
   issues,
   onGenerate,
   pending = false,
+  generationControls,
+  generationDisabled = false,
 }: {
   items: GeneratorReadinessItem[];
   issues: GeneratorReadinessIssue[];
   onGenerate?: () => void;
   pending?: boolean;
+  generationControls?: ReactNode;
+  generationDisabled?: boolean;
 }) {
   const ready = items.length > 0 && items.every((item) => item.status === "ready");
   const blockingCount = getBlockingIssueCount(items);
@@ -56,14 +61,14 @@ export function GeneratorReadiness({
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
             {items.map((item) => (
               <div
                 key={item.id}
                 className="flex min-h-16 items-center justify-between gap-3 rounded-lg bg-muted/45 px-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{item.label}</p>
+                  <p className="text-sm font-medium leading-5">{item.label}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{item.value}</p>
                 </div>
                 {item.status === "ready" ? (
@@ -104,17 +109,21 @@ export function GeneratorReadiness({
             </div>
           )}
 
+          {generationControls}
+
           {onGenerate && (
             <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                {ready
-                  ? "همه اطلاعات ضروری آماده است؛ می‌توانید تولید برنامه را آغاز کنید."
-                  : "برای فعال شدن تولید برنامه، ابتدا اطلاعات ناقص بخش آمادگی را تکمیل کنید."}
+                {ready && generationDisabled
+                  ? "مقدار تنظیمات زمان‌بندی را اصلاح کنید."
+                  : ready
+                    ? "همه اطلاعات ضروری آماده است؛ می‌توانید تولید برنامه را آغاز کنید."
+                    : "برای فعال شدن تولید برنامه، ابتدا اطلاعات ناقص بخش آمادگی را تکمیل کنید."}
               </p>
               <Button
                 size="lg"
                 onClick={onGenerate}
-                disabled={!ready || pending}
+                disabled={!ready || pending || generationDisabled}
                 className="min-w-48 shrink-0"
               >
                 <Sparkles className="me-2 h-4 w-4" />
