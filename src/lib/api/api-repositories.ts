@@ -2,6 +2,8 @@ import { ApiError, apiRequest } from "@/lib/api/client";
 import type {
   ClassAssignmentDto,
   ClassDto,
+  ClassSlotUnavailabilityDto,
+  ClassUnavailableSlotsReplaceDto,
   CourseDto,
   DeleteCheckDto,
   FastApiPage,
@@ -42,6 +44,7 @@ import type {
   ClassAssignmentUpdateInput,
   ClassCreateInput,
   ClassRepository,
+  ClassUnavailableSlotsRepository,
   ClassUpdateInput,
   CourseCreateInput,
   CourseRepository,
@@ -251,6 +254,43 @@ export class ApiDaySlotRepository implements DaySlotRepository {
       withSignal(options),
     );
     return mapWeeklyDaySlots(week);
+  }
+}
+
+export class ApiClassUnavailableSlotsRepository implements ClassUnavailableSlotsRepository {
+  private readonly getSchoolId: SchoolIdProvider;
+
+  constructor(getSchoolId: SchoolIdProvider) {
+    this.getSchoolId = getSchoolId;
+  }
+
+  async list(classId: string, options?: RepositoryRequestOptions): Promise<string[]> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    const rows = await apiRequest<ClassSlotUnavailabilityDto[]>(
+      `/schools/${schoolId}/classes/${toApiId(classId, "classId")}/unavailable-slots`,
+      withSignal(options),
+    );
+    return rows.map((row) => String(row.day_slot_id));
+  }
+
+  async replace(
+    classId: string,
+    daySlotIds: readonly string[],
+    options?: RepositoryRequestOptions,
+  ): Promise<string[]> {
+    const schoolId = requireSchoolId(this.getSchoolId);
+    const payload: ClassUnavailableSlotsReplaceDto = {
+      day_slot_ids: daySlotIds.map((id) => toApiId(id, "daySlotId")),
+    };
+    const rows = await apiRequest<ClassSlotUnavailabilityDto[]>(
+      `/schools/${schoolId}/classes/${toApiId(classId, "classId")}/unavailable-slots`,
+      {
+        ...withSignal(options),
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+    );
+    return rows.map((row) => String(row.day_slot_id));
   }
 }
 

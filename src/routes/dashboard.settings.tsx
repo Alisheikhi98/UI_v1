@@ -1,6 +1,6 @@
-import { useEffect, useState, type ComponentProps, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Loader2, Lock, User } from "lucide-react";
+import { Check, Copy, Loader2, Lock, Ticket, User } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
 import { withAppName } from "@/lib/branding";
@@ -20,6 +20,7 @@ import {
   validatePasswordChange,
   type SettingsFieldErrors,
 } from "@/lib/settings-errors";
+import { copyReferralCode, getReferralCode } from "@/lib/referral-code";
 
 export const Route = createFileRoute("/dashboard/settings")({
   head: () => ({
@@ -136,7 +137,7 @@ function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="profile">
+          <TabsContent value="profile" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>تنظیمات پروفایل</CardTitle>
@@ -229,6 +230,9 @@ function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+            {userQuery.data ? (
+              <ReferralCodeCard referralCode={userQuery.data.referral_code} />
+            ) : null}
           </TabsContent>
 
           <TabsContent value="security">
@@ -300,6 +304,96 @@ function SettingsPage() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+type ReferralCopyState = "idle" | "copied" | "failed";
+
+function ReferralCodeCard({ referralCode }: { referralCode: string | null | undefined }) {
+  const code = getReferralCode(referralCode);
+  const [copyState, setCopyState] = useState<ReferralCopyState>("idle");
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(function clearReferralCopyTimerOnUnmount() {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
+
+  function setTemporaryCopyState(state: ReferralCopyState) {
+    setCopyState(state);
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => setCopyState("idle"), 1800);
+  }
+
+  async function handleCopyReferralCode() {
+    const copied = await copyReferralCode(code);
+    setTemporaryCopyState(copied ? "copied" : "failed");
+  }
+
+  return (
+    <Card data-testid="referral-code-card" className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Ticket className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle className="text-base">کد معرف</CardTitle>
+            <CardDescription className="mt-1">
+              این کد را برای معرفی چیدمان به دیگران به اشتراک بگذارید.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {code ? (
+          <div className="rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <code
+                dir="ltr"
+                className="min-w-0 break-all text-center font-mono text-lg font-bold tracking-wider text-foreground sm:text-start"
+              >
+                {code}
+              </code>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full shrink-0 gap-2 sm:w-auto"
+                aria-label="کپی کد معرف"
+                title="کپی کد معرف"
+                onClick={() => void handleCopyReferralCode()}
+              >
+                {copyState === "copied" ? (
+                  <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                )}
+                کپی
+              </Button>
+            </div>
+            <p
+              role="status"
+              aria-live="polite"
+              className={`mt-2 min-h-5 text-xs ${
+                copyState === "failed" ? "text-destructive" : "text-primary"
+              }`}
+            >
+              {copyState === "copied"
+                ? "کپی شد"
+                : copyState === "failed"
+                  ? "کپی کد معرف انجام نشد. دوباره تلاش کنید."
+                  : ""}
+            </p>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+            کد معرف برای این حساب ثبت نشده است.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

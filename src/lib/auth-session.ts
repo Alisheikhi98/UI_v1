@@ -22,6 +22,7 @@ let mockUser: AuthenticatedUser = {
   full_name: "کاربر توسعه",
   email: null,
   phone_number: "",
+  referral_code: "",
 };
 
 export function buildLoginUrl(destination?: string) {

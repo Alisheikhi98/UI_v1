@@ -632,7 +632,10 @@ test("successful generation renders one bounded School preview from the candidat
   assert.match(route, /generationInFlight\.current/);
   assert.equal(route.match(/generate\.mutateAsync\(generationSettings\.settings\)/g)?.length, 1);
   assert.doesNotMatch(route, /demoCandidates|setTimeout|activeStep/);
-  assert.doesNotMatch(progress, /setTimeout|activeStep/);
+  assert.match(progress, /LONG_RUNNING_STATUS_DELAY_MS = 9_000/);
+  assert.match(progress, /window\.setTimeout/);
+  assert.match(progress, /window\.clearTimeout/);
+  assert.match(progress, /پردازش همچنان ادامه دارد؛ لطفاً صفحه را نبندید/);
   assert.match(route, /<GeneratedSchedulePreview/);
   assert.match(route, /timetable=\{generatedTimetable\}/);
   assert.doesNotMatch(route, /CandidateList|useScheduleCandidates/);
@@ -664,7 +667,10 @@ test("successful generation renders one bounded School preview from the candidat
   assert.match(route, /confirmInFlight\.current/);
   assert.match(route, /finally/);
   assert.match(route, /to: "\/dashboard\/timetable"/);
-  assert.match(readinessComponent, /disabled=\{!ready \|\| pending \|\| generationDisabled\}/);
+  assert.match(
+    readinessComponent,
+    /disabled=\{!ready \|\| pending \|\| operationLocked \|\| generationDisabled\}/,
+  );
   assert.match(readinessComponent, /issue\.actionLabel \?\? "رفع مشکل"/);
   assert.match(readinessComponent, /grid gap-2 md:grid-cols-2 lg:grid-cols-4/);
   assert.doesNotMatch(readinessComponent, /xl:grid-cols-3|truncate text-sm font-medium/);
@@ -745,11 +751,52 @@ test("Repair CTA is scoped to infeasibility and uses one guarded React Query mut
     route.match(/const repairAvailability[\s\S]*?\n  };/)?.[0] ?? "",
     /setOutcome|saveConflictReport|setMinimizeGaps|setMaxSameCourseSlotsPerDay/,
   );
-  assert.match(panel, /repairPending \? "در حال تعمیر برنامه\.\.\." : "تعمیر برنامه"/);
+  assert.match(panel, /repairPending \? "در حال بررسی…" : "تعمیر برنامه"/);
   assert.match(panel, /disabled=\{pending \|\| repairPending\}/);
   assert.match(queries, /useRepairScheduleAvailability/);
   assert.match(queries, /scheduleApi\.repairAvailability\(schoolId, settings\)/);
   assert.match(api, /\/repair-availability/);
+});
+
+test("Generate and Repair expose compact mutually exclusive loading feedback", async () => {
+  const [route, progress, readiness, diagnostics] = await Promise.all([
+    readSource("../src/routes/dashboard.generator.tsx"),
+    readSource("../src/components/generator/generation-progress.tsx"),
+    readSource("../src/components/generator/generator-readiness.tsx"),
+    readSource("../src/components/generator/infeasible-diagnostics.tsx"),
+  ]);
+
+  assert.match(route, /const operationPending = generate\.isPending \|\| repair\.isPending/);
+  assert.match(route, /repair\.isPending \|\|\s*repairInFlight\.current/);
+  assert.match(route, /generate\.isPending \|\|\s*generationInFlight\.current/);
+  assert.match(route, /operation=\{repair\.isPending \? "repair" : "generate"\}/);
+  assert.match(route, /operationLocked=\{repair\.isPending\}/);
+  assert.match(route, /disabled=\{operationPending\}/);
+  assert.match(readiness, /در حال تولید…/);
+  assert.match(diagnostics, /در حال بررسی…/);
+  assert.match(readiness, /aria-busy=\{pending\}/);
+  assert.match(diagnostics, /aria-busy=\{repairPending\}/);
+  assert.match(progress, /در حال تولید برنامه…/);
+  assert.match(progress, /بررسی محدودیت‌ها و ساخت برنامه ممکن است چند لحظه طول بکشد/);
+  assert.match(progress, /در حال بررسی راه‌حل‌های تعمیر برنامه…/);
+  assert.match(progress, /بررسی تغییرات لازم ممکن است چند لحظه طول بکشد/);
+  assert.match(progress, /aria-live="polite"/);
+  assert.match(progress, /motion-reduce:animate-none/);
+});
+
+test("Generator loading feedback clears for success, infeasible, and failure paths", async () => {
+  const route = await readSource("../src/routes/dashboard.generator.tsx");
+  const generationHandler = route.match(/const startGeneration[\s\S]*?\n  };/)?.[0] ?? "";
+  const repairHandler = route.match(/const repairAvailability[\s\S]*?\n  };/)?.[0] ?? "";
+
+  assert.match(generationHandler, /result\.status === "INFEASIBLE"/);
+  assert.match(generationHandler, /catch \(error\)/);
+  assert.match(generationHandler, /finally/);
+  assert.match(generationHandler, /generationInFlight\.current = false/);
+  assert.match(repairHandler, /catch \(error\)/);
+  assert.match(repairHandler, /finally/);
+  assert.match(repairHandler, /repairInFlight\.current = false/);
+  assert.match(route, /\{operationPending \? \(/);
 });
 
 test("repair remains a responsive non-persistent proposal and reuses the School preview", async () => {

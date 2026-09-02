@@ -1,7 +1,15 @@
 import { ApiError } from "@/lib/api/client";
 
-export type AuthField = "username" | "full_name" | "phone_number" | "email" | "password";
+export type AuthField =
+  | "username"
+  | "full_name"
+  | "phone_number"
+  | "email"
+  | "password"
+  | "referral_code";
 export type AuthFieldErrors = Partial<Record<AuthField, string>>;
+
+const invalidReferralCodeMessage = "کد معرف وارد شده معتبر نیست.";
 
 const authFields = new Set<AuthField>([
   "username",
@@ -9,15 +17,29 @@ const authFields = new Set<AuthField>([
   "phone_number",
   "email",
   "password",
+  "referral_code",
 ]);
+
+function isReferralCodeError(error: ApiError): boolean {
+  if (error.validationIssues.some((issue) => issue.path.split(".").at(-1) === "referral_code")) {
+    return true;
+  }
+  return error.message.toLocaleLowerCase("en-US").includes("referral");
+}
 
 export function getAuthFieldErrors(error: unknown): AuthFieldErrors {
   if (!(error instanceof ApiError) || error.status !== 422) return {};
-  return error.validationIssues.reduce<AuthFieldErrors>((result, issue) => {
+  const fieldErrors = error.validationIssues.reduce<AuthFieldErrors>((result, issue) => {
     const field = issue.path.split(".").at(-1) as AuthField | undefined;
-    if (field && authFields.has(field) && !result[field]) result[field] = issue.message;
+    if (field && authFields.has(field) && !result[field]) {
+      result[field] = field === "referral_code" ? invalidReferralCodeMessage : issue.message;
+    }
     return result;
   }, {});
+  if (!fieldErrors.referral_code && isReferralCodeError(error)) {
+    fieldErrors.referral_code = invalidReferralCodeMessage;
+  }
+  return fieldErrors;
 }
 
 function retryMessage(error: ApiError) {
@@ -47,6 +69,7 @@ export function getRegistrationErrorMessage(error: unknown): string {
     if (message.includes("email")) return "این ایمیل قبلاً ثبت شده است.";
     return "کاربری با این اطلاعات قبلاً ثبت شده است.";
   }
+  if (error.status === 422 && isReferralCodeError(error)) return invalidReferralCodeMessage;
   if (error.status === 429) return retryMessage(error);
   return error.message;
 }

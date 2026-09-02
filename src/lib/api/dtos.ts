@@ -36,6 +36,18 @@ export interface WeeklyDaySlotsDto {
   }>;
 }
 
+export interface ClassSlotUnavailabilityDto {
+  id: number;
+  school_id: number;
+  class_id: number;
+  day_slot_id: number;
+  created_at: string;
+}
+
+export interface ClassUnavailableSlotsReplaceDto {
+  day_slot_ids: number[];
+}
+
 export interface TeacherDto {
   id: number;
   school_id: number;

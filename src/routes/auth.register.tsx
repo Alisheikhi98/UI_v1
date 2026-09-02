@@ -49,6 +49,7 @@ const initialForm = {
   email: "",
   phone_number: "",
   password: "",
+  referral_code: "",
 };
 
 function validateRegistration(form: typeof initialForm): AuthFieldErrors {
@@ -101,6 +102,7 @@ function RegisterPage() {
         phone_number: formData.phone_number.trim(),
         email: formData.email.trim() || null,
         password: formData.password,
+        referral_code: formData.referral_code.trim() || undefined,
       });
       toast.success("ثبت‌نام با موفقیت انجام شد", {
         description: "اکنون با نام کاربری و رمز عبور ثبت‌شده وارد شوید.",
@@ -184,6 +186,19 @@ function RegisterPage() {
               onChange={handleChange}
               disabled={isLoading}
               autoComplete="email"
+            />
+            <RegistrationField
+              id="referral_code"
+              label="کد معرف"
+              placeholder="در صورت داشتن کد معرف وارد کنید"
+              helperText="اگر کد معرف دارید، می‌توانید اینجا وارد کنید."
+              value={formData.referral_code}
+              error={fieldErrors.referral_code}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
             />
 
             <div className="space-y-2">
@@ -279,13 +294,16 @@ function RegistrationField({
   id,
   label,
   error,
+  helperText,
   ...inputProps
 }: {
-  id: "username" | "full_name" | "phone_number" | "email";
+  id: "username" | "full_name" | "phone_number" | "email" | "referral_code";
   label: string;
   error?: string;
+  helperText?: string;
 } & Omit<React.ComponentProps<typeof Input>, "id" | "name">) {
   const errorId = `${id}-error`;
+  const helperId = `${id}-helper`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -294,8 +312,16 @@ function RegistrationField({
         id={id}
         name={id}
         aria-invalid={Boolean(error)}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={
+          [helperText ? helperId : null, error ? errorId : null].filter(Boolean).join(" ") ||
+          undefined
+        }
       />
+      {helperText && (
+        <p id={helperId} className="text-xs text-muted-foreground">
+          {helperText}
+        </p>
+      )}
       {error && (
         <p id={errorId} role="alert" className="text-xs text-destructive">
           {error}

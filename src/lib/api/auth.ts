@@ -12,6 +12,7 @@ export interface AuthenticatedUser {
   full_name: string;
   email: string | null;
   phone_number: string;
+  referral_code: string;
 }
 
 export interface RegisterUserInput {
@@ -20,6 +21,7 @@ export interface RegisterUserInput {
   phone_number: string;
   email?: string | null;
   password: string;
+  referral_code?: string | null;
 }
 
 export interface UpdateAuthenticatedUserInput {
@@ -39,12 +41,15 @@ export function buildLoginForm(username: string, password: string) {
 }
 
 export function buildRegistrationPayload(data: RegisterUserInput): RegisterUserInput {
+  const referralCode = data.referral_code?.trim();
+
   return {
     username: data.username,
     full_name: data.full_name,
     phone_number: data.phone_number,
     email: data.email ?? null,
     password: data.password,
+    ...(referralCode ? { referral_code: referralCode } : {}),
   };
 }
 

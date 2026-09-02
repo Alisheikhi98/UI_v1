@@ -33,6 +33,25 @@ test("Registration sends only the authoritative FastAPI fields", () => {
   );
 });
 
+test("Registration omits an empty Referral Code and trims a supplied code", () => {
+  const baseInput = {
+    username: "manager",
+    full_name: "School Manager",
+    phone_number: "09123456789",
+    password: "StrongPass1",
+  };
+
+  assert.equal("referral_code" in buildRegistrationPayload(baseInput), false);
+  assert.equal(
+    "referral_code" in buildRegistrationPayload({ ...baseInput, referral_code: "   " }),
+    false,
+  );
+  assert.equal(
+    buildRegistrationPayload({ ...baseInput, referral_code: "  abcdef2345  " }).referral_code,
+    "abcdef2345",
+  );
+});
+
 test("Login uses the OAuth2 username/password form contract", () => {
   const form = buildLoginForm("manager name", "p&ssword");
   assert.equal(form.get("username"), "manager name");
@@ -53,6 +72,31 @@ test("FastAPI Registration validation and duplicate conflicts map clearly", () =
     getRegistrationErrorMessage(new ApiError("Username already registered", 409)),
     "این نام کاربری قبلاً ثبت شده است.",
   );
+});
+
+test("Referral Code validation is localized and attached to its field", () => {
+  const fieldValidation = new ApiError("raw validation detail", 422, undefined, [
+    { path: "referral_code", message: "Value error, invalid referral code format" },
+  ]);
+  const unknownCode = new ApiError("Invalid referral code.", 422);
+
+  assert.deepEqual(getAuthFieldErrors(fieldValidation), {
+    referral_code: "کد معرف وارد شده معتبر نیست.",
+  });
+  assert.deepEqual(getAuthFieldErrors(unknownCode), {
+    referral_code: "کد معرف وارد شده معتبر نیست.",
+  });
+  assert.equal(getRegistrationErrorMessage(unknownCode), "کد معرف وارد شده معتبر نیست.");
+  assert.doesNotMatch(getRegistrationErrorMessage(fieldValidation), /raw|invalid/i);
+});
+
+test("Registration form exposes an optional accessible Referral Code field", async () => {
+  const registerSource = await readSource("../src/routes/auth.register.tsx");
+  assert.match(registerSource, /id="referral_code"/);
+  assert.match(registerSource, /label="کد معرف"/);
+  assert.match(registerSource, /placeholder="در صورت داشتن کد معرف وارد کنید"/);
+  assert.match(registerSource, /اگر کد معرف دارید، می‌توانید اینجا وارد کنید/);
+  assert.match(registerSource, /error=\{fieldErrors\.referral_code\}/);
 });
 
 test("invalid credentials and Retry-After receive Login-specific messages", () => {

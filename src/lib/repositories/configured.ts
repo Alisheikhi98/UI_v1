@@ -1,6 +1,7 @@
 import {
   ApiClassAssignmentRepository,
   ApiClassRepository,
+  ApiClassUnavailableSlotsRepository,
   ApiCourseRepository,
   ApiDaySlotRepository,
   ApiMajorRepository,
@@ -12,6 +13,7 @@ import { getActiveSchoolId } from "@/lib/active-school";
 import type {
   ClassAssignmentRepository,
   ClassRepository,
+  ClassUnavailableSlotsRepository,
   CourseRepository,
   PaginatedResult,
   TeacherRepository,
@@ -34,6 +36,7 @@ export interface RepositoryRegistry {
   classAssignments: RepositoryBinding<ClassAssignment, ClassAssignmentRepository>;
   majors: RepositoryBinding<Major, MajorRepository>;
   daySlots: DaySlotRepository;
+  classUnavailableSlots: ClassUnavailableSlotsRepository;
   teacherAvailability: TeacherAvailabilityRepository;
   teacherCourses: TeacherCoursesRepository;
 }
@@ -61,6 +64,7 @@ const createMockRepositories = async (): Promise<RepositoryRegistry> => {
     { classAssignmentRepository, classRepository, courseRepository, teacherRepository },
     {
       MockDaySlotRepository,
+      MockClassUnavailableSlotsRepository,
       MockMajorRepository,
       MockTeacherAvailabilityRepository,
       MockTeacherCoursesRepository,
@@ -93,6 +97,7 @@ const createMockRepositories = async (): Promise<RepositoryRegistry> => {
       initialData: initialResult(await majorRepository.list()),
     },
     daySlots: new MockDaySlotRepository(),
+    classUnavailableSlots: new MockClassUnavailableSlotsRepository(),
     teacherAvailability: new MockTeacherAvailabilityRepository(),
     teacherCourses: new MockTeacherCoursesRepository(),
   };
@@ -105,6 +110,7 @@ const apiRepositories: RepositoryRegistry = {
   classAssignments: { repository: new ApiClassAssignmentRepository(getActiveSchoolId) },
   majors: { repository: new ApiMajorRepository() },
   daySlots: new ApiDaySlotRepository(getActiveSchoolId),
+  classUnavailableSlots: new ApiClassUnavailableSlotsRepository(getActiveSchoolId),
   teacherAvailability: new ApiTeacherAvailabilityRepository(getActiveSchoolId),
   teacherCourses: new ApiTeacherCoursesRepository(getActiveSchoolId),
 };

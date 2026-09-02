@@ -1,6 +1,7 @@
 import { courseRepository, teacherRepository } from "@/lib/mock-repositories";
 import type {
   DaySlotRepository,
+  ClassUnavailableSlotsRepository,
   MajorRepository,
   RepositoryRequestOptions,
   TeacherAvailabilityRepository,
@@ -33,6 +34,8 @@ const mockAvailabilityByTeacher = new Map<string, string[]>([
   ["5", []],
 ]);
 
+const mockUnavailableSlotsByClass = new Map<string, string[]>();
+
 const mockMajors: readonly Major[] = [
   { id: "major-1", code: "math", name: "ریاضی فیزیک", active: true },
   { id: "major-2", code: "exp", name: "علوم تجربی", active: true },
@@ -42,6 +45,21 @@ const mockMajors: readonly Major[] = [
 export class MockDaySlotRepository implements DaySlotRepository {
   listWeek(): Promise<DaySlotGroup[]> {
     return Promise.resolve(structuredClone(mockDaySlotGroups));
+  }
+}
+
+export class MockClassUnavailableSlotsRepository implements ClassUnavailableSlotsRepository {
+  async list(classId: string): Promise<string[]> {
+    return structuredClone(mockUnavailableSlotsByClass.get(classId) ?? []);
+  }
+
+  async replace(classId: string, daySlotIds: readonly string[]): Promise<string[]> {
+    const validSlotIds = new Set(
+      mockDaySlotGroups.flatMap((group) => group.slots.map((slot) => slot.id)),
+    );
+    if (daySlotIds.some((id) => !validSlotIds.has(id))) throw new Error("Day slot not found.");
+    mockUnavailableSlotsByClass.set(classId, [...daySlotIds]);
+    return [...daySlotIds];
   }
 }
 

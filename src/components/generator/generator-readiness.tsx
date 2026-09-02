@@ -1,6 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ClipboardCheck, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ClipboardCheck,
+  LoaderCircle,
+  Sparkles,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +22,7 @@ export function GeneratorReadiness({
   issues,
   onGenerate,
   pending = false,
+  operationLocked = false,
   generationControls,
   generationDisabled = false,
 }: {
@@ -22,6 +30,7 @@ export function GeneratorReadiness({
   issues: GeneratorReadinessIssue[];
   onGenerate?: () => void;
   pending?: boolean;
+  operationLocked?: boolean;
   generationControls?: ReactNode;
   generationDisabled?: boolean;
 }) {
@@ -114,20 +123,30 @@ export function GeneratorReadiness({
           {onGenerate && (
             <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                {ready && generationDisabled
-                  ? "مقدار تنظیمات زمان‌بندی را اصلاح کنید."
-                  : ready
-                    ? "همه اطلاعات ضروری آماده است؛ می‌توانید تولید برنامه را آغاز کنید."
-                    : "برای فعال شدن تولید برنامه، ابتدا اطلاعات ناقص بخش آمادگی را تکمیل کنید."}
+                {ready && operationLocked
+                  ? "ابتدا عملیات در حال اجرا را کامل کنید."
+                  : ready && generationDisabled
+                    ? "مقدار تنظیمات زمان‌بندی را اصلاح کنید."
+                    : ready
+                      ? "همه اطلاعات ضروری آماده است؛ می‌توانید تولید برنامه را آغاز کنید."
+                      : "برای فعال شدن تولید برنامه، ابتدا اطلاعات ناقص بخش آمادگی را تکمیل کنید."}
               </p>
               <Button
                 size="lg"
                 onClick={onGenerate}
-                disabled={!ready || pending || generationDisabled}
+                disabled={!ready || pending || operationLocked || generationDisabled}
+                aria-busy={pending}
                 className="min-w-48 shrink-0"
               >
-                <Sparkles className="me-2 h-4 w-4" />
-                {pending ? "در حال تولید..." : "تولید برنامه"}
+                {pending ? (
+                  <LoaderCircle
+                    className="me-2 h-4 w-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Sparkles className="me-2 h-4 w-4" aria-hidden="true" />
+                )}
+                {pending ? "در حال تولید…" : "تولید برنامه"}
               </Button>
             </div>
           )}

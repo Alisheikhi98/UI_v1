@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
+import { ClassUnavailableSlotsDialog } from "@/components/classes/class-unavailable-slots-dialog";
 import { GRADE_OPTIONS, type ClassViewModel, useClassManagementData } from "@/lib/class-management";
 import { withAppName } from "@/lib/branding";
 import {
@@ -60,6 +61,7 @@ import {
   Trash2,
   GraduationCap,
   CalendarClock,
+  CalendarX2,
   Check,
   Filter,
   LoaderCircle,
@@ -401,6 +403,7 @@ function ClassesPage() {
   const navigate = useNavigate();
   const publishedClassSchedule = usePublishedClassScheduleCheck();
   const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
+  const [unavailabilityClass, setUnavailabilityClass] = useState<ClassViewModel | null>(null);
   const {
     classes,
     majorOptions,
@@ -651,6 +654,9 @@ function ClassesPage() {
                         <TableHead className="text-center">پایه</TableHead>
                         <TableHead className="text-center">رشته</TableHead>
                         <TableHead className="text-center">مدیریت کلاس</TableHead>
+                        <TableHead className="whitespace-nowrap text-center">
+                          روز و زنگ خالی
+                        </TableHead>
                         <TableHead className="w-28 text-center">مشاهده برنامه</TableHead>
                         <TableHead className="w-20 text-center">حذف</TableHead>
                       </TableRow>
@@ -688,6 +694,18 @@ function ClassesPage() {
                                   }
                                 />
                                 تنظیم دروس
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="whitespace-nowrap"
+                                onClick={() => setUnavailabilityClass(classItem)}
+                              >
+                                <CalendarX2 className="me-2 h-4 w-4" aria-hidden="true" />
+                                تنظیم
                               </Button>
                             </TableCell>
                             <TableCell className="text-center">
@@ -776,6 +794,18 @@ function ClassesPage() {
                             />
                             تنظیم دروس
                           </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="min-h-10 justify-between"
+                            onClick={() => setUnavailabilityClass(classItem)}
+                          >
+                            <span className="flex items-center gap-2">
+                              <CalendarX2 className="h-4 w-4" aria-hidden="true" />
+                              روز و زنگ خالی
+                            </span>
+                            <span className="text-xs text-muted-foreground">تنظیم</span>
+                          </Button>
                           <div className="grid grid-cols-2 gap-2">
                             <TooltipProvider>
                               <ViewTimetableAction
@@ -822,6 +852,15 @@ function ClassesPage() {
         classItem={renamingClass}
         onSave={renameClass}
       />
+
+      {unavailabilityClass ? (
+        <ClassUnavailableSlotsDialog
+          key={unavailabilityClass.id}
+          open
+          classItem={unavailabilityClass}
+          onOpenChange={(open) => !open && setUnavailabilityClass(null)}
+        />
+      ) : null}
 
       <AlertDialog
         open={Boolean(classToDelete)}

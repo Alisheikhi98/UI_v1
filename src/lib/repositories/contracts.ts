@@ -110,6 +110,15 @@ export interface DaySlotRepository {
   listWeek(options?: RepositoryRequestOptions): Promise<DaySlotGroup[]>;
 }
 
+export interface ClassUnavailableSlotsRepository {
+  list(classId: string, options?: RepositoryRequestOptions): Promise<string[]>;
+  replace(
+    classId: string,
+    daySlotIds: readonly string[],
+    options?: RepositoryRequestOptions,
+  ): Promise<string[]>;
+}
+
 export interface TeacherAvailabilityRepository {
   list(teacherId: string, options?: RepositoryRequestOptions): Promise<string[]>;
   replace(

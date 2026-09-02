@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, CheckCircle2, RefreshCcw, Wrench, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  LoaderCircle,
+  RefreshCcw,
+  Wrench,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,14 +200,38 @@ export function InfeasibleDiagnostics({
               </p>
             ) : null}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={onRetry} disabled={pending || repairPending}>
-                <RefreshCcw className="me-2 h-4 w-4" aria-hidden="true" />
-                {pending ? "در حال تولید..." : allResolved ? "تولید مجدد برنامه" : "تلاش دوباره"}
+              <Button
+                variant="outline"
+                onClick={onRetry}
+                disabled={pending || repairPending}
+                aria-busy={pending}
+              >
+                {pending ? (
+                  <LoaderCircle
+                    className="me-2 h-4 w-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <RefreshCcw className="me-2 h-4 w-4" aria-hidden="true" />
+                )}
+                {pending ? "در حال تولید…" : allResolved ? "تولید مجدد برنامه" : "تلاش دوباره"}
               </Button>
               {onRepair && !allResolved ? (
-                <Button variant="secondary" onClick={onRepair} disabled={pending || repairPending}>
-                  <Wrench className="me-2 h-4 w-4" aria-hidden="true" />
-                  {repairPending ? "در حال تعمیر برنامه..." : "تعمیر برنامه"}
+                <Button
+                  variant="secondary"
+                  onClick={onRepair}
+                  disabled={pending || repairPending}
+                  aria-busy={repairPending}
+                >
+                  {repairPending ? (
+                    <LoaderCircle
+                      className="me-2 h-4 w-4 animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Wrench className="me-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  {repairPending ? "در حال بررسی…" : "تعمیر برنامه"}
                 </Button>
               ) : null}
             </div>

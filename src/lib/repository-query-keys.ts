@@ -20,6 +20,8 @@ export const repositoryQueryKeys = {
     ["class-assignments", schoolId ?? "none", [...classIds].sort()] as const,
   assignmentsRoot: (schoolId: string | null) => ["class-assignments", schoolId ?? "none"] as const,
   daySlots: (schoolId: string | null) => ["schools", schoolId ?? "none", "day-slots"] as const,
+  classUnavailableSlots: (schoolId: string | null, classId: string) =>
+    ["schools", schoolId ?? "none", "classes", classId, "unavailable-slots"] as const,
   schoolStatistics: (schoolId: string | null) =>
     ["schools", schoolId ?? "none", "statistics"] as const,
   scheduleCandidates: (schoolId: string | null) =>

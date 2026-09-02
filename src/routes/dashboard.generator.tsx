@@ -147,6 +147,8 @@ function ScheduleGeneratorPage() {
       !readiness.data.ready ||
       !generationSettings.settings ||
       generate.isPending ||
+      repair.isPending ||
+      repairInFlight.current ||
       generationInFlight.current
     )
       return;
@@ -205,6 +207,8 @@ function ScheduleGeneratorPage() {
     if (
       !conflictReport ||
       !generationSettings.settings ||
+      generate.isPending ||
+      generationInFlight.current ||
       repair.isPending ||
       repairInFlight.current
     )
@@ -245,6 +249,7 @@ function ScheduleGeneratorPage() {
 
   const loadingReadiness = readiness.loading;
   const readinessFailed = Boolean(readiness.error);
+  const operationPending = generate.isPending || repair.isPending;
 
   return (
     <div className="flex flex-col" dir="rtl">
@@ -270,6 +275,7 @@ function ScheduleGeneratorPage() {
             issues={readiness.data.issues}
             onGenerate={startGeneration}
             pending={generate.isPending}
+            operationLocked={repair.isPending}
             generationDisabled={!generationSettings.settings}
             generationControls={
               <SchedulerConstraintControls
@@ -279,13 +285,15 @@ function ScheduleGeneratorPage() {
                 onMaxSameCourseSlotsPerDayChange={setMaxSameCourseSlotsPerDay}
                 maximumPeriodsPerDay={maximumPeriodsPerDay}
                 error={generationSettings.error}
-                disabled={generate.isPending}
+                disabled={operationPending}
               />
             }
           />
         )}
 
-        {generate.isPending && <GenerationProgress />}
+        {operationPending ? (
+          <GenerationProgress operation={repair.isPending ? "repair" : "generate"} />
+        ) : null}
         {outcome === "failed" && (
           <GeneratorEmptyState
             kind="failed"

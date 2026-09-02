@@ -7,6 +7,7 @@ import {
   Clock3,
   GraduationCap,
   Sparkles,
+  Tag,
   UsersRound,
 } from "lucide-react";
 import { ContactChannels } from "@/components/contact-channels";
@@ -48,6 +49,90 @@ const workflowSteps = [
   },
 ] as const;
 
+const pricingPlans = [
+  {
+    id: "trial",
+    title: "پلن آزمایشی پایه",
+    description: "برای شروع و آشنایی با امکانات سامانه",
+    features: [
+      "۵ روز اعتبار",
+      "تا ۶۰ دبیر فعال",
+      "تا ۲۰ کلاس فعال",
+      "حداکثر ۲۰ بار ساخت برنامه در کل دوره",
+      "حداکثر ۴ بار ساخت برنامه در روز برای هر کاربر",
+      "خروجی اکسل با واترمارک",
+    ],
+    note: "ظرفیت دبیر و کلاس این پلن برای ارزیابی کامل سامانه بازتر است، اما دوره فقط ۵ روز و حداکثر ۲۰ بار ساخت برنامه فعال است.",
+    cta: "شروع دوره آزمایشی",
+    destination: "register",
+    cardClass:
+      "border-sky-200/80 bg-sky-50/35 hover:border-sky-300 dark:border-sky-900/70 dark:bg-sky-950/15 dark:hover:border-sky-800",
+    accentClass: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    checkClass: "text-sky-600 dark:text-sky-400",
+  },
+  {
+    id: "professional",
+    title: "پلن حرفه‌ای",
+    description: "مناسب مدارس کوچک و استفاده روزمره",
+    price: "۱٬۵۰۰٬۰۰۰",
+    features: [
+      "اعتبار یک‌ساله",
+      "تا ۳۰ دبیر فعال",
+      "تا ۱۰ کلاس فعال",
+      "بدون محدودیت در تعداد کل ساخت برنامه",
+      "حداکثر ۲۰ بار ساخت برنامه در روز برای هر کاربر",
+      "خروجی اکسل بدون واترمارک",
+    ],
+    cta: "انتخاب پلن حرفه‌ای",
+    destination: "contact",
+    cardClass:
+      "border-emerald-200/80 bg-emerald-50/30 hover:border-emerald-300 dark:border-emerald-900/70 dark:bg-emerald-950/15 dark:hover:border-emerald-800",
+    accentClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    checkClass: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    id: "advanced",
+    title: "پلن پیشرفته",
+    description: "مناسب مدارس متوسط و مجموعه‌های آموزشی بزرگ‌تر",
+    badge: "پیشنهاد ویژه",
+    price: "۲٬۵۰۰٬۰۰۰",
+    features: [
+      "اعتبار یک‌ساله",
+      "تا ۶۰ دبیر فعال",
+      "تا ۲۵ کلاس فعال",
+      "بدون محدودیت در تعداد کل ساخت برنامه",
+      "حداکثر ۵۰ بار ساخت برنامه در روز برای هر کاربر",
+      "خروجی اکسل بدون واترمارک",
+    ],
+    cta: "انتخاب پلن پیشرفته",
+    destination: "contact",
+    cardClass:
+      "border-indigo-400/80 bg-indigo-50/45 shadow-lg shadow-indigo-500/10 hover:border-indigo-500 dark:border-indigo-700/80 dark:bg-indigo-950/20 dark:hover:border-indigo-600",
+    accentClass: "bg-indigo-500/12 text-indigo-700 dark:text-indigo-300",
+    checkClass: "text-indigo-600 dark:text-indigo-400",
+  },
+  {
+    id: "enterprise",
+    title: "پلن سازمانی",
+    description: "راهکاری منعطف برای مدارس و مجموعه‌های بزرگ",
+    features: [
+      "اعتبار یک‌ساله",
+      "ظرفیت دبیران متناسب با نیاز مجموعه",
+      "ظرفیت کلاس‌ها متناسب با نیاز مجموعه",
+      "بدون محدودیت در تعداد کل ساخت برنامه",
+      "سقف روزانه ساخت برنامه به‌صورت اختصاصی",
+      "خروجی اکسل بدون واترمارک",
+      "تنظیم محدودیت‌ها براساس نیاز مدرسه",
+    ],
+    cta: "تماس برای مشاوره",
+    destination: "contact",
+    cardClass:
+      "border-amber-200/90 bg-amber-50/35 hover:border-amber-300 dark:border-amber-900/70 dark:bg-amber-950/15 dark:hover:border-amber-800",
+    accentClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    checkClass: "text-amber-600 dark:text-amber-400",
+  },
+] as const;
+
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: withAppName("برنامه‌ریزی هوشمند مدارس") }] }),
   component: HomePage,
@@ -64,7 +149,13 @@ function HomePage() {
             </span>
             <span className="truncate text-lg font-bold tracking-tight">{APP_NAME}</span>
           </Link>
-          <nav className="flex shrink-0 items-center gap-1.5" aria-label="ورود به سامانه">
+          <nav className="flex shrink-0 items-center gap-1.5" aria-label="ناوبری اصلی">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5 px-2.5 sm:px-3">
+              <a href="#pricing">
+                <Tag className="h-4 w-4" aria-hidden="true" />
+                تعرفه‌ها
+              </a>
+            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/auth/login">ورود</Link>
             </Button>
@@ -177,7 +268,116 @@ function HomePage() {
           </div>
         </section>
 
-        <section className="py-14 sm:py-20" aria-labelledby="contact-title">
+        <section
+          id="pricing"
+          className="scroll-mt-20 py-14 sm:py-20"
+          aria-labelledby="pricing-title"
+        >
+          <div className="container mx-auto w-full px-4 sm:px-6">
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 id="pricing-title" className="text-2xl font-bold tracking-tight sm:text-3xl">
+                پلن مناسب مدرسه خود را انتخاب کنید
+              </h2>
+              <p className="mt-3 leading-7 text-muted-foreground">
+                با توجه به تعداد کلاس‌ها، دبیران و میزان استفاده از سیستم برنامه‌ریزی، بهترین گزینه
+                را برای مجموعه آموزشی خود انتخاب کنید.
+              </p>
+            </div>
+
+            <div className="mx-auto mt-9 grid w-full max-w-7xl items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {pricingPlans.map((plan) => {
+                const highlighted = plan.id === "advanced";
+                return (
+                  <Card
+                    key={plan.id}
+                    className={`relative h-full shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none ${plan.cardClass}`}
+                  >
+                    <CardContent className="flex h-full flex-col p-5 sm:p-6">
+                      <div className="relative min-h-28">
+                        {"badge" in plan ? (
+                          <span className="absolute end-0 top-0 inline-flex rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white dark:bg-indigo-500">
+                            {plan.badge}
+                          </span>
+                        ) : null}
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${plan.accentClass}`}
+                          >
+                            <Tag className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <h3 className="text-lg font-bold leading-7">{plan.title}</h3>
+                        </div>
+                        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                          {plan.description}
+                        </p>
+                      </div>
+
+                      <div className="my-5 border-t border-border/70" />
+
+                      <ul className="flex-1 space-y-3" aria-label={`امکانات ${plan.title}`}>
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-start gap-2.5 text-sm leading-6">
+                            <CheckCircle2
+                              className={`mt-1 h-4 w-4 shrink-0 ${plan.checkClass}`}
+                              aria-hidden="true"
+                            />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {"note" in plan ? (
+                        <p className="mt-5 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-muted-foreground">
+                          {plan.note}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-6 min-h-9 text-center">
+                        {"price" in plan ? (
+                          <p
+                            className="flex items-baseline justify-center gap-1.5"
+                            aria-label={`${plan.price} تومان`}
+                          >
+                            <span className="text-xl font-black tracking-tight">{plan.price}</span>
+                            <span className="text-sm font-semibold text-muted-foreground">
+                              تومان
+                            </span>
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3">
+                        {plan.destination === "register" ? (
+                          <Button
+                            asChild
+                            className="w-full"
+                            variant={highlighted ? "default" : "outline"}
+                          >
+                            <Link to="/auth/register">{plan.cta}</Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            asChild
+                            className="w-full"
+                            variant={highlighted ? "default" : "outline"}
+                          >
+                            <a href="#contact">{plan.cta}</a>
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="contact"
+          className="scroll-mt-20 border-t border-border/60 py-14 sm:py-20"
+          aria-labelledby="contact-title"
+        >
           <div className="container mx-auto w-full px-4 sm:px-6">
             <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[1fr_0.9fr]">
               <div className="rounded-3xl bg-primary p-6 text-primary-foreground sm:p-8">

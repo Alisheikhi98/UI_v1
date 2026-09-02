@@ -4,6 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "../src/lib/api/client.ts";
 import { buildPasswordChangePayload, buildProfileUpdatePayload } from "../src/lib/api/auth.ts";
+import { copyReferralCode, getReferralCode } from "../src/lib/referral-code.ts";
 import {
   getSettingsErrorMessage,
   getSettingsFieldErrors,
@@ -31,6 +32,7 @@ test("profile and password payloads contain only FastAPI-supported fields", () =
       full_name: "School Manager",
       phone_number: "09123456789",
       email: undefined,
+      referral_code: "SHOULD-NOT-BE-SENT",
     }),
     {
       username: "manager",
@@ -43,6 +45,65 @@ test("profile and password payloads contain only FastAPI-supported fields", () =
     buildPasswordChangePayload({ current_password: "OldPass1", new_password: "NewPass2" }),
     { current_password: "OldPass1", new_password: "NewPass2" },
   );
+});
+
+test("authenticated profile maps the authoritative referral code without another request", async () => {
+  const apiSource = await readSource("../src/lib/api/auth.ts");
+  const sessionSource = await readSource("../src/lib/auth-session.ts");
+  const routeSource = await readSource("../src/routes/dashboard.settings.tsx");
+
+  assert.match(apiSource, /referral_code: string/);
+  assert.match(apiSource, /getCurrentUser[\s\S]*"\/users\/me"/);
+  assert.match(routeSource, /userQuery\.data\.referral_code/);
+  assert.doesNotMatch(routeSource, /users\/me\/referral|useQuery|apiRequest/);
+  assert.doesNotMatch(sessionSource, /users\/me\/referral/);
+});
+
+test("Referral Code is a separate read-only Profile card with a safe empty state", async () => {
+  const source = await readSource("../src/routes/dashboard.settings.tsx");
+
+  assert.match(source, /data-testid="referral-code-card"/);
+  assert.match(source, /<CardTitle className="text-base">کد معرف<\/CardTitle>/);
+  assert.match(source, /<code[\s\S]*\{code\}[\s\S]*<\/code>/);
+  assert.match(source, /کد معرف برای این حساب ثبت نشده است/);
+  assert.match(source, /aria-label="کپی کد معرف"/);
+  assert.match(source, /overflow-hidden/);
+  assert.match(source, /flex min-w-0 flex-col gap-3 sm:flex-row/);
+  assert.match(source, /w-full shrink-0 gap-2 sm:w-auto/);
+  assert.match(source, /break-all text-center/);
+  assert.doesNotMatch(source, /ProfileField[\s\S]{0,150}referral/);
+});
+
+test("Referral Code copy uses only the canonical value and fails safely", async () => {
+  const copiedValues = [];
+  const clipboard = {
+    async writeText(value) {
+      copiedValues.push(value);
+    },
+  };
+
+  assert.equal(getReferralCode("  ABC2345678  "), "ABC2345678");
+  assert.equal(getReferralCode("  "), null);
+  assert.equal(getReferralCode(null), null);
+  assert.equal(await copyReferralCode("  ABC2345678  ", clipboard), true);
+  assert.deepEqual(copiedValues, ["ABC2345678"]);
+  assert.equal(
+    await copyReferralCode("ABC2345678", {
+      async writeText() {
+        throw new Error("clipboard denied");
+      },
+    }),
+    false,
+  );
+});
+
+test("Referral Code copy feedback is localized and inline", async () => {
+  const source = await readSource("../src/routes/dashboard.settings.tsx");
+  assert.match(source, /role="status"/);
+  assert.match(source, /aria-live="polite"/);
+  assert.match(source, /"کپی شد"/);
+  assert.match(source, /"کپی کد معرف انجام نشد\. دوباره تلاش کنید\."/);
+  assert.doesNotMatch(source, /toast\.(success|error)\([^)]*کپی/);
 });
 
 test("Settings loads and updates the canonical authenticated-user query", async () => {
