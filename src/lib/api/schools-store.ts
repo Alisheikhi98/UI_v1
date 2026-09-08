@@ -1,6 +1,7 @@
 import { ApiError, apiRequest } from "./client";
 import { SchoolRepository, type SchoolPersistenceAdapter } from "./school-repository";
 import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "@/lib/weekday-labels";
+import type { EducationStage } from "@/lib/academic-policy";
 
 const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true";
 
@@ -14,6 +15,7 @@ export interface School {
   id: number;
   name: string;
   slug: string;
+  educationStage: EducationStage;
   status: "active" | "inactive";
   dayOptions: SchoolDayOption[];
   workingDays: string[];
@@ -33,12 +35,16 @@ export interface SchoolDayOption {
   label: string;
 }
 
-export type SchoolFormData = Pick<School, "name" | "slug" | "workingDays" | "timing" | "periods">;
+export type SchoolFormData = Pick<
+  School,
+  "name" | "slug" | "educationStage" | "workingDays" | "timing" | "periods"
+>;
 
 interface SchoolRead {
   id: number;
   name: string;
   slug: string;
+  education_stage: EducationStage;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -188,6 +194,7 @@ function toSchool(school: SchoolRead, week: WeeklyDaySlotsResponse): School {
     id: school.id,
     name: school.name,
     slug: school.slug,
+    educationStage: school.education_stage,
     status: school.active ? "active" : "inactive",
     ...deriveScheduling(week),
     createdAt: school.created_at,
@@ -297,7 +304,11 @@ async function saveDaySlots(schoolId: number, data: SchoolFormData) {
 async function createSchoolWithApi(data: SchoolFormData): Promise<School> {
   const created = await apiRequest<SchoolRead>("/schools/", {
     method: "POST",
-    body: JSON.stringify({ name: data.name, slug: data.slug }),
+    body: JSON.stringify({
+      name: data.name,
+      slug: data.slug,
+      education_stage: data.educationStage,
+    }),
   });
   await saveDaySlots(created.id, data);
   return toSchool(created, await getSchoolWeek(created.id));
@@ -318,8 +329,8 @@ async function updateSchoolWithApi({
   return toSchool(updated, await getSchoolWeek(id));
 }
 
-async function deleteSchoolWithApi(): Promise<never> {
-  throw new ApiError("OpenAPI برای حذف مدرسه endpoint تعریف نکرده است.", 405);
+async function deleteSchoolWithApi(id: number): Promise<void> {
+  await apiRequest<void>(`/schools/${id}`, { method: "DELETE" });
 }
 
 const apiSchoolPersistenceAdapter: SchoolPersistenceAdapter = {
@@ -330,7 +341,7 @@ const apiSchoolPersistenceAdapter: SchoolPersistenceAdapter = {
   },
   create: createSchoolWithApi,
   update: (id, data) => updateSchoolWithApi({ id, data }),
-  delete: () => deleteSchoolWithApi(),
+  delete: deleteSchoolWithApi,
 };
 
 const schoolPersistenceAdapter = USE_MOCK_API

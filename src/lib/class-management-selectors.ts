@@ -1,10 +1,5 @@
 import type { Class, Course, Major, Teacher } from "@/lib/types";
-
-export const GRADE_OPTIONS = [
-  { value: "10", label: "پایه دهم" },
-  { value: "11", label: "پایه یازدهم" },
-  { value: "12", label: "پایه دوازدهم" },
-] as const;
+import { ALL_GRADE_OPTIONS, getGradeOptions, type EducationStage } from "@/lib/academic-policy";
 
 const MAJOR_LABELS_BY_CODE: Readonly<Record<string, string>> = {
   math: "ریاضی فیزیک",
@@ -17,7 +12,7 @@ export interface ClassViewModel {
   name: string;
   gradeId: string;
   gradeName: string;
-  majorId: string;
+  majorId: string | null;
   majorName: string;
   studentCapacity: number;
 }
@@ -28,8 +23,9 @@ export interface PickerOption {
   searchText: string;
 }
 
-export const resolveGradeName = (gradeId: string) =>
-  GRADE_OPTIONS.find((grade) => grade.value === gradeId)?.label ?? `پایه ${gradeId}`;
+export const resolveGradeName = (gradeId: string, stage?: EducationStage | null) =>
+  (stage ? getGradeOptions(stage) : ALL_GRADE_OPTIONS).find((grade) => grade.value === gradeId)
+    ?.label ?? `پایه ${gradeId}`;
 
 export const getMajorDisplayName = (major: Pick<Major, "code" | "name">) =>
   MAJOR_LABELS_BY_CODE[major.code.trim().toLocaleLowerCase("en-US")] ?? major.name;
@@ -42,17 +38,22 @@ export const selectMajorOptions = (majors: Major[]) =>
       label: getMajorDisplayName(major),
     }));
 
-export const resolveMajorName = (majorId: string, majors: Major[]) => {
+export const resolveMajorName = (majorId: string | null, majors: Major[]) => {
+  if (majorId === null) return "";
   const major = majors.find((item) => item.id === majorId);
   return major ? getMajorDisplayName(major) : majorId;
 };
 
-export const selectClassViewModels = (classes: Class[], majors: Major[]): ClassViewModel[] =>
+export const selectClassViewModels = (
+  classes: Class[],
+  majors: Major[],
+  stage?: EducationStage | null,
+): ClassViewModel[] =>
   classes.map((schoolClass) => ({
     id: schoolClass.id,
     name: schoolClass.name,
     gradeId: schoolClass.gradeId,
-    gradeName: resolveGradeName(schoolClass.gradeId),
+    gradeName: resolveGradeName(schoolClass.gradeId, stage),
     majorId: schoolClass.majorId,
     majorName: resolveMajorName(schoolClass.majorId, majors),
     studentCapacity: schoolClass.studentCapacity,

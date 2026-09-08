@@ -28,14 +28,14 @@ test("desktop and mobile Sidebar share the Schools, Classes, Teachers navigation
   const entries = [...navigationSource.matchAll(/name: "([^"]+)", href: "([^"]+)"/g)].map(
     ([, name, href]) => ({ name, href }),
   );
-  const schoolsIndex = entries.findIndex((item) => item.name === "مدارس");
+  const schoolsIndex = entries.findIndex((item) => item.name === "مدرسه");
   const classesIndex = entries.findIndex((item) => item.name === "کلاس‌ها");
   const teachersIndex = entries.findIndex((item) => item.name === "معلمان");
 
   assert.ok(schoolsIndex < classesIndex);
   assert.ok(classesIndex < teachersIndex);
   assert.deepEqual(entries.slice(schoolsIndex, teachersIndex + 1), [
-    { name: "مدارس", href: "/dashboard/schools" },
+    { name: "مدرسه", href: "/dashboard/schools" },
     { name: "کلاس‌ها", href: "/dashboard/classes" },
     { name: "معلمان", href: "/dashboard/teachers" },
   ]);
@@ -82,21 +82,22 @@ test("wide scheduling surfaces scroll locally and mobile controls wrap without s
   const master = await readSource("../src/components/timetable/school-master-timetable.tsx");
   const entity = await readSource("../src/components/timetable/entity-timetable.tsx");
   const preview = await readSource("../src/components/generator/timetable-preview.tsx");
-  const toolbar = await readSource("../src/components/timetable/weekly-timetable-toolbar.tsx");
+  const actions = await readSource("../src/components/timetable/timetable-page-actions.tsx");
   assert.match(master, /timetable-scroll[^"]*overflow-auto/);
   assert.match(entity, /timetable-scroll[^"]*overflow-auto/);
   assert.match(preview, /w-full overflow-auto/);
-  assert.match(toolbar, /grid grid-cols-2 gap-2 sm:flex/);
-  assert.match(toolbar, /col-span-2 sm:col-auto/);
+  assert.match(actions, /grid grid-cols-2 gap-2 sm:flex/);
+  assert.match(actions, /col-span-2 sm:col-auto/);
 });
 
 test("mobile landscape gives the timetable one touch scroller and compact sticky context", async () => {
-  const [route, fullscreen, master, entity, toolbar, styles] = await Promise.all([
+  const [route, fullscreen, master, entity, toolbar, actions, styles] = await Promise.all([
     readSource("../src/routes/dashboard.timetable.tsx"),
     readSource("../src/components/timetable/fullscreen-timetable-overview.tsx"),
     readSource("../src/components/timetable/school-master-timetable.tsx"),
     readSource("../src/components/timetable/entity-timetable.tsx"),
     readSource("../src/components/timetable/weekly-timetable-toolbar.tsx"),
+    readSource("../src/components/timetable/timetable-page-actions.tsx"),
     readSource("../src/styles.css"),
   ]);
 
@@ -110,7 +111,7 @@ test("mobile landscape gives the timetable one touch scroller and compact sticky
   assert.match(master, /timetable-sticky-period/);
   assert.match(entity, /timetable-sticky-entity-period/);
   assert.match(toolbar, /timetable-toolbar-primary/);
-  assert.match(toolbar, /timetable-toolbar-actions/);
+  assert.match(actions, /timetable-toolbar-actions/);
   assert.match(toolbar, /timetable-context-controls/);
   assert.match(styles, /orientation: landscape/);
   assert.match(styles, /max-width: 950px/);
@@ -121,7 +122,8 @@ test("mobile landscape gives the timetable one touch scroller and compact sticky
   assert.match(styles, /\.timetable-sticky-period\s*\{[^}]*right: 4rem/s);
   assert.match(styles, /@media \(max-width: 639px\)/);
   assert.match(styles, /\.timetable-sticky-period\s*\{[^}]*width: 3rem/s);
-  assert.match(styles, /grid-template-areas:\s*"views actions"\s*"context context"/s);
+  assert.match(toolbar, /xl:flex-row xl:items-center/);
+  assert.match(styles, /\.timetable-toolbar-filters\s*\{[^}]*flex-wrap: nowrap;/s);
   assert.match(styles, /html\.timetable-fullscreen-active #mobile-dashboard-menu-trigger/);
 });
 

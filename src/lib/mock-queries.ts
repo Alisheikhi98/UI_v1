@@ -225,11 +225,12 @@ export function useClassesRepository(params: RepositoryListParams = {}) {
   );
 }
 
-export function useMajorsRepository() {
+export function useMajorsRepository(enabled = true) {
   return useQuery<Major[]>({
     queryKey: repositoryQueryKeys.majors(),
     queryFn: ({ signal }) => repositories.majors.repository.list({ signal }),
     initialData: useMockApi ? repositories.majors.initialData?.items : undefined,
+    enabled,
   });
 }
 

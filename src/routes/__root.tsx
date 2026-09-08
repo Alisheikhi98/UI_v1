@@ -12,8 +12,14 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { buildLoginUrl, clearAuthenticatedSession } from "@/lib/auth-session";
+import { GoogleAnalyticsPageViews } from "@/components/google-analytics-page-views";
+import { AuthSessionProvider, buildLoginUrl, clearAuthenticatedSession } from "@/lib/auth-session";
 import { APP_NAME } from "@/lib/branding";
+import {
+  GOOGLE_ANALYTICS_BOOTSTRAP,
+  GOOGLE_ANALYTICS_ENABLED,
+  GOOGLE_ANALYTICS_SCRIPT_URL,
+} from "@/lib/google-analytics";
 
 function NotFoundComponent() {
   return (
@@ -83,15 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: APP_NAME },
       { name: "description", content: "سامانه هوشمند مدیریت برنامه درسی مدارس" },
     ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap",
-      },
-      { rel: "stylesheet", href: appCss },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -104,6 +102,12 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="fa" dir="rtl">
       <head>
         <HeadContent />
+        {GOOGLE_ANALYTICS_ENABLED ? (
+          <>
+            <script async src={GOOGLE_ANALYTICS_SCRIPT_URL} />
+            <script dangerouslySetInnerHTML={{ __html: GOOGLE_ANALYTICS_BOOTSTRAP }} />
+          </>
+        ) : null}
       </head>
       <body>
         {children}
@@ -118,19 +122,23 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <UnauthorizedRecovery />
-      <Outlet />
-      <Toaster richColors position="top-left" />
+      <AuthSessionProvider>
+        <UnauthorizedRecovery />
+        <GoogleAnalyticsPageViews />
+        <Outlet />
+        <Toaster richColors position="top-left" />
+      </AuthSessionProvider>
     </QueryClientProvider>
   );
 }
 
 function UnauthorizedRecovery() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
   const recoveryInProgress = useRef(false);
 
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = async () => {
       if (recoveryInProgress.current) return;
       recoveryInProgress.current = true;
 
@@ -138,16 +146,20 @@ function UnauthorizedRecovery() {
 
       if (window.location.pathname !== "/auth/login") {
         const destination = `${window.location.pathname}${window.location.search}`;
-        window.location.replace(buildLoginUrl(destination));
-        return;
+        try {
+          await router.navigate({ href: buildLoginUrl(destination), replace: true });
+        } finally {
+          recoveryInProgress.current = false;
+        }
+      } else {
+        recoveryInProgress.current = false;
       }
-
-      recoveryInProgress.current = false;
     };
 
-    window.addEventListener("api:unauthorized", handleUnauthorized);
-    return () => window.removeEventListener("api:unauthorized", handleUnauthorized);
-  }, [queryClient]);
+    const handleUnauthorizedEvent = () => void handleUnauthorized();
+    window.addEventListener("api:unauthorized", handleUnauthorizedEvent);
+    return () => window.removeEventListener("api:unauthorized", handleUnauthorizedEvent);
+  }, [queryClient, router]);
 
   return null;
 }

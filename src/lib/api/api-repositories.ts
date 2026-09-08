@@ -349,9 +349,11 @@ export class ApiCourseRepository implements CourseRepository {
     options?: RepositoryRequestOptions,
   ): Promise<Course> {
     const schoolId = requireSchoolId(this.getSchoolId);
-    const payload: Record<string, string | number> = {};
+    const payload: Record<string, string | number | null> = {};
     if (input.name !== undefined) payload.name = input.name;
-    if (input.majorId !== undefined) payload.major_id = toApiId(input.majorId, "majorId");
+    if (input.majorId !== undefined) {
+      payload.major_id = input.majorId === null ? null : toApiId(input.majorId, "majorId");
+    }
     if (input.gradeId !== undefined) payload.grade = Number(input.gradeId);
     if (input.category !== undefined) payload.category = input.category;
     return mapCourse(
@@ -418,7 +420,7 @@ export class ApiClassRepository implements ClassRepository {
         body: JSON.stringify({
           name: input.name,
           grade: Number(input.gradeId),
-          major_id: toApiId(input.majorId, "majorId"),
+          major_id: input.majorId === null ? null : toApiId(input.majorId, "majorId"),
         }),
       }),
     );
@@ -430,10 +432,12 @@ export class ApiClassRepository implements ClassRepository {
     options?: RepositoryRequestOptions,
   ): Promise<Class> {
     const schoolId = requireSchoolId(this.getSchoolId);
-    const payload: Record<string, string | number> = {};
+    const payload: Record<string, string | number | null> = {};
     if (input.name !== undefined) payload.name = input.name;
     if (input.gradeId !== undefined) payload.grade = Number(input.gradeId);
-    if (input.majorId !== undefined) payload.major_id = toApiId(input.majorId, "majorId");
+    if (input.majorId !== undefined) {
+      payload.major_id = input.majorId === null ? null : toApiId(input.majorId, "majorId");
+    }
     return mapClass(
       await apiRequest<ClassDto>(`/schools/${schoolId}/classes/${toApiId(id, "classId")}`, {
         ...withSignal(options),

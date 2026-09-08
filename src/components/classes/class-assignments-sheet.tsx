@@ -267,7 +267,8 @@ export function ClassAssignmentsSheet({
             <div className="flex w-full flex-col items-center px-2 text-center">
               <DialogTitle className="w-full truncate text-center text-lg">مدیریت کلاس</DialogTitle>
               <p className="mt-1 w-full text-center text-sm text-muted-foreground">
-                {classItem.gradeName} • رشته {classItem.majorName}
+                {classItem.gradeName}
+                {classItem.majorName ? ` • رشته ${classItem.majorName}` : ""}
               </p>
               <DialogDescription className="mt-2 w-full text-center">
                 درس، معلم و تعداد زنگ هفتگی هر ردیف را مشخص کنید.

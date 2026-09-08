@@ -14,10 +14,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardTimetableRouteImport } from './routes/dashboard.timetable'
 import { Route as DashboardTeachersRouteImport } from './routes/dashboard.teachers'
+import { Route as DashboardSubscriptionRouteImport } from './routes/dashboard.subscription'
 import { Route as DashboardSubjectsRouteImport } from './routes/dashboard.subjects'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchoolsRouteImport } from './routes/dashboard.schools'
 import { Route as DashboardGeneratorRouteImport } from './routes/dashboard.generator'
+import { Route as DashboardContactRouteImport } from './routes/dashboard.contact'
 import { Route as DashboardClassesRouteImport } from './routes/dashboard.classes'
 import { Route as AuthRegisterRouteImport } from './routes/auth.register'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
@@ -48,6 +50,11 @@ const DashboardTeachersRoute = DashboardTeachersRouteImport.update({
   path: '/teachers',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSubscriptionRoute = DashboardSubscriptionRouteImport.update({
+  id: '/subscription',
+  path: '/subscription',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardSubjectsRoute = DashboardSubjectsRouteImport.update({
   id: '/subjects',
   path: '/subjects',
@@ -66,6 +73,11 @@ const DashboardSchoolsRoute = DashboardSchoolsRouteImport.update({
 const DashboardGeneratorRoute = DashboardGeneratorRouteImport.update({
   id: '/generator',
   path: '/generator',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardContactRoute = DashboardContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardClassesRoute = DashboardClassesRouteImport.update({
@@ -96,10 +108,12 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/dashboard/classes': typeof DashboardClassesRoute
+  '/dashboard/contact': typeof DashboardContactRoute
   '/dashboard/generator': typeof DashboardGeneratorRoute
   '/dashboard/schools': typeof DashboardSchoolsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/subjects': typeof DashboardSubjectsRoute
+  '/dashboard/subscription': typeof DashboardSubscriptionRoute
   '/dashboard/teachers': typeof DashboardTeachersRoute
   '/dashboard/timetable': typeof DashboardTimetableRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -110,10 +124,12 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/dashboard/classes': typeof DashboardClassesRoute
+  '/dashboard/contact': typeof DashboardContactRoute
   '/dashboard/generator': typeof DashboardGeneratorRoute
   '/dashboard/schools': typeof DashboardSchoolsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/subjects': typeof DashboardSubjectsRoute
+  '/dashboard/subscription': typeof DashboardSubscriptionRoute
   '/dashboard/teachers': typeof DashboardTeachersRoute
   '/dashboard/timetable': typeof DashboardTimetableRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -126,10 +142,12 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/dashboard/classes': typeof DashboardClassesRoute
+  '/dashboard/contact': typeof DashboardContactRoute
   '/dashboard/generator': typeof DashboardGeneratorRoute
   '/dashboard/schools': typeof DashboardSchoolsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/subjects': typeof DashboardSubjectsRoute
+  '/dashboard/subscription': typeof DashboardSubscriptionRoute
   '/dashboard/teachers': typeof DashboardTeachersRoute
   '/dashboard/timetable': typeof DashboardTimetableRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -143,10 +161,12 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register'
     | '/dashboard/classes'
+    | '/dashboard/contact'
     | '/dashboard/generator'
     | '/dashboard/schools'
     | '/dashboard/settings'
     | '/dashboard/subjects'
+    | '/dashboard/subscription'
     | '/dashboard/teachers'
     | '/dashboard/timetable'
     | '/dashboard/'
@@ -157,10 +177,12 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register'
     | '/dashboard/classes'
+    | '/dashboard/contact'
     | '/dashboard/generator'
     | '/dashboard/schools'
     | '/dashboard/settings'
     | '/dashboard/subjects'
+    | '/dashboard/subscription'
     | '/dashboard/teachers'
     | '/dashboard/timetable'
     | '/dashboard'
@@ -172,10 +194,12 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register'
     | '/dashboard/classes'
+    | '/dashboard/contact'
     | '/dashboard/generator'
     | '/dashboard/schools'
     | '/dashboard/settings'
     | '/dashboard/subjects'
+    | '/dashboard/subscription'
     | '/dashboard/teachers'
     | '/dashboard/timetable'
     | '/dashboard/'
@@ -226,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTeachersRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/subscription': {
+      id: '/dashboard/subscription'
+      path: '/subscription'
+      fullPath: '/dashboard/subscription'
+      preLoaderRoute: typeof DashboardSubscriptionRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/subjects': {
       id: '/dashboard/subjects'
       path: '/subjects'
@@ -252,6 +283,13 @@ declare module '@tanstack/react-router' {
       path: '/generator'
       fullPath: '/dashboard/generator'
       preLoaderRoute: typeof DashboardGeneratorRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/contact': {
+      id: '/dashboard/contact'
+      path: '/contact'
+      fullPath: '/dashboard/contact'
+      preLoaderRoute: typeof DashboardContactRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/classes': {
@@ -287,10 +325,12 @@ declare module '@tanstack/react-router' {
 
 interface DashboardRouteChildren {
   DashboardClassesRoute: typeof DashboardClassesRoute
+  DashboardContactRoute: typeof DashboardContactRoute
   DashboardGeneratorRoute: typeof DashboardGeneratorRoute
   DashboardSchoolsRoute: typeof DashboardSchoolsRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSubjectsRoute: typeof DashboardSubjectsRoute
+  DashboardSubscriptionRoute: typeof DashboardSubscriptionRoute
   DashboardTeachersRoute: typeof DashboardTeachersRoute
   DashboardTimetableRoute: typeof DashboardTimetableRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -298,10 +338,12 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardClassesRoute: DashboardClassesRoute,
+  DashboardContactRoute: DashboardContactRoute,
   DashboardGeneratorRoute: DashboardGeneratorRoute,
   DashboardSchoolsRoute: DashboardSchoolsRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSubjectsRoute: DashboardSubjectsRoute,
+  DashboardSubscriptionRoute: DashboardSubscriptionRoute,
   DashboardTeachersRoute: DashboardTeachersRoute,
   DashboardTimetableRoute: DashboardTimetableRoute,
   DashboardIndexRoute: DashboardIndexRoute,

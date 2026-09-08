@@ -6,6 +6,25 @@ import { getWeekdayDisplayLabel } from "@/lib/weekday-labels";
 
 export type TimetableViewMode = "school" | "class" | "teacher";
 
+export interface TimetableRouteSearch {
+  mode?: TimetableViewMode;
+  classId?: string;
+  teacherId?: string;
+}
+
+export function parseTimetableRouteSearch(search: Record<string, unknown>): TimetableRouteSearch {
+  const mode =
+    search.mode === "school" || search.mode === "class" || search.mode === "teacher"
+      ? search.mode
+      : undefined;
+  const classId =
+    typeof search.classId === "string" ? search.classId.trim() || undefined : undefined;
+  const teacherId =
+    typeof search.teacherId === "string" ? search.teacherId.trim() || undefined : undefined;
+
+  return { mode, classId, teacherId };
+}
+
 export interface TimetableDay {
   id: string;
   backendName: string;
@@ -275,10 +294,10 @@ export function normalizePublishedTimetable({
     return {
       id: item.id,
       name: item.name,
-      shortName: `${gradeLabel} • ${majorLabel}`,
+      shortName: majorLabel ? `${gradeLabel} • ${majorLabel}` : gradeLabel,
       gradeId: item.gradeId,
       gradeLabel,
-      majorId: item.majorId,
+      majorId: item.majorId ?? "",
       majorLabel,
     };
   });

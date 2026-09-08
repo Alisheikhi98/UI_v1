@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TimetableViewMode } from "@/lib/timetable";
 
 export function TimetableViewHeader({
@@ -5,11 +6,13 @@ export function TimetableViewHeader({
   schoolName,
   selectedClassName,
   selectedTeacherName,
+  children,
 }: {
   mode: TimetableViewMode;
   schoolName: string;
   selectedClassName?: string;
   selectedTeacherName?: string;
+  children?: ReactNode;
 }) {
   const title =
     mode === "school"
@@ -23,9 +26,15 @@ export function TimetableViewHeader({
   if (!title) return null;
 
   return (
-    <div className="border-b bg-background px-3 py-2.5 sm:px-4" data-testid="timetable-view-header">
-      <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
-      {mode === "school" && <p className="mt-0.5 text-xs text-muted-foreground">{schoolName}</p>}
+    <div
+      className="flex flex-col gap-2 border-b bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+      data-testid="timetable-view-header"
+    >
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
+        {mode === "school" && <p className="mt-0.5 text-xs text-muted-foreground">{schoolName}</p>}
+      </div>
+      {children}
     </div>
   );
 }

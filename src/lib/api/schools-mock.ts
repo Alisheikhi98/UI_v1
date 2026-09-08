@@ -1,6 +1,7 @@
 import type { SchoolPersistenceAdapter } from "@/lib/api/school-repository";
 import type { School, SchoolFormData } from "@/lib/api/schools-store";
 import { BACKEND_WEEKDAY_NAMES, getWeekdayDisplayLabel } from "../weekday-labels.ts";
+import { EDUCATION_STAGES } from "../academic-policy.ts";
 
 const STORAGE_KEY = "dev_mock_schools";
 
@@ -9,6 +10,7 @@ const INITIAL_SCHOOLS: readonly School[] = [
     id: 1,
     name: "Development School",
     slug: "development-school",
+    educationStage: EDUCATION_STAGES.secondarySecond,
     status: "active",
     dayOptions: BACKEND_WEEKDAY_NAMES.map((name, index) => ({
       id: index + 1,
@@ -76,6 +78,7 @@ export class MockSchoolPersistenceAdapter implements SchoolPersistenceAdapter {
     const updated: School = {
       ...clone(data),
       id,
+      educationStage: current.educationStage,
       status: current.status,
       dayOptions: current.dayOptions,
       createdAt: current.createdAt,
@@ -101,7 +104,12 @@ export class MockSchoolPersistenceAdapter implements SchoolPersistenceAdapter {
     }
 
     try {
-      return JSON.parse(stored) as School[];
+      return (
+        JSON.parse(stored) as Array<School & { educationStage?: School["educationStage"] }>
+      ).map((school) => ({
+        ...school,
+        educationStage: school.educationStage ?? EDUCATION_STAGES.secondarySecond,
+      }));
     } catch {
       const seeded = clone([...INITIAL_SCHOOLS]);
       this.write(seeded);

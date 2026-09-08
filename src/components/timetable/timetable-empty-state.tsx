@@ -8,7 +8,7 @@ export function TimetableEmptyState({
   kind: "no-final" | "no-class" | "no-teacher" | "no-lessons" | "load-error";
 }) {
   const content = {
-    "no-final": "هنوز برنامه هفتگی نهایی ثبت نشده است.",
+    "no-final": "برنامه هفتگی هنوز آماده نیست.",
     "no-class": "برای مشاهده برنامه، یک کلاس انتخاب کنید.",
     "no-teacher": "برای مشاهده برنامه، یک معلم انتخاب کنید.",
     "no-lessons": "برای مورد انتخاب‌شده هنوز درسی در برنامه قرار نگرفته است.",

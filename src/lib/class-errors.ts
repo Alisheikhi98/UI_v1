@@ -84,7 +84,7 @@ export function getClassDeleteErrorMessage(error: unknown): string {
 
 export function getCourseErrorMessage(error: unknown): string {
   if (error instanceof IncompatibleCreatedCourseError) {
-    return "درس ایجاد شد، اما با پایه و رشته این کلاس سازگار نیست.";
+    return "درس ایجاد شد، اما با مشخصات تحصیلی این کلاس سازگار نیست.";
   }
   if (!isApiError(error)) return "عملیات درس با خطا مواجه شد. دوباره تلاش کنید.";
   const commonMessage = commonApiErrorMessage(error);

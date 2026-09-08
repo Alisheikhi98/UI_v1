@@ -65,6 +65,47 @@ describe("Schools page presentation", () => {
     expect(source).toContain("shiftTimeByMinutes(current.timing.dayStart, 15)");
     expect(source).toContain("shiftTimeByMinutes(current.timing.dayStart, -15)");
   });
+
+  test("safe School deletion is edit-only and requires explicit confirmation", async () => {
+    const source = await readSource("../src/routes/dashboard.schools.tsx");
+    expect(source).toContain("{editing ? (");
+    expect(source).toContain("setDeleteConfirmationOpen(true)");
+    expect(source).toContain("تمام اطلاعات مربوط به کلاس‌ها و معلمان این مدرسه حذف می‌شوند");
+    expect(source).toContain("open={deleteConfirmationOpen}");
+    expect(source).toContain("await onDelete()");
+    expect(source).toContain("deleteInFlightRef.current");
+    const initialDeleteAction = source.slice(
+      source.indexOf("setDeleteConfirmationOpen(true)"),
+      source.indexOf("<AlertDialog", source.indexOf("setDeleteConfirmationOpen(true)")),
+    );
+    expect(initialDeleteAction).not.toContain("handleDelete");
+    expect(source).toContain("onClick={handleDelete}");
+  });
+
+  test("School level is selectable only while creating a School", async () => {
+    const source = await readSource("../src/routes/dashboard.schools.tsx");
+    const store = await readSource("../src/lib/api/schools-store.ts");
+    expect(source).toContain('labelNote={editing ? "قابل ویرایش نیست." : undefined}');
+    expect(source).toContain("disabled={Boolean(editing)}");
+    expect(source).toContain("EDUCATION_STAGE_OPTIONS.map");
+    expect(source).toContain("setForm({ ...form, educationStage })");
+    expect(source).not.toContain("مقطع ثبت‌شده:");
+    expect(store).toContain("body: JSON.stringify({ name: data.name, slug: data.slug })");
+    expect(store).not.toMatch(
+      /updateSchoolWithApi[\s\S]*?body: JSON\.stringify\(\{[^}]*education_stage/,
+    );
+  });
+
+  test("School delete action stays in the footer with pending and error feedback", async () => {
+    const source = await readSource("../src/routes/dashboard.schools.tsx");
+    const footer = source.slice(source.indexOf('<DialogFooter className="border-t pt-4'));
+    expect(footer).toContain("sm:justify-between");
+    expect(footer).toContain("حذف مدرسه");
+    expect(footer).toContain("در حال حذف…");
+    expect(footer).toContain('role="alert"');
+    expect(source).toContain("getSchoolDeleteErrorMessage(error)");
+    expect(footer).not.toContain("error.message");
+  });
 });
 
 describe("Independent School breaks", () => {

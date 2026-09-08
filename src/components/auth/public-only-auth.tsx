@@ -1,8 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { useAuthenticatedUser } from "@/lib/auth-session";
-import { useAccessToken } from "@/lib/auth-token";
+import { useAuthSession } from "@/lib/auth-session";
 
 export function PublicOnlyAuth({
   children,
@@ -11,17 +10,16 @@ export function PublicOnlyAuth({
   children: ReactNode;
   authenticatedDestination?: string;
 }) {
-  const token = useAccessToken();
-  const userQuery = useAuthenticatedUser();
+  const session = useAuthSession();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (userQuery.data) {
+    if (session.status === "authenticated") {
       void navigate({ to: authenticatedDestination as "/dashboard", replace: true });
     }
-  }, [authenticatedDestination, navigate, userQuery.data]);
+  }, [authenticatedDestination, navigate, session.status]);
 
-  if (token && (userQuery.isPending || userQuery.isSuccess)) {
+  if (session.status !== "unauthenticated") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

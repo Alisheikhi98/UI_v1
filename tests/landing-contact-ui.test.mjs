@@ -24,13 +24,14 @@ describe("landing and dashboard contact experience", () => {
     expect(source).not.toContain("مشاهده دمو");
   });
 
-  test("replaces the notification control with an accessible contact popover", async () => {
+  test("removes dashboard Search and Contact controls in favor of the Subscription link", async () => {
     const source = await readSource("../src/components/header.tsx");
 
-    expect(source).toContain("PhoneCall");
-    expect(source).toContain("<Popover>");
-    expect(source).toContain("aria-label={CONTACT_INFO.title}");
-    expect(source).toContain("<ContactChannels />");
+    expect(source).toContain('to="/dashboard/subscription"');
+    expect(source).toContain("وضعیت اشتراک در دسترس نیست");
+    expect(source).not.toContain("SearchInput");
+    expect(source).not.toContain("PhoneCall");
+    expect(source).not.toContain("<Popover>");
     expect(source).not.toContain("Bell");
     expect(source).not.toContain("اعلان‌ها");
   });
@@ -45,18 +46,18 @@ describe("landing and dashboard contact experience", () => {
     expect(source).not.toContain("toast(");
   });
 
-  test("keeps the landing and contact popover within narrow viewports", async () => {
-    const [landing, header, popover] = await Promise.all([
+  test("keeps the landing and Subscription header link within narrow viewports", async () => {
+    const [landing, header] = await Promise.all([
       readSource("../src/routes/index.tsx"),
       readSource("../src/components/header.tsx"),
-      readSource("../src/components/ui/popover.tsx"),
     ]);
 
     expect(landing).toContain("overflow-x-clip");
     expect(landing).toContain("lg:grid-cols-[1.05fr_0.95fr]");
     expect(landing).toContain("md:grid-cols-3");
-    expect(header).toContain("w-[calc(100vw-2rem)] max-w-80");
-    expect(popover).toContain("max-w-[calc(100vw-1rem)]");
+    expect(header).toContain("max-w-44");
+    expect(header).toContain("sm:max-w-56");
+    expect(header).toContain("truncate");
   });
 
   test("centers every landing container and keeps card groups full width", async () => {
@@ -73,31 +74,35 @@ describe("landing and dashboard contact experience", () => {
   });
 
   test("renders four capability-based plans with only the approved paid-plan prices", async () => {
-    const source = await readSource("../src/routes/index.tsx");
+    const [source, plans] = await Promise.all([
+      readSource("../src/routes/index.tsx"),
+      readSource("../src/lib/plans.ts"),
+    ]);
 
     for (const planName of ["پلن آزمایشی پایه", "پلن حرفه‌ای", "پلن پیشرفته", "پلن سازمانی"]) {
-      expect(source).toContain(planName);
+      expect(plans).toContain(planName);
     }
 
+    expect(source).toContain("PLAN_CATALOG.map");
     expect(source).toContain("پلن مناسب مدرسه خود را انتخاب کنید");
-    expect(source).toContain("۵ روز اعتبار");
-    expect(source).toContain("حداکثر ۲۰ بار ساخت برنامه در کل دوره");
-    expect(source).toContain(
+    expect(plans).toContain("۵ روز اعتبار");
+    expect(plans).toContain("حداکثر ۲۰ بار ساخت برنامه در کل دوره");
+    expect(plans).toContain(
       "ظرفیت دبیر و کلاس این پلن برای ارزیابی کامل سامانه بازتر است، اما دوره فقط ۵ روز و حداکثر ۲۰ بار ساخت برنامه فعال است.",
     );
-    expect(source).toContain("پیشنهاد ویژه");
-    expect(source).toContain("تماس برای مشاوره");
-    expect(source).toContain('price: "۱٬۵۰۰٬۰۰۰"');
-    expect(source).toContain('price: "۲٬۵۰۰٬۰۰۰"');
-    expect(source.match(/price: "/g)).toHaveLength(2);
-    expect(source).not.toContain("ریال");
+    expect(plans).toContain("پیشنهاد ویژه");
+    expect(plans).toContain("تماس برای مشاوره");
+    expect(plans).toContain('price: "۱٬۵۰۰٬۰۰۰"');
+    expect(plans).toContain('price: "۲٬۵۰۰٬۰۰۰"');
+    expect(plans.match(/price: "/g)).toHaveLength(2);
+    expect(plans).not.toContain("ریال");
   });
 
   test("uses honest responsive plan CTAs and the existing Contact section", async () => {
     const source = await readSource("../src/routes/index.tsx");
 
-    expect(source).toContain('<Link to="/auth/register">{plan.cta}</Link>');
-    expect(source).toContain('<a href="#contact">{plan.cta}</a>');
+    expect(source).toContain('<Link to="/auth/register">{plan.landingCta}</Link>');
+    expect(source).toContain('<a href="#contact">{plan.landingCta}</a>');
     expect(source).toContain('id="contact"');
     expect(source).toContain("md:grid-cols-2 xl:grid-cols-4");
     expect(source).toContain("max-w-7xl");
@@ -115,14 +120,17 @@ describe("landing and dashboard contact experience", () => {
   });
 
   test("gives every plan a distinct restrained visual treatment", async () => {
-    const source = await readSource("../src/routes/index.tsx");
+    const [source, plans] = await Promise.all([
+      readSource("../src/routes/index.tsx"),
+      readSource("../src/lib/plans.ts"),
+    ]);
 
-    expect(source).toContain("border-sky-200/80 bg-sky-50/35");
-    expect(source).toContain("border-emerald-200/80 bg-emerald-50/30");
-    expect(source).toContain("border-indigo-400/80 bg-indigo-50/45 shadow-lg");
-    expect(source).toContain("border-amber-200/90 bg-amber-50/35");
+    expect(plans).toContain("border-sky-200/80 bg-sky-50/35");
+    expect(plans).toContain("border-emerald-200/80 bg-emerald-50/30");
+    expect(plans).toContain("border-indigo-400/80 bg-indigo-50/45 shadow-lg");
+    expect(plans).toContain("border-amber-200/90 bg-amber-50/35");
     expect(source).toContain("motion-reduce:transition-none");
-    expect(source).toContain("پیشنهاد ویژه");
+    expect(source).toContain("plan.badge");
   });
 
   test("keeps the Advanced badge on the physical left without changing header height", async () => {
@@ -137,7 +145,7 @@ describe("landing and dashboard contact experience", () => {
     const source = await readSource("../src/routes/index.tsx");
     const featuresIndex = source.indexOf('<ul className="flex-1 space-y-3"');
     const priceIndex = source.indexOf('"price" in plan', featuresIndex);
-    const ctaIndex = source.indexOf('plan.destination === "register"', priceIndex);
+    const ctaIndex = source.indexOf('plan.landingDestination === "register"', priceIndex);
 
     expect(featuresIndex).toBeGreaterThan(-1);
     expect(priceIndex).toBeGreaterThan(featuresIndex);

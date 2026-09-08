@@ -7,6 +7,8 @@ import {
   Sparkles,
   CalendarDays,
   Settings,
+  CreditCard,
+  MessageCircle,
   LogOut,
   Menu,
   X,
@@ -18,12 +20,14 @@ import { APP_NAME } from "@/lib/branding";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
-  { name: "مدارس", href: "/dashboard/schools", icon: LayoutDashboard },
+  { name: "مدرسه", href: "/dashboard/schools", icon: LayoutDashboard },
   { name: "کلاس‌ها", href: "/dashboard/classes", icon: GraduationCap },
   { name: "معلمان", href: "/dashboard/teachers", icon: Users },
   { name: "تولید برنامه", href: "/dashboard/generator", icon: Sparkles },
   { name: "برنامه هفتگی", href: "/dashboard/timetable", icon: CalendarDays },
+  { name: "طرح و اشتراک", href: "/dashboard/subscription", icon: CreditCard },
   { name: "تنظیمات", href: "/dashboard/settings", icon: Settings },
+  { name: "ارتباط با ما", href: "/dashboard/contact", icon: MessageCircle },
 ];
 
 export function Sidebar({
@@ -103,6 +107,7 @@ export function Sidebar({
                   key={item.name}
                   to={item.href}
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive

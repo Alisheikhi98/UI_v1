@@ -298,9 +298,9 @@ test("blocked and failed PDF preparation produce safe localized errors", async (
 });
 
 test("Weekly Timetable connects server Excel and client PDF without changing print or fullscreen", async () => {
-  const [route, toolbar, exportUtility, excelUtility] = await Promise.all([
+  const [route, actions, exportUtility, excelUtility] = await Promise.all([
     readSource("../src/routes/dashboard.timetable.tsx"),
-    readSource("../src/components/timetable/weekly-timetable-toolbar.tsx"),
+    readSource("../src/components/timetable/timetable-page-actions.tsx"),
     readSource("../src/lib/timetable-export.ts"),
     readSource("../src/lib/api/timetable-excel.ts"),
   ]);
@@ -312,10 +312,10 @@ test("Weekly Timetable connects server Excel and client PDF without changing pri
   assert.match(route, /const pdfExportDisabled = !schoolId \|\| !exportModel/);
   assert.match(route, /pdfExportDisabled=\{pdfExportDisabled\}/);
   assert.match(route, /excelExportDisabled=\{excelExportDisabled\}/);
-  assert.match(toolbar, /دانلود PDF/);
-  assert.match(toolbar, /دانلود Excel/);
-  assert.match(toolbar, /min-h-10/);
-  assert.doesNotMatch(toolbar, /به‌زودی/);
+  assert.match(actions, /دانلود PDF/);
+  assert.match(actions, /دانلود Excel/);
+  assert.match(actions, /min-h-10/);
+  assert.doesNotMatch(actions, /به‌زودی/);
   assert.doesNotMatch(exportUtility, /write-excel-file|SheetData/);
   assert.match(excelUtility, /weekly-plan\.xlsx/);
   assert.match(excelUtility, /URL\.revokeObjectURL/);

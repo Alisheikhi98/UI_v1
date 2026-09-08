@@ -43,5 +43,9 @@ test("protected 401 responses trigger guarded session recovery", async () => {
   const rootSource = await readSource("../src/routes/__root.tsx");
   assert.match(clientSource, /requiresAuth && response\.status === 401/);
   assert.match(rootSource, /clearAuthenticatedSession\(queryClient\)/);
-  assert.match(rootSource, /window\.location\.replace\(buildLoginUrl\(destination\)\)/);
+  assert.match(
+    rootSource,
+    /router\.navigate\(\{ href: buildLoginUrl\(destination\), replace: true \}\)/,
+  );
+  assert.doesNotMatch(rootSource, /window\.location\.replace/);
 });

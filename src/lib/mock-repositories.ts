@@ -191,8 +191,8 @@ const initialClasses: Class[] = [
   },
   {
     id: "3",
-    name: "کلاس ۹-الف",
-    gradeId: "9",
+    name: "کلاس ۱۱-الف",
+    gradeId: "11",
     majorId: "major-3",
     section: "الف",
     studentCapacity: 28,
@@ -200,8 +200,8 @@ const initialClasses: Class[] = [
   },
   {
     id: "4",
-    name: "کلاس ۹-ب",
-    gradeId: "9",
+    name: "کلاس ۱۱-ب",
+    gradeId: "11",
     majorId: "major-1",
     section: "ب",
     studentCapacity: 31,
@@ -209,8 +209,8 @@ const initialClasses: Class[] = [
   },
   {
     id: "5",
-    name: "کلاس ۸-الف",
-    gradeId: "8",
+    name: "کلاس ۱۲-الف",
+    gradeId: "12",
     majorId: "major-2",
     section: "الف",
     studentCapacity: 29,
@@ -218,8 +218,8 @@ const initialClasses: Class[] = [
   },
   {
     id: "6",
-    name: "کلاس ۸-ب",
-    gradeId: "8",
+    name: "کلاس ۱۲-ب",
+    gradeId: "12",
     majorId: "major-3",
     section: "ب",
     studentCapacity: 27,

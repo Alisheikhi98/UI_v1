@@ -34,7 +34,7 @@ export interface Class {
   id: string;
   name: string;
   gradeId: string;
-  majorId: string;
+  majorId: string | null;
   section?: string;
   studentCapacity: number;
   advisorTeacherId?: string;
@@ -52,7 +52,7 @@ export interface Course {
   name: string;
   active: boolean;
   gradeId: string;
-  majorId: string;
+  majorId: string | null;
   category: "general" | "specialized";
   code: string;
   weeklyHours: number;

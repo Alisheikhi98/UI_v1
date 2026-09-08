@@ -125,7 +125,7 @@ describe("Weekly Timetable UI", () => {
       readSource("../src/components/timetable/weekly-timetable-toolbar.tsx"),
     ]);
 
-    expect(routeSource).toContain('useState<TimetableViewMode>("school")');
+    expect(routeSource).toContain('const mode = search.mode ?? "school"');
     expect(routeSource).toContain("usePublishedTimetable()");
     expect(routeSource).not.toContain("demoFinalTimetable");
     expect(routeSource).toContain("<SchoolMasterTimetable");
@@ -182,6 +182,11 @@ describe("Weekly Timetable UI", () => {
     ]);
     expect(routeSource).toContain("<TimetableSummary");
     expect(routeSource).toContain("<TimetableViewHeader");
+    expect(routeSource).toMatch(
+      /<TimetableViewHeader[\s\S]*?<TimetableSummary[\s\S]*?<\/TimetableViewHeader>/,
+    );
+    expect(headingSource).toContain("sm:justify-between");
+    expect(summarySource).not.toContain("border-b bg-muted/15");
     expect(summarySource).toContain("timetable.entries");
     expect(summarySource).toContain("timetable.days.length");
     expect(summarySource).toContain("timetable.periods.length");
@@ -204,10 +209,10 @@ describe("Weekly Timetable UI", () => {
   });
 
   test("print, fullscreen, and real timetable download actions are wired", async () => {
-    const [routeSource, fullscreenSource, toolbarSource, stylesSource] = await Promise.all([
+    const [routeSource, fullscreenSource, actionsSource, stylesSource] = await Promise.all([
       readSource("../src/routes/dashboard.timetable.tsx"),
       readSource("../src/components/timetable/fullscreen-timetable-overview.tsx"),
-      readSource("../src/components/timetable/weekly-timetable-toolbar.tsx"),
+      readSource("../src/components/timetable/timetable-page-actions.tsx"),
       readSource("../src/styles.css"),
     ]);
 
@@ -223,11 +228,11 @@ describe("Weekly Timetable UI", () => {
     expect(fullscreenSource).toContain("orientationchange");
     expect(fullscreenSource).toContain("classes={timetable.classes}");
     expect(fullscreenSource).toContain("<SchoolMasterTimetable");
-    expect(toolbarSource).toContain('onExport("pdf")');
-    expect(toolbarSource).toContain('onExport("excel")');
-    expect(toolbarSource).toContain("دانلود PDF");
-    expect(toolbarSource).toContain("دانلود Excel");
-    expect(toolbarSource).not.toContain("به‌زودی");
+    expect(actionsSource).toContain('onExport("pdf")');
+    expect(actionsSource).toContain('onExport("excel")');
+    expect(actionsSource).toContain("دانلود PDF");
+    expect(actionsSource).toContain("دانلود Excel");
+    expect(actionsSource).not.toContain("به‌زودی");
     expect(routeSource).toContain("createTimetableExportModel");
     expect(routeSource).toContain("downloadWeeklyPlanExcel");
     expect(routeSource).toContain("printTimetablePdf");
@@ -299,6 +304,22 @@ describe("Weekly Timetable UI", () => {
     expect(source).toContain('"no-lessons"');
     expect(source).toContain('"load-error"');
     expect(source).toContain('to="/dashboard/generator"');
+    expect(source).toContain("برنامه هفتگی هنوز آماده نیست.");
+  });
+
+  test("missing published lessons stay inside the Timetable page instead of the root error page", async () => {
+    const [routeSource, querySource] = await Promise.all([
+      readSource("../src/routes/dashboard.timetable.tsx"),
+      readSource("../src/lib/timetable-queries.ts"),
+    ]);
+
+    expect(routeSource).toContain("errorComponent: TimetableRouteError");
+    expect(routeSource).toContain('<TimetableEmptyState kind="no-final" />');
+    expect(routeSource).not.toContain("بازگشت به خانه");
+    expect(querySource).toContain("hasPublishedEntries");
+    expect(querySource).toContain("if (!hasPublishedEntries)");
+    expect(querySource).toContain("entries: []");
+    expect(querySource).toContain("enabled: referenceDataEnabled");
   });
 
   test("published queries are school-scoped and fetch each class schedule without mock fallback", async () => {

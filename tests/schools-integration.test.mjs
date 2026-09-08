@@ -12,6 +12,7 @@ const readSource = async (relativePath) =>
 const schoolInput = {
   name: "مدرسه یک",
   slug: "school-one",
+  educationStage: "secondary_second",
   workingDays: ["شنبه"],
   timing: { periodsCount: 1, dayStart: "08:00", classDuration: 45, breakDuration: 0 },
   periods: [{ index: 1, start: "08:00", end: "08:45" }],
@@ -64,13 +65,41 @@ test("School mutations require an authoritative refetch before success", async (
   assert.match(querySource, /refetchQueries/);
   assert.doesNotMatch(querySource, /setQueryData/);
   assert.match(querySource, /confirmedSchools\.find/);
+  assert.match(querySource, /schoolRepository\.delete\(id\)/);
+  assert.match(querySource, /confirmedSchools\.some/);
+  assert.match(querySource, /setActiveSchoolId/);
+  assert.match(querySource, /removeQueries/);
 });
 
-test("API mode has no School mock fallback and unsupported actions are absent", async () => {
+test("API mode uses the authoritative School soft-delete endpoint without mock fallback", async () => {
   const storeSource = await readSource("../src/lib/api/schools-store.ts");
   const routeSource = await readSource("../src/routes/dashboard.schools.tsx");
   assert.match(storeSource, /USE_MOCK_API\s*\?\s*new \(await import\("\.\/schools-mock"\)\)/);
   assert.doesNotMatch(storeSource, /catch[\s\S]{0,200}schools-mock/);
-  assert.doesNotMatch(routeSource, /deleteTarget|حذف قطعی|school-status/);
+  assert.match(storeSource, /`\/schools\/\$\{id\}`[\s\S]{0,80}method: "DELETE"/);
+  assert.doesNotMatch(routeSource, /classRepository|teacherRepository|courseRepository/);
   assert.match(routeSource, /schools\.length === 0/);
+});
+
+test("Mock School deletion changes only the School repository", async () => {
+  const repository = emptySchoolRepository();
+  const created = await repository.create(schoolInput);
+  await repository.delete(created.id);
+  assert.deepEqual(await repository.getAll(), []);
+});
+
+test("School deletion errors are localized without exposing backend text", async () => {
+  const { ApiError } = await import("../src/lib/api/client.ts");
+  const { getSchoolDeleteErrorMessage } = await import("../src/lib/school-errors.ts");
+  const raw = "duplicate key value violates unique constraint schools_pkey";
+
+  assert.equal(
+    getSchoolDeleteErrorMessage(new ApiError(raw, 403, { detail: raw })),
+    "اجازه حذف این مدرسه را ندارید.",
+  );
+  assert.equal(
+    getSchoolDeleteErrorMessage(new ApiError(raw, 409, { detail: raw })),
+    "حذف مدرسه با وضعیت فعلی اطلاعات امکان‌پذیر نیست.",
+  );
+  assert.doesNotMatch(getSchoolDeleteErrorMessage(new ApiError(raw, 500, raw)), /duplicate key/);
 });

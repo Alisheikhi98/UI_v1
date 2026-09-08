@@ -11,7 +11,6 @@ describe("shared RTL visual primitives", () => {
 
     const consumers = await Promise.all(
       [
-        "../src/components/header.tsx",
         "../src/routes/dashboard.classes.tsx",
         "../src/routes/dashboard.subjects.tsx",
         "../src/routes/dashboard.teachers.tsx",

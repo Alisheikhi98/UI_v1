@@ -1,9 +1,5 @@
-import { PhoneCall } from "lucide-react";
-import { ContactChannels } from "@/components/contact-channels";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SearchInput } from "@/components/ui/search-input";
-import { CONTACT_INFO } from "@/lib/contact-info";
+import { Link } from "@tanstack/react-router";
+import { CreditCard } from "lucide-react";
 
 interface HeaderProps {
   title: string;
@@ -20,42 +16,23 @@ export function Header({ title, description }: HeaderProps) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-4">
-        {/* Search */}
-        <SearchInput
-          containerClassName="hidden md:block"
-          type="search"
-          placeholder="جستجو..."
-          className="w-64"
-        />
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={CONTACT_INFO.title}
-              title={CONTACT_INFO.title}
-            >
-              <PhoneCall className="h-5 w-5" aria-hidden="true" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            dir="rtl"
-            align="start"
-            sideOffset={8}
-            className="w-[calc(100vw-2rem)] max-w-80 rounded-2xl p-3"
-          >
-            <div className="px-1 pb-3 pt-1">
-              <p className="font-semibold">{CONTACT_INFO.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                برای ارتباط با تیم چیدمان، یکی از شناسه‌های بله را کپی کنید.
-              </p>
-            </div>
-            <ContactChannels />
-          </PopoverContent>
-        </Popover>
-      </div>
+      <Link
+        to="/dashboard/subscription"
+        className="flex min-w-0 max-w-44 shrink-0 items-center gap-2 rounded-xl border border-border/70 bg-card px-2.5 py-2 text-start shadow-sm transition-colors hover:border-primary/35 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:max-w-56 sm:px-3"
+        aria-label="مشاهده طرح و اشتراک"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <CreditCard className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-xs font-semibold text-foreground sm:text-sm">
+            طرح و اشتراک
+          </span>
+          <span className="block truncate text-[10px] leading-4 text-muted-foreground sm:text-xs">
+            وضعیت اشتراک در دسترس نیست
+          </span>
+        </span>
+      </Link>
     </header>
   );
 }

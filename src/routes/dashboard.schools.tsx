@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Building2,
+  GraduationCap,
   Calendar,
   Clock,
   Plus,
@@ -13,6 +14,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Loader2,
+  Trash2,
 } from "lucide-react";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,6 +39,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useSchoolsRepository } from "@/lib/api/school-queries";
 import {
   type School,
@@ -39,6 +57,7 @@ import {
   PeriodTime,
 } from "@/lib/api/schools-store";
 import { cn } from "@/lib/utils";
+import { EDUCATION_STAGE_OPTIONS, type EducationStage } from "@/lib/academic-policy";
 import { setActiveSchoolId } from "@/lib/active-school";
 import {
   applyPeriodTimeDrafts,
@@ -53,6 +72,7 @@ import {
   shiftTimeByMinutes,
   updateBreakDuration,
 } from "@/lib/school-schedule";
+import { getSchoolDeleteErrorMessage } from "@/lib/school-errors";
 
 export const Route = createFileRoute("/dashboard/schools")({
   component: SchoolsPage,
@@ -61,6 +81,7 @@ export const Route = createFileRoute("/dashboard/schools")({
 interface FormState {
   name: string;
   slug: string;
+  educationStage: EducationStage | "";
   workingDays: string[];
   timing: {
     periodsCount: number;
@@ -76,6 +97,7 @@ const defaultForm = (): FormState => {
   return {
     name: "",
     slug: "",
+    educationStage: "",
     workingDays: [...DEFAULT_WORKING_DAYS],
     timing,
     periods: calculatePeriods(
@@ -88,21 +110,16 @@ const defaultForm = (): FormState => {
 };
 
 function SchoolsPage() {
-  const { schools, query: schoolsQuery, create, update } = useSchoolsRepository();
+  const {
+    schools,
+    query: schoolsQuery,
+    create,
+    update,
+    remove,
+    isDeleting,
+  } = useSchoolsRepository();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<School | null>(null);
-
-  const stats = useMemo(() => {
-    const totalSchools = schools.length;
-    const activeDaysSet = new Set<string>();
-    schools.forEach((s) => {
-      s.workingDays.forEach((d) => activeDaysSet.add(d));
-    });
-    return {
-      totalSchools,
-      activeDays: activeDaysSet.size,
-    };
-  }, [schools]);
 
   const openCreate = () => {
     setEditing(null);
@@ -130,22 +147,6 @@ function SchoolsPage() {
           )}
         </div>
 
-        {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <StatCard
-            icon={Building2}
-            label="مجموع مدارس"
-            value={stats.totalSchools}
-            tone="primary"
-          />
-          <StatCard
-            icon={Calendar}
-            label="روزهای کاری فعال"
-            value={stats.activeDays}
-            tone="success"
-          />
-        </div>
-
         {/* List / Empty */}
         {schoolsQuery.isPending ? (
           <div className="text-center text-muted-foreground py-12">در حال بارگذاری…</div>
@@ -171,6 +172,14 @@ function SchoolsPage() {
           onOpenChange={setDialogOpen}
           editing={editing}
           dayOptions={editing?.dayOptions.map((day) => day.label) ?? WEEK_DAYS}
+          deleting={isDeleting}
+          onDelete={
+            editing
+              ? async () => {
+                  await remove(editing.id);
+                }
+              : undefined
+          }
           onSubmit={async (data) => {
             try {
               if (editing) {
@@ -190,36 +199,6 @@ function SchoolsPage() {
         />
       </main>
     </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  tone: "primary" | "success";
-}) {
-  const tones = {
-    primary: "bg-primary/10 text-primary",
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  };
-  return (
-    <Card className="relative overflow-hidden">
-      <CardContent className="p-6 flex items-center gap-4">
-        <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", tones[tone])}>
-          <Icon className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold mt-0.5">{value.toLocaleString("fa-IR")}</p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -297,17 +276,24 @@ function SchoolDialog({
   editing,
   dayOptions,
   onSubmit,
+  onDelete,
+  deleting,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: School | null;
   dayOptions: readonly string[];
   onSubmit: (data: SchoolFormData) => Promise<void>;
+  onDelete?: () => Promise<void>;
+  deleting: boolean;
 }) {
   const [form, setForm] = useState<FormState>(defaultForm());
   const [submitting, setSubmitting] = useState(false);
   const [periodsDirty, setPeriodsDirty] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteInFlightRef = useRef(false);
   const [periodTimeDrafts, setPeriodTimeDrafts] = useState<PeriodTimeDrafts>(() =>
     createPeriodTimeDrafts(defaultForm().periods),
   );
@@ -319,6 +305,7 @@ function SchoolDialog({
         ? {
             name: editing.name,
             slug: editing.slug,
+            educationStage: editing.educationStage,
             workingDays: [...editing.workingDays],
             timing:
               editing.periods.length > 0 ? { ...editing.timing } : emptyScheduleDefaults.timing,
@@ -330,6 +317,8 @@ function SchoolDialog({
       setPeriodTimeDrafts(createPeriodTimeDrafts(nextForm.periods));
       setPeriodsDirty(false);
       setScheduleError(null);
+      setDeleteConfirmationOpen(false);
+      setDeleteError(null);
     }
   }, [open, editing]);
 
@@ -449,6 +438,10 @@ function SchoolDialog({
       toast.error("شناسه مدرسه الزامی است");
       return;
     }
+    if (!form.educationStage) {
+      toast.error("انتخاب مقطع مدرسه الزامی است");
+      return;
+    }
     if (!/^[a-z0-9-]+$/.test(form.slug.trim())) {
       toast.error("شناسه مدرسه فقط می‌تواند شامل حروف کوچک انگلیسی، عدد و خط تیره باشد");
       return;
@@ -470,6 +463,7 @@ function SchoolDialog({
       await onSubmit({
         name: form.name.trim(),
         slug: form.slug.trim(),
+        educationStage: form.educationStage,
         workingDays: form.workingDays,
         timing: form.timing,
         periods,
@@ -479,8 +473,27 @@ function SchoolDialog({
     }
   };
 
+  const handleDelete = async () => {
+    if (!onDelete || deleting || deleteInFlightRef.current) return;
+    deleteInFlightRef.current = true;
+    setDeleteError(null);
+    try {
+      await onDelete();
+      setDeleteConfirmationOpen(false);
+      onOpenChange(false);
+      toast.success("مدرسه با موفقیت حذف شد");
+    } catch (error) {
+      setDeleteError(getSchoolDeleteErrorMessage(error));
+    } finally {
+      deleteInFlightRef.current = false;
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !submitting && onOpenChange(nextOpen)}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => !submitting && !deleting && onOpenChange(nextOpen)}
+    >
       <DialogContent dir="rtl" className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader className="w-full text-right sm:text-right">
           <DialogTitle className="flex items-center gap-2 text-right">
@@ -496,7 +509,7 @@ function SchoolDialog({
           {/* Basic info */}
           <section className="space-y-4">
             <SectionTitle icon={Building2} title="اطلاعات پایه" />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="نام مدرسه *" icon={Building2}>
                 <Input
                   value={form.name}
@@ -511,6 +524,30 @@ function SchoolDialog({
                   placeholder="alborz-high-school"
                   dir="ltr"
                 />
+              </Field>
+              <Field
+                label="مقطع *"
+                icon={GraduationCap}
+                labelNote={editing ? "قابل ویرایش نیست." : undefined}
+              >
+                <Select
+                  value={form.educationStage}
+                  disabled={Boolean(editing)}
+                  onValueChange={(educationStage: EducationStage) =>
+                    setForm({ ...form, educationStage })
+                  }
+                >
+                  <SelectTrigger aria-label="مقطع مدرسه">
+                    <SelectValue placeholder="انتخاب مقطع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EDUCATION_STAGE_OPTIONS.map((stage) => (
+                      <SelectItem key={stage.value} value={stage.value}>
+                        {stage.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
           </section>
@@ -766,14 +803,84 @@ function SchoolDialog({
           </section>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-            انصراف
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting} className="gap-2">
-            {submitting ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "ایجاد مدرسه"}
-          </Button>
+        <DialogFooter className="border-t pt-4 sm:block">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {editing ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full gap-2 sm:w-auto"
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteConfirmationOpen(true);
+                }}
+                disabled={submitting || deleting}
+              >
+                <Trash2 className="h-4 w-4" />
+                حذف مدرسه
+              </Button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={submitting || deleting}
+              >
+                انصراف
+              </Button>
+              <Button onClick={handleSubmit} disabled={submitting || deleting} className="gap-2">
+                {submitting ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "ایجاد مدرسه"}
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
+
+        <AlertDialog
+          open={deleteConfirmationOpen}
+          onOpenChange={(nextOpen) => {
+            if (!deleting) {
+              setDeleteConfirmationOpen(nextOpen);
+              if (!nextOpen) setDeleteError(null);
+            }
+          }}
+        >
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader className="text-right sm:text-right">
+              <AlertDialogTitle className="text-right">حذف مدرسه</AlertDialogTitle>
+              <AlertDialogDescription className="text-right leading-7">
+                با حذف این مدرسه، تمام اطلاعات مربوط به کلاس‌ها و معلمان این مدرسه حذف می‌شوند. آیا
+                از حذف مدرسه مطمئن هستید؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {deleteError ? (
+              <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {deleteError}
+              </p>
+            ) : null}
+            <AlertDialogFooter className="gap-2 sm:space-x-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteConfirmationOpen(false)}
+                disabled={deleting}
+              >
+                انصراف
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="gap-2"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {deleting ? "در حال حذف…" : "حذف مدرسه"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
@@ -799,19 +906,22 @@ function Field({
   icon: Icon,
   className,
   labelClassName,
+  labelNote,
   children,
 }: {
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
   labelClassName?: string;
+  labelNote?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <Label className={cn("flex items-center gap-1.5 text-xs font-medium", labelClassName)}>
         {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
-        {label}
+        <span>{label}</span>
+        {labelNote ? <span className="font-normal text-muted-foreground">{labelNote}</span> : null}
       </Label>
       {children}
     </div>

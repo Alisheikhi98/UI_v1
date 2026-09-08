@@ -67,7 +67,7 @@ export const mapCourse = (dto: CourseDto): Course => ({
   name: dto.name,
   active: dto.active,
   gradeId: String(dto.grade),
-  majorId: String(dto.major_id),
+  majorId: dto.major_id === null ? null : String(dto.major_id),
   category: dto.category,
   code: dto.course_code ?? "",
   weeklyHours: 1,
@@ -76,7 +76,7 @@ export const mapCourse = (dto: CourseDto): Course => ({
 
 export const mapCourseCreateInputToDto = (input: CourseCreateInput): CourseCreateDto => ({
   name: input.name,
-  major_id: toApiId(input.majorId, "majorId"),
+  major_id: input.majorId === null ? null : toApiId(input.majorId, "majorId"),
   grade: Number(input.gradeId),
   category: input.category,
 });
@@ -85,7 +85,7 @@ export const mapClass = (dto: ClassDto): Class => ({
   id: String(dto.id),
   name: dto.name,
   gradeId: String(dto.grade),
-  majorId: String(dto.major_id),
+  majorId: dto.major_id === null ? null : String(dto.major_id),
   studentCapacity: 0,
 });
 

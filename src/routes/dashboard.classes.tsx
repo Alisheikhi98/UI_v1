@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import { ClassAssignmentsSheet } from "@/components/classes/class-assignments-sheet";
 import { ClassUnavailableSlotsDialog } from "@/components/classes/class-unavailable-slots-dialog";
-import { GRADE_OPTIONS, type ClassViewModel, useClassManagementData } from "@/lib/class-management";
+import { type ClassViewModel, useClassManagementData } from "@/lib/class-management";
+import { getGradeOptions, supportsMajor, type EducationStage } from "@/lib/academic-policy";
 import { withAppName } from "@/lib/branding";
-import {
-  createClassTimetableFeedbackController,
-  type ClassTimetableFeedback,
-} from "@/lib/class-timetable-feedback";
 import {
   getClassErrorMessage,
   getClassDeleteErrorMessage,
@@ -55,7 +52,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { usePublishedClassScheduleCheck } from "@/lib/timetable-queries";
 import {
   Plus,
   Trash2,
@@ -100,65 +96,37 @@ function EmptyState({ onAddClass }: { onAddClass: () => void }) {
 
 function ViewTimetableAction({
   classItem,
-  feedback,
-  isChecking,
   showLabel = false,
   onClick,
 }: {
   classItem: ClassViewModel;
-  feedback: ClassTimetableFeedback | null;
-  isChecking: boolean;
   showLabel?: boolean;
   onClick: (classItem: ClassViewModel) => void;
 }) {
-  const message = feedback?.classId === classItem.id ? feedback.message : null;
-
   return (
-    <Popover open={Boolean(message)}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant={showLabel ? "outline" : "ghost"}
-              size={showLabel ? "default" : "icon"}
-              className={showLabel ? "w-full" : undefined}
-              aria-label={`مشاهده برنامه ${classItem.name}`}
-              aria-busy={isChecking || undefined}
-              disabled={isChecking}
-              onClick={() => onClick(classItem)}
-            >
-              {isChecking ? (
-                <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-              ) : (
-                <CalendarClock className={showLabel ? "me-2 h-4 w-4" : "h-4 w-4"} />
-              )}
-              {showLabel && "مشاهده برنامه"}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>مشاهده برنامه</TooltipContent>
-      </Tooltip>
-      <PopoverContent
-        side="bottom"
-        align="center"
-        sideOffset={6}
-        dir="rtl"
-        role="status"
-        aria-live="polite"
-        className="w-auto max-w-[min(14rem,calc(100vw-2rem))] px-3 py-2 text-center text-xs text-muted-foreground shadow-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-      >
-        {message}
-      </PopoverContent>
-    </Popover>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant={showLabel ? "outline" : "ghost"}
+          size={showLabel ? "default" : "icon"}
+          className={showLabel ? "w-full" : undefined}
+          aria-label={`مشاهده برنامه ${classItem.name}`}
+          onClick={() => onClick(classItem)}
+        >
+          <CalendarClock className={showLabel ? "me-2 h-4 w-4" : "h-4 w-4"} />
+          {showLabel && "مشاهده برنامه"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>مشاهده برنامه</TooltipContent>
+    </Tooltip>
   );
 }
 
 type ClassFormData = Pick<ClassViewModel, "name" | "gradeId" | "majorId">;
 type MajorOption = { value: string; label: string };
 
-const emptyClassForm = (): ClassFormData => ({ name: "", gradeId: "", majorId: "" });
+const emptyClassForm = (): ClassFormData => ({ name: "", gradeId: "", majorId: null });
 
 function ClassDialog({
   open,
@@ -167,6 +135,7 @@ function ClassDialog({
   majorOptions,
   majorsPending,
   majorsError,
+  educationStage,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -174,11 +143,14 @@ function ClassDialog({
   majorOptions: MajorOption[];
   majorsPending: boolean;
   majorsError: Error | null;
+  educationStage: EducationStage;
 }) {
   const [formData, setFormData] = useState<ClassFormData>(emptyClassForm);
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ClassFieldErrors>({});
+  const majorApplies = supportsMajor(educationStage);
+  const gradeOptions = getGradeOptions(educationStage);
 
   useEffect(() => {
     if (!open) return;
@@ -209,7 +181,9 @@ function ClassDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>افزودن کلاس جدید</DialogTitle>
-          <DialogDescription>نام، پایه و رشته کلاس را مشخص کنید.</DialogDescription>
+          <DialogDescription>
+            {majorApplies ? "نام، پایه و رشته کلاس را مشخص کنید." : "نام و پایه کلاس را مشخص کنید."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
@@ -241,7 +215,7 @@ function ClassDialog({
                   <SelectValue placeholder="انتخاب پایه" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GRADE_OPTIONS.map((grade) => (
+                  {gradeOptions.map((grade) => (
                     <SelectItem key={grade.value} value={grade.value}>
                       {grade.label}
                     </SelectItem>
@@ -255,17 +229,23 @@ function ClassDialog({
             <div className="space-y-2">
               <Label>رشته تحصیلی</Label>
               <Select
-                value={formData.majorId}
+                value={formData.majorId ?? ""}
                 onValueChange={(majorId) => {
                   setFormData({ ...formData, majorId });
                   setFieldErrors((current) => ({ ...current, majorId: undefined }));
                 }}
-                required
-                disabled={majorsPending || Boolean(majorsError)}
+                required={majorApplies}
+                disabled={!majorApplies || majorsPending || Boolean(majorsError)}
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={majorsPending ? "در حال دریافت رشته‌ها..." : "انتخاب رشته"}
+                    placeholder={
+                      !majorApplies
+                        ? "برای این مقطع کاربرد ندارد"
+                        : majorsPending
+                          ? "در حال دریافت رشته‌ها..."
+                          : "انتخاب رشته"
+                    }
                   />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,7 +256,10 @@ function ClassDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {majorsError && (
+              {!majorApplies ? (
+                <p className="text-xs text-muted-foreground">در متوسطه اول رشته تعریف نمی‌شود.</p>
+              ) : null}
+              {majorApplies && majorsError && (
                 <p className="text-xs text-destructive">دریافت رشته‌های تحصیلی انجام نشد.</p>
               )}
               {fieldErrors.majorId && (
@@ -298,11 +281,11 @@ function ClassDialog({
               type="submit"
               disabled={
                 isSaving ||
-                majorsPending ||
-                Boolean(majorsError) ||
+                (majorApplies && majorsPending) ||
+                (majorApplies && Boolean(majorsError)) ||
                 !formData.name.trim() ||
                 !formData.gradeId ||
-                !formData.majorId
+                (majorApplies && !formData.majorId)
               }
             >
               {isSaving ? "در حال ذخیره..." : "افزودن کلاس"}
@@ -319,11 +302,13 @@ function RenameClassDialog({
   onOpenChange,
   classItem,
   onSave,
+  majorApplies,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classItem: ClassViewModel | null;
   onSave: (name: string) => Promise<void>;
+  majorApplies: boolean;
 }) {
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -343,7 +328,11 @@ function RenameClassDialog({
       <DialogContent dir="rtl" className="sm:max-w-sm">
         <DialogHeader className="text-right">
           <DialogTitle>ویرایش نام کلاس</DialogTitle>
-          <DialogDescription>پایه و رشته کلاس پس از ایجاد قابل تغییر نیستند.</DialogDescription>
+          <DialogDescription>
+            {majorApplies
+              ? "پایه و رشته کلاس پس از ایجاد قابل تغییر نیستند."
+              : "پایه کلاس پس از ایجاد قابل تغییر نیست."}
+          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={async (event) => {
@@ -401,11 +390,11 @@ function RenameClassDialog({
 
 function ClassesPage() {
   const navigate = useNavigate();
-  const publishedClassSchedule = usePublishedClassScheduleCheck();
   const [assignmentClass, setAssignmentClass] = useState<ClassViewModel | null>(null);
   const [unavailabilityClass, setUnavailabilityClass] = useState<ClassViewModel | null>(null);
   const {
     classes,
+    educationStage,
     majorOptions,
     courses,
     teachers,
@@ -416,6 +405,7 @@ function ClassesPage() {
     coursesRepository,
     teachersRepository,
     activeClassAssignmentsRepository,
+    schoolsRepository,
   } = useClassManagementData(assignmentClass?.id);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
@@ -425,17 +415,16 @@ function ClassesPage() {
   const [classToDelete, setClassToDelete] = useState<ClassViewModel | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [checkingTimetableClassId, setCheckingTimetableClassId] = useState<string | null>(null);
-  const [timetableFeedback, setTimetableFeedback] = useState<ClassTimetableFeedback | null>(null);
-  const timetableFeedbackController = useRef(
-    createClassTimetableFeedbackController(setTimetableFeedback),
-  );
-
+  const majorApplies = supportsMajor(educationStage);
+  const gradeOptions = getGradeOptions(educationStage);
   useEffect(
-    () => () => {
-      timetableFeedbackController.current.dispose();
+    function resetFiltersOutsideCurrentStage() {
+      if (!majorApplies) setMajorFilter("all");
+      if (gradeFilter !== "all" && !gradeOptions.some((grade) => grade.value === gradeFilter)) {
+        setGradeFilter("all");
+      }
     },
-    [],
+    [gradeFilter, gradeOptions, majorApplies],
   );
   const filteredClasses = classes.filter((c) => {
     const normalizedSearch = search.toLowerCase();
@@ -443,18 +432,19 @@ function ClassesPage() {
       c.name.toLowerCase().includes(normalizedSearch) ||
       c.majorName.toLowerCase().includes(normalizedSearch);
     const matchesGrade = gradeFilter === "all" || c.gradeId === gradeFilter;
-    const matchesMajor = majorFilter === "all" || c.majorId === majorFilter;
+    const matchesMajor = !majorApplies || majorFilter === "all" || c.majorId === majorFilter;
     return matchesSearch && matchesGrade && matchesMajor;
   });
 
-  const activeFilterCount = Number(gradeFilter !== "all") + Number(majorFilter !== "all");
+  const activeFilterCount =
+    Number(gradeFilter !== "all") + Number(majorApplies && majorFilter !== "all");
 
   const handleSave = async (data: ClassFormData) => {
     try {
       await classesRepository.create({
         name: data.name,
         gradeId: data.gradeId,
-        majorId: data.majorId,
+        majorId: majorApplies ? data.majorId : null,
       });
       toast.success("کلاس با موفقیت اضافه شد");
     } catch (error) {
@@ -494,37 +484,11 @@ function ClassesPage() {
   };
   const assignmentCount = (classId: string) =>
     assignments.filter((assignment) => assignment.classId === classId).length;
-  const handleViewTimetable = async (classItem: ClassViewModel) => {
-    if (checkingTimetableClassId === classItem.id) return;
-    if (!publishedClassSchedule.canCheck) {
-      timetableFeedbackController.current.show({
-        classId: classItem.id,
-        message: "وضعیت برنامه قابل بررسی نیست.",
-      });
-      return;
-    }
-
-    setCheckingTimetableClassId(classItem.id);
-    try {
-      const isPublished = await publishedClassSchedule.check(classItem.id);
-      if (!isPublished) {
-        timetableFeedbackController.current.show({
-          classId: classItem.id,
-          message: "برنامه هنوز آماده نیست.",
-        });
-        return;
-      }
-
-      timetableFeedbackController.current.clear();
-      await navigate({ to: "/dashboard/timetable" });
-    } catch {
-      timetableFeedbackController.current.show({
-        classId: classItem.id,
-        message: "وضعیت برنامه قابل بررسی نیست.",
-      });
-    } finally {
-      setCheckingTimetableClassId(null);
-    }
+  const handleViewTimetable = (classItem: ClassViewModel) => {
+    void navigate({
+      to: "/dashboard/timetable",
+      search: { mode: "class", classId: classItem.id },
+    });
   };
 
   return (
@@ -555,7 +519,7 @@ function ClassesPage() {
                 <div className="space-y-2">
                   <p className="px-1 text-xs font-semibold text-muted-foreground">پایه تحصیلی</p>
                   <div className="grid gap-1">
-                    {[{ value: "all", label: "همه پایه‌ها" }, ...GRADE_OPTIONS].map((grade) => (
+                    {[{ value: "all", label: "همه پایه‌ها" }, ...gradeOptions].map((grade) => (
                       <Button
                         key={grade.value}
                         type="button"
@@ -570,23 +534,27 @@ function ClassesPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 border-t pt-3">
-                  <p className="px-1 text-xs font-semibold text-muted-foreground">رشته تحصیلی</p>
-                  <div className="grid gap-1">
-                    {[{ value: "all", label: "همه رشته‌ها" }, ...majorOptions].map((major) => (
-                      <Button
-                        key={major.value}
-                        type="button"
-                        variant="ghost"
-                        className="h-8 justify-between px-2 font-normal"
-                        onClick={() => setMajorFilter(major.value)}
-                      >
-                        <span>{major.label}</span>
-                        {majorFilter === major.value && <Check className="h-4 w-4 text-primary" />}
-                      </Button>
-                    ))}
+                {majorApplies ? (
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="px-1 text-xs font-semibold text-muted-foreground">رشته تحصیلی</p>
+                    <div className="grid gap-1">
+                      {[{ value: "all", label: "همه رشته‌ها" }, ...majorOptions].map((major) => (
+                        <Button
+                          key={major.value}
+                          type="button"
+                          variant="ghost"
+                          className="h-8 justify-between px-2 font-normal"
+                          onClick={() => setMajorFilter(major.value)}
+                        >
+                          <span>{major.label}</span>
+                          {majorFilter === major.value && (
+                            <Check className="h-4 w-4 text-primary" />
+                          )}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <Button
                   type="button"
@@ -604,22 +572,30 @@ function ClassesPage() {
               </PopoverContent>
             </Popover>
           </div>
-          <Button onClick={openAddDialog}>
+          <Button onClick={openAddDialog} disabled={!educationStage}>
             <Plus className="me-2 h-4 w-4" />
             افزودن کلاس
           </Button>
         </div>
 
-        {classesRepository.query.isPending || majorsRepository.isPending ? (
+        {schoolsRepository.query.isPending ||
+        classesRepository.query.isPending ||
+        (majorApplies && majorsRepository.isPending) ? (
           <Card className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
             <LoaderCircle className="mb-3 h-8 w-8 animate-spin text-primary" />
             <p className="font-medium">در حال دریافت کلاس‌ها...</p>
           </Card>
-        ) : classesRepository.query.isError || majorsRepository.isError ? (
+        ) : schoolsRepository.query.isError ||
+          classesRepository.query.isError ||
+          (majorApplies && majorsRepository.isError) ? (
           <Card className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
             <p className="font-medium text-destructive">دریافت کلاس‌ها انجام نشد.</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {getClassErrorMessage(classesRepository.query.error ?? majorsRepository.error)}
+              {getClassErrorMessage(
+                schoolsRepository.query.error ??
+                  classesRepository.query.error ??
+                  majorsRepository.error,
+              )}
             </p>
             <Button
               type="button"
@@ -627,7 +603,8 @@ function ClassesPage() {
               className="mt-4"
               onClick={() => {
                 void classesRepository.query.refetch();
-                void majorsRepository.refetch();
+                void schoolsRepository.query.refetch();
+                if (majorApplies) void majorsRepository.refetch();
               }}
             >
               <RefreshCw className="me-2 h-4 w-4" />
@@ -680,7 +657,9 @@ function ClassesPage() {
                               </Button>
                             </TableCell>
                             <TableCell className="text-center">{classItem.gradeName}</TableCell>
-                            <TableCell className="text-center">{classItem.majorName}</TableCell>
+                            <TableCell className="text-center">
+                              {majorApplies ? classItem.majorName : null}
+                            </TableCell>
                             <TableCell className="text-center">
                               <Button
                                 type="button"
@@ -711,9 +690,7 @@ function ClassesPage() {
                             <TableCell className="text-center">
                               <ViewTimetableAction
                                 classItem={classItem}
-                                feedback={timetableFeedback}
-                                isChecking={checkingTimetableClassId === classItem.id}
-                                onClick={(item) => void handleViewTimetable(item)}
+                                onClick={handleViewTimetable}
                               />
                             </TableCell>
                             <TableCell className="text-center">
@@ -778,9 +755,11 @@ function ClassesPage() {
                                 <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                                   {classItem.gradeName}
                                 </span>
-                                <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                                  رشته: {classItem.majorName}
-                                </span>
+                                {majorApplies ? (
+                                  <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                                    رشته: {classItem.majorName}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -810,10 +789,8 @@ function ClassesPage() {
                             <TooltipProvider>
                               <ViewTimetableAction
                                 classItem={classItem}
-                                feedback={timetableFeedback}
-                                isChecking={checkingTimetableClassId === classItem.id}
                                 showLabel
-                                onClick={(item) => void handleViewTimetable(item)}
+                                onClick={handleViewTimetable}
                               />
                             </TooltipProvider>
                             <Button
@@ -837,20 +814,24 @@ function ClassesPage() {
         )}
       </div>
 
-      <ClassDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSave={handleSave}
-        majorOptions={majorOptions}
-        majorsPending={majorsRepository.isPending}
-        majorsError={majorsRepository.error}
-      />
+      {educationStage ? (
+        <ClassDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSave={handleSave}
+          majorOptions={majorOptions}
+          majorsPending={majorsRepository.isPending}
+          majorsError={majorsRepository.error}
+          educationStage={educationStage}
+        />
+      ) : null}
 
       <RenameClassDialog
         open={Boolean(renamingClass)}
         onOpenChange={(open) => !open && setRenamingClass(null)}
         classItem={renamingClass}
         onSave={renameClass}
+        majorApplies={majorApplies}
       />
 
       {unavailabilityClass ? (

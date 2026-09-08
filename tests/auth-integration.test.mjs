@@ -9,7 +9,7 @@ import {
   getLoginErrorMessage,
   getRegistrationErrorMessage,
 } from "../src/lib/auth-errors.ts";
-import { buildLoginUrl } from "../src/lib/auth-session.ts";
+import { buildLoginUrl, resolveAuthSessionStatus } from "../src/lib/auth-session.ts";
 
 const readSource = async (relativePath) =>
   readFile(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
@@ -113,7 +113,7 @@ test("Login validates /users/me before navigation and stores one canonical token
   const loginRoute = await readSource("../src/routes/auth.login.tsx");
   assert.match(authSource, /await loginUser\(username, password\)/);
   assert.match(authSource, /setAccessToken\(response\.access_token\)/);
-  assert.match(authSource, /await loadAuthenticatedUser\(\)/);
+  assert.match(authSource, /await queryClient\.fetchQuery\(authenticatedUserQueryOptions\(\)\)/);
   assert.match(loginRoute, /await loginAndBootstrap/);
   assert.match(loginRoute, /await navigate/);
   assert.match(tokenSource, /ACCESS_TOKEN_STORAGE_KEY = "access_token"/);
@@ -122,22 +122,64 @@ test("Login validates /users/me before navigation and stores one canonical token
 
 test("session restoration and protected/public route guards are present", async () => {
   const dashboardSource = await readSource("../src/routes/dashboard.tsx");
+  const rootSource = await readSource("../src/routes/__root.tsx");
+  const sessionSource = await readSource("../src/lib/auth-session.ts");
   const loginSource = await readSource("../src/routes/auth.login.tsx");
   const registerSource = await readSource("../src/routes/auth.register.tsx");
   const publicBoundarySource = await readSource("../src/components/auth/public-only-auth.tsx");
   assert.match(dashboardSource, /beforeLoad/);
   assert.match(dashboardSource, /!getAccessToken\(\)/);
-  assert.match(dashboardSource, /useAuthenticatedUser\(\)/);
+  assert.match(dashboardSource, /useAuthSession\(\)/);
   assert.match(dashboardSource, /userQuery\.isPending/);
+  assert.match(rootSource, /<AuthSessionProvider>/);
+  assert.match(sessionSource, /"loading" \| "authenticated" \| "unauthenticated"/);
   assert.match(loginSource, /validateStoredSession/);
   assert.match(registerSource, /validateStoredSession/);
   assert.match(loginSource, /PublicOnlyAuth/);
   assert.match(registerSource, /PublicOnlyAuth/);
-  assert.match(publicBoundarySource, /useAuthenticatedUser\(\)/);
+  assert.match(publicBoundarySource, /useAuthSession\(\)/);
   assert.match(publicBoundarySource, /authenticatedDestination = "\/dashboard"/);
   assert.match(publicBoundarySource, /navigate\(\{ to: authenticatedDestination/);
   assert.match(loginSource, /throw redirect\(\{ to: \(search\.redirect \?\? "\/dashboard"\)/);
   assert.match(registerSource, /throw redirect\(\{ to: "\/dashboard" \}\)/);
+});
+
+test("auth loading never becomes unauthenticated and cached users remain authenticated", () => {
+  assert.equal(
+    resolveAuthSessionStatus({ hasToken: true, hasUser: false, isUnauthorized: false }),
+    "loading",
+  );
+  assert.equal(
+    resolveAuthSessionStatus({ hasToken: true, hasUser: true, isUnauthorized: false }),
+    "authenticated",
+  );
+  assert.equal(
+    resolveAuthSessionStatus({ hasToken: true, hasUser: true, isUnauthorized: true }),
+    "unauthenticated",
+  );
+  assert.equal(
+    resolveAuthSessionStatus({ hasToken: false, hasUser: false, isUnauthorized: false }),
+    "unauthenticated",
+  );
+});
+
+test("dashboard navigation cannot render Login during restoration or background refetch", async () => {
+  const dashboardSource = await readSource("../src/routes/dashboard.tsx");
+  const publicBoundarySource = await readSource("../src/components/auth/public-only-auth.tsx");
+  assert.match(dashboardSource, /session\.status === "loading" && userQuery\.isError/);
+  assert.doesNotMatch(dashboardSource, /window\.location\.(replace|assign)|window\.location\.href/);
+  assert.doesNotMatch(dashboardSource, /useEffect\([\s\S]*auth\/login/);
+  assert.match(publicBoundarySource, /session\.status !== "unauthenticated"/);
+  assert.match(publicBoundarySource, /return children/);
+});
+
+test("authenticated user restoration is app-owned, cached, and deduplicated", async () => {
+  const rootSource = await readSource("../src/routes/__root.tsx");
+  const sessionSource = await readSource("../src/lib/auth-session.ts");
+  assert.equal((rootSource.match(/<AuthSessionProvider>/g) ?? []).length, 1);
+  assert.match(sessionSource, /AUTHENTICATED_USER_STALE_TIME = Number\.POSITIVE_INFINITY/);
+  assert.match(sessionSource, /queryClient\.fetchQuery\(authenticatedUserQueryOptions\(\)\)/);
+  assert.doesNotMatch(sessionSource, /const user = await loadAuthenticatedUser\(\)/);
 });
 
 test("protected redirects preserve a safe encoded dashboard destination", () => {
@@ -155,6 +197,11 @@ test("Logout and protected 401 share centralized session cleanup", async () => {
   assert.match(dashboardSource, /clearAuthenticatedSession\(queryClient\)/);
   assert.match(rootSource, /clearAuthenticatedSession\(queryClient\)/);
   assert.match(clientSource, /requiresAuth && response\.status === 401/);
+  assert.match(
+    rootSource,
+    /router\.navigate\(\{ href: buildLoginUrl\(destination\), replace: true \}\)/,
+  );
+  assert.doesNotMatch(rootSource, /window\.location\.replace/);
   assert.match(sessionSource, /clearAccessToken\(\)/);
   assert.match(sessionSource, /setActiveSchoolId\(null\)/);
   assert.match(sessionSource, /queryClient\.clear\(\)/);

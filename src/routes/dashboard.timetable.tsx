@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { History } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
@@ -10,6 +10,7 @@ import { FullscreenTimetableOverview } from "@/components/timetable/fullscreen-t
 import { SchoolMasterTimetable } from "@/components/timetable/school-master-timetable";
 import { TimetableEmptyState } from "@/components/timetable/timetable-empty-state";
 import { TimetableHistorySheet } from "@/components/timetable/timetable-history-sheet";
+import { TimetablePageActions } from "@/components/timetable/timetable-page-actions";
 import { TimetableSummary } from "@/components/timetable/timetable-summary";
 import { TimetableViewHeader } from "@/components/timetable/timetable-view-header";
 import { WeeklyTimetableToolbar } from "@/components/timetable/weekly-timetable-toolbar";
@@ -18,6 +19,7 @@ import { downloadWeeklyPlanExcel, getWeeklyPlanExcelErrorMessage } from "@/lib/a
 import {
   filterTimetableClasses,
   hasActiveSchoolFilters,
+  parseTimetableRouteSearch,
   type SchoolTimetableFilters,
   type TimetableViewMode,
 } from "@/lib/timetable";
@@ -29,6 +31,7 @@ import {
 import { usePublishedTimetable } from "@/lib/timetable-queries";
 
 export const Route = createFileRoute("/dashboard/timetable")({
+  validateSearch: parseTimetableRouteSearch,
   head: () => ({
     meta: [
       { title: withAppName("برنامه هفتگی") },
@@ -39,6 +42,7 @@ export const Route = createFileRoute("/dashboard/timetable")({
     ],
   }),
   component: TimetablePage,
+  errorComponent: TimetableRouteError,
 });
 
 const initialFilters: SchoolTimetableFilters = {
@@ -47,14 +51,42 @@ const initialFilters: SchoolTimetableFilters = {
   search: "",
 };
 
+function TimetableRouteError({ reset }: { reset: () => void }) {
+  const router = useRouter();
+
+  return (
+    <div className="weekly-timetable-page flex flex-col" dir="rtl">
+      <Header title="برنامه هفتگی" description="برنامه نهایی و ثبت‌شده مدرسه" />
+      <main className="timetable-page-main p-4 sm:p-6">
+        <section className="overflow-hidden border bg-background shadow-sm sm:rounded-xl">
+          <TimetableEmptyState kind="no-final" />
+          <div className="pb-6 text-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void router.invalidate().then(reset);
+              }}
+            >
+              تلاش دوباره
+            </Button>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
 function TimetablePage() {
   const schoolId = useActiveSchoolId();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const timetableQuery = usePublishedTimetable();
   const timetable = timetableQuery.data;
-  const [mode, setMode] = useState<TimetableViewMode>("school");
+  const mode = search.mode ?? "school";
+  const selectedClassId = search.classId ?? "";
+  const selectedTeacherId = search.teacherId ?? "";
   const [filters, setFilters] = useState(initialFilters);
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [exportPending, setExportPending] = useState<"pdf" | "excel" | null>(null);
@@ -98,6 +130,31 @@ function TimetablePage() {
     (mode === "class" && !selectedClassId) ||
     (mode === "teacher" && !selectedTeacherId);
 
+  const setMode = (nextMode: TimetableViewMode) => {
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        mode: nextMode === "school" ? undefined : nextMode,
+      }),
+    });
+  };
+
+  const setSelectedClassId = (classId: string) => {
+    void navigate({
+      search: (previous) => ({ ...previous, mode: "class", classId: classId || undefined }),
+    });
+  };
+
+  const setSelectedTeacherId = (teacherId: string) => {
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        mode: "teacher",
+        teacherId: teacherId || undefined,
+      }),
+    });
+  };
+
   const handleExport = async (format: "pdf" | "excel") => {
     if (exportPending || exportInFlight.current) return;
     if (format === "pdf" && pdfExportDisabled) return;
@@ -139,11 +196,22 @@ function TimetablePage() {
       <Header title="برنامه هفتگی" description="برنامه نهایی و ثبت‌شده مدرسه" />
 
       <main className="timetable-page-main p-4 sm:p-6">
-        <div className="mb-3 flex justify-end print:hidden">
+        <div className="mb-3 flex flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <Button type="button" variant="outline" onClick={() => setHistoryOpen(true)}>
             <History className="h-4 w-4" />
             تاریخچه برنامه‌ها
           </Button>
+          {!timetableQuery.isPending && !timetableQuery.isError && timetable && (
+            <TimetablePageActions
+              fullscreen={false}
+              onFullscreenToggle={() => setFullscreen((value) => !value)}
+              onPrint={() => window.print()}
+              onExport={(format) => void handleExport(format)}
+              pdfExportDisabled={pdfExportDisabled}
+              excelExportDisabled={excelExportDisabled}
+              exportPending={exportPending}
+            />
+          )}
         </div>
         <section
           id="timetable-print-root"
@@ -172,18 +240,11 @@ function TimetablePage() {
                 selectedClassId={selectedClassId}
                 selectedTeacherId={selectedTeacherId}
                 filtersActive={hasActiveSchoolFilters(filters)}
-                fullscreen={false}
                 onModeChange={setMode}
                 onFiltersChange={setFilters}
                 onResetFilters={() => setFilters(initialFilters)}
                 onClassChange={setSelectedClassId}
                 onTeacherChange={setSelectedTeacherId}
-                onFullscreenToggle={() => setFullscreen((value) => !value)}
-                onPrint={() => window.print()}
-                onExport={(format) => void handleExport(format)}
-                pdfExportDisabled={pdfExportDisabled}
-                excelExportDisabled={excelExportDisabled}
-                exportPending={exportPending}
               />
 
               {hasFinalTimetable && (
@@ -193,10 +254,11 @@ function TimetablePage() {
                     schoolName={timetable.schoolName}
                     selectedClassName={selectedClass?.name}
                     selectedTeacherName={selectedTeacher?.name}
-                  />
-                  {mode === "school" && filteredClasses.length > 0 && (
-                    <TimetableSummary timetable={timetable} classes={filteredClasses} />
-                  )}
+                  >
+                    {mode === "school" && filteredClasses.length > 0 ? (
+                      <TimetableSummary timetable={timetable} classes={filteredClasses} />
+                    ) : null}
+                  </TimetableViewHeader>
                 </>
               )}
 
@@ -209,7 +271,7 @@ function TimetablePage() {
                   <TimetableEmptyState kind="no-lessons" />
                 )
               ) : mode === "class" ? (
-                !selectedClassId ? (
+                !selectedClassId || !selectedClass ? (
                   <TimetableEmptyState kind="no-class" />
                 ) : selectedEntityHasLessons ? (
                   <EntityTimetable timetable={timetable} mode="class" entityId={selectedClassId} />

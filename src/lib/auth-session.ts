@@ -1,4 +1,11 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import {
   changeCurrentUserPassword,
   getCurrentUser,
@@ -15,6 +22,17 @@ import { clearAllGeneratorPreviewReferences } from "@/lib/generator-preview-sess
 
 export const authenticatedUserQueryKey = ["auth", "current-user"] as const;
 export const useMockAuthentication = import.meta.env.VITE_USE_MOCK_API === "true";
+const AUTHENTICATED_USER_STALE_TIME = Number.POSITIVE_INFINITY;
+
+export type AuthSessionStatus = "loading" | "authenticated" | "unauthenticated";
+
+interface AuthSessionContextValue {
+  status: AuthSessionStatus;
+  user: AuthenticatedUser | null;
+  userQuery: UseQueryResult<AuthenticatedUser, Error>;
+}
+
+const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 
 let mockUser: AuthenticatedUser = {
   id: 0,
@@ -59,7 +77,7 @@ export async function loginAndBootstrap(
   setAccessToken(response.access_token);
 
   try {
-    const user = await loadAuthenticatedUser();
+    const user = await queryClient.fetchQuery(authenticatedUserQueryOptions());
     setActiveSchoolId(null);
     queryClient.setQueryData(authenticatedUserQueryKey, user);
     return user;
@@ -75,27 +93,66 @@ export async function validateStoredSession(
   if (!getAccessToken()) return null;
   try {
     return await queryClient.fetchQuery({
-      queryKey: authenticatedUserQueryKey,
-      queryFn: loadAuthenticatedUser,
-      staleTime: 0,
-      retry: false,
+      ...authenticatedUserQueryOptions(),
     });
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearAuthenticatedSession(queryClient);
+      return null;
     }
-    return null;
+    throw error;
   }
 }
 
-export function useAuthenticatedUser() {
-  const token = useAccessToken();
-  return useQuery({
+function authenticatedUserQueryOptions() {
+  return {
     queryKey: authenticatedUserQueryKey,
     queryFn: loadAuthenticatedUser,
-    enabled: typeof window !== "undefined" && Boolean(token),
+    staleTime: AUTHENTICATED_USER_STALE_TIME,
     retry: false,
+  } as const;
+}
+
+export function resolveAuthSessionStatus({
+  hasToken,
+  hasUser,
+  isUnauthorized,
+}: {
+  hasToken: boolean;
+  hasUser: boolean;
+  isUnauthorized: boolean;
+}): AuthSessionStatus {
+  if (!hasToken || isUnauthorized) return "unauthenticated";
+  return hasUser ? "authenticated" : "loading";
+}
+
+export function AuthSessionProvider({ children }: { children: ReactNode }) {
+  const token = useAccessToken();
+  const userQuery = useQuery({
+    ...authenticatedUserQueryOptions(),
+    enabled: typeof window !== "undefined" && Boolean(token),
   });
+  const status = resolveAuthSessionStatus({
+    hasToken: Boolean(token),
+    hasUser: Boolean(userQuery.data),
+    isUnauthorized: userQuery.error instanceof ApiError && userQuery.error.status === 401,
+  });
+
+  return createElement(
+    AuthSessionContext.Provider,
+    { value: { status, user: userQuery.data ?? null, userQuery } },
+    children,
+  );
+}
+
+export function useAuthSession() {
+  const session = useContext(AuthSessionContext);
+  if (!session) throw new Error("useAuthSession must be used within AuthSessionProvider.");
+  return session;
+}
+
+export function useAuthenticatedUser() {
+  return useAuthSession().userQuery;
 }
 
 export function useUpdateAuthenticatedUser() {

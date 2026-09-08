@@ -13,7 +13,7 @@ export interface RepositoryListParams extends RepositoryRequestOptions {
   page?: number;
   pageSize?: number;
   search?: string;
-  filters?: Record<string, string | number | boolean | readonly string[] | undefined>;
+  filters?: Record<string, string | number | boolean | null | readonly string[] | undefined>;
   sort?: readonly RepositorySort[];
 }
 
@@ -56,7 +56,7 @@ export interface TeacherRepository extends EntityRepository<
 export interface CourseCreateInput {
   name: string;
   gradeId: string;
-  majorId: string;
+  majorId: string | null;
   category: Course["category"];
   active?: boolean;
 }
@@ -71,7 +71,7 @@ export interface CourseRepository extends EntityRepository<
 export interface ClassCreateInput {
   name: string;
   gradeId: string;
-  majorId: string;
+  majorId: string | null;
 }
 export type ClassUpdateInput = Partial<ClassCreateInput>;
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

@@ -24,7 +24,7 @@ export function TimetableSummary({
 
   return (
     <div
-      className="print-hidden flex flex-wrap items-center gap-2 border-b bg-muted/15 px-3 py-2 sm:px-4"
+      className="print-hidden flex flex-wrap items-center gap-2 sm:justify-end"
       data-testid="timetable-summary"
       aria-label="خلاصه برنامه مدرسه"
     >

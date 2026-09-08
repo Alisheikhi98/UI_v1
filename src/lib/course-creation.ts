@@ -8,7 +8,7 @@ export class IncompatibleCreatedCourseError extends Error {
 
   constructor(course: Course) {
     super(
-      `درس «${course.name}» ایجاد شد، اما با پایه و رشته این کلاس سازگار نیست و قابل انتخاب نیست.`,
+      `درس «${course.name}» ایجاد شد، اما با مشخصات تحصیلی این کلاس سازگار نیست و قابل انتخاب نیست.`,
     );
     this.name = "IncompatibleCreatedCourseError";
     this.course = course;
@@ -23,7 +23,7 @@ export function createCourseInputForClass(
     name,
     gradeId: selectedClass.gradeId,
     majorId: selectedClass.majorId,
-    category: "specialized",
+    category: selectedClass.majorId === null ? "general" : "specialized",
     active: true,
   };
 }

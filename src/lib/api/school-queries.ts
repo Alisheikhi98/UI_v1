@@ -41,6 +41,38 @@ export function useSchoolsRepository() {
     }
   };
 
+  const refreshSchoolDependentData = async (schoolId: number) => {
+    const scopedSchoolId = String(schoolId);
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.classesRoot(scopedSchoolId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.coursesRoot(scopedSchoolId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.compatibleCoursesRoot(scopedSchoolId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: repositoryQueryKeys.assignmentsRoot(scopedSchoolId),
+      }),
+    ]);
+  };
+
+  const clearSchoolDependentCache = (schoolId: number) => {
+    const scopedSchoolId = String(schoolId);
+    [
+      repositoryQueryKeys.teachersRoot(scopedSchoolId),
+      repositoryQueryKeys.classesRoot(scopedSchoolId),
+      repositoryQueryKeys.coursesRoot(scopedSchoolId),
+      repositoryQueryKeys.compatibleCoursesRoot(scopedSchoolId),
+      repositoryQueryKeys.assignmentsRoot(scopedSchoolId),
+      ["schools", scopedSchoolId] as const,
+    ].forEach((dependentQueryKey) => {
+      queryClient.removeQueries({ queryKey: dependentQueryKey });
+    });
+  };
+
   const create = useMutation({
     mutationFn: (data: SchoolFormData) => schoolRepository.create(data),
     onSuccess: async (school) => {
@@ -55,7 +87,27 @@ export function useSchoolsRepository() {
   const update = useMutation({
     mutationFn: ({ id, data }: { id: number; data: SchoolFormData }) =>
       schoolRepository.update(id, data),
-    onSuccess: refetchAuthoritativeSchools,
+    onSuccess: async (school) => {
+      await refetchAuthoritativeSchools();
+      await refreshSchoolDependentData(school.id);
+    },
+    onError: recoverAuthoritativeSchools,
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => schoolRepository.delete(id),
+    onSuccess: async (_, deletedSchoolId) => {
+      const confirmedSchools = await refetchAuthoritativeSchools();
+      if (confirmedSchools.some((school) => school.id === deletedSchoolId)) {
+        throw new Error("مدرسه حذف شد اما فهرست نهایی سرور به‌روزرسانی نشد.");
+      }
+      setActiveSchoolId(
+        resolveActiveSchoolId(
+          activeSchoolId,
+          confirmedSchools.map((school) => school.id),
+        ),
+      );
+      clearSchoolDependentCache(deletedSchoolId);
+    },
     onError: recoverAuthoritativeSchools,
   });
 
@@ -64,7 +116,9 @@ export function useSchoolsRepository() {
     query,
     create: create.mutateAsync,
     update: update.mutateAsync,
+    remove: remove.mutateAsync,
     isCreating: create.isPending,
     isUpdating: update.isPending,
+    isDeleting: remove.isPending,
   };
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActiveSchoolId } from "@/lib/active-school";
 import { scheduleApi } from "@/lib/api/schedule-api";
@@ -123,30 +123,6 @@ export async function fetchPublishedClassSchedules(
   );
 }
 
-export function usePublishedClassScheduleCheck() {
-  const schoolId = useActiveSchoolId();
-  const queryClient = useQueryClient();
-
-  const check = useCallback(
-    async (classId: string) => {
-      if (useMockApi || !schoolId) {
-        throw new Error("Published timetable availability requires an active API School.");
-      }
-
-      const schedule = await queryClient.fetchQuery({
-        queryKey: repositoryQueryKeys.publishedClassSchedule(schoolId, classId),
-        queryFn: ({ signal }) => scheduleApi.getClassSchedule(schoolId, classId, { signal }),
-        staleTime: 30_000,
-      });
-
-      return schedule.items.length > 0;
-    },
-    [queryClient, schoolId],
-  );
-
-  return { check, canCheck: !useMockApi && schoolId !== null };
-}
-
 export function usePublishedClassSchedules(classIds: readonly string[]) {
   const schoolId = useActiveSchoolId();
   const queryClient = useQueryClient();
@@ -176,36 +152,46 @@ export function usePublishedTimetable() {
     queryFn: ({ signal }) => listAllEntities(repositories.classes.repository, signal),
     enabled: !useMockApi && schoolId !== null,
   });
+  const classIds = (classes.data ?? []).map((item) => item.id);
+  const published = usePublishedClassSchedules(classes.isSuccess ? classIds : []);
+  const hasPublishedEntries =
+    published.data?.some((schedule) => schedule.items.length > 0) ?? false;
+  const referenceDataEnabled = !useMockApi && schoolId !== null && hasPublishedEntries;
   const teachers = useQuery<Teacher[]>({
     queryKey: repositoryQueryKeys.teachers(schoolId, { scope: "timetable", page: "all" }),
     queryFn: ({ signal }) => listAllEntities(repositories.teachers.repository, signal),
-    enabled: !useMockApi && schoolId !== null,
+    enabled: referenceDataEnabled,
   });
   const majors = useQuery<Major[]>({
     queryKey: repositoryQueryKeys.majors(),
     queryFn: ({ signal }) => repositories.majors.repository.list({ signal }),
-    enabled: !useMockApi,
+    enabled: referenceDataEnabled,
   });
   const daySlots = useQuery({
     queryKey: repositoryQueryKeys.daySlots(schoolId),
     queryFn: ({ signal }) => repositories.daySlots.listWeek({ signal }),
-    enabled: !useMockApi && schoolId !== null,
+    enabled: referenceDataEnabled,
   });
-  const classIds = (classes.data ?? []).map((item) => item.id);
-  const published = usePublishedClassSchedules(classes.isSuccess ? classIds : []);
   const school = schools.schools.find((item) => String(item.id) === schoolId);
   const data = useMemo(() => {
-    if (
-      !schoolId ||
-      !school ||
-      !classes.data ||
-      !teachers.data ||
-      !majors.data ||
-      !daySlots.data ||
-      !published.data
-    ) {
+    if (!schoolId || !school || !classes.data || !published.data) {
       return null;
     }
+
+    if (!hasPublishedEntries) {
+      return {
+        id: `published-${schoolId}`,
+        schoolName: school.name,
+        days: [],
+        periods: [],
+        classes: [],
+        teachers: [],
+        entries: [],
+      };
+    }
+
+    if (!teachers.data || !majors.data || !daySlots.data) return null;
+
     return normalizePublishedTimetable({
       schoolId,
       schoolName: school.name,
@@ -215,7 +201,16 @@ export function usePublishedTimetable() {
       daySlotGroups: daySlots.data,
       classSchedules: published.data,
     });
-  }, [classes.data, daySlots.data, majors.data, published.data, school, schoolId, teachers.data]);
+  }, [
+    classes.data,
+    daySlots.data,
+    hasPublishedEntries,
+    majors.data,
+    published.data,
+    school,
+    schoolId,
+    teachers.data,
+  ]);
 
   return {
     data,
@@ -223,16 +218,12 @@ export function usePublishedTimetable() {
       !useMockApi &&
       (schools.query.isPending ||
         classes.isPending ||
-        teachers.isPending ||
-        majors.isPending ||
-        daySlots.isPending ||
+        (hasPublishedEntries && (teachers.isPending || majors.isPending || daySlots.isPending)) ||
         published.isPending),
     isError:
       schools.query.isError ||
       classes.isError ||
-      teachers.isError ||
-      majors.isError ||
-      daySlots.isError ||
+      (hasPublishedEntries && (teachers.isError || majors.isError || daySlots.isError)) ||
       published.isError ||
       useMockApi,
     refetch: published.refetch,

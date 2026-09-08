@@ -1,3 +1,5 @@
+import type { EducationStage } from "@/lib/academic-policy";
+
 export interface FastApiPage<T> {
   items: T[];
   page: number;
@@ -10,6 +12,7 @@ export interface SchoolDto {
   id: number;
   name: string;
   slug: string;
+  education_stage: EducationStage;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -73,7 +76,7 @@ export interface CourseDto {
   id: number;
   school_id: number | null;
   name: string;
-  major_id: number;
+  major_id: number | null;
   grade: number;
   category: "general" | "specialized";
   active: boolean;
@@ -91,7 +94,7 @@ export interface MajorDto {
 
 export interface CourseCreateDto {
   name: string;
-  major_id: number;
+  major_id: number | null;
   grade: number;
   category: "general" | "specialized";
 }
@@ -100,14 +103,14 @@ export interface TeacherCourseGroupDto {
   subject_code: string | null;
   display_name: string;
   grades: number[];
-  major_ids: number[];
+  major_ids: Array<number | null>;
   courses: CourseDto[];
 }
 
 export interface ClassDto {
   id: number;
   school_id: number;
-  major_id: number;
+  major_id: number | null;
   name: string;
   grade: number;
   active: boolean;

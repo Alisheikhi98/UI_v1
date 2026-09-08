@@ -1,24 +1,6 @@
-import {
-  ChevronDown,
-  Download,
-  Expand,
-  FileSpreadsheet,
-  FileText,
-  Loader2,
-  Minimize2,
-  Printer,
-  RotateCcw,
-} from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { SearchInput } from "@/components/ui/search-input";
 import {
   Select,
@@ -43,18 +25,11 @@ export function WeeklyTimetableToolbar({
   selectedClassId,
   selectedTeacherId,
   filtersActive,
-  fullscreen,
   onModeChange,
   onFiltersChange,
   onResetFilters,
   onClassChange,
   onTeacherChange,
-  onFullscreenToggle,
-  onPrint,
-  onExport,
-  pdfExportDisabled,
-  excelExportDisabled,
-  exportPending,
 }: {
   mode: TimetableViewMode;
   filters: SchoolTimetableFilters;
@@ -63,18 +38,11 @@ export function WeeklyTimetableToolbar({
   selectedClassId: string;
   selectedTeacherId: string;
   filtersActive: boolean;
-  fullscreen: boolean;
   onModeChange: (mode: TimetableViewMode) => void;
   onFiltersChange: (filters: SchoolTimetableFilters) => void;
   onResetFilters: () => void;
   onClassChange: (classId: string) => void;
   onTeacherChange: (teacherId: string) => void;
-  onFullscreenToggle: () => void;
-  onPrint: () => void;
-  onExport: (format: "pdf" | "excel") => void;
-  pdfExportDisabled: boolean;
-  excelExportDisabled: boolean;
-  exportPending: "pdf" | "excel" | null;
 }) {
   const grades = [...new Map(classes.map((item) => [item.gradeId, item.gradeLabel])).entries()];
   const majors = [...new Map(classes.map((item) => [item.majorId, item.majorLabel])).entries()];
@@ -84,9 +52,9 @@ export function WeeklyTimetableToolbar({
       className="timetable-toolbar print-hidden border-b bg-background p-3 sm:p-4"
       data-testid="timetable-toolbar"
     >
-      <div className="timetable-toolbar-primary flex flex-col gap-3 xl:grid xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
+      <div className="timetable-toolbar-primary flex flex-col gap-3 xl:flex-row xl:items-center">
         <Tabs
-          className="timetable-view-tabs"
+          className="timetable-view-tabs shrink-0"
           value={mode}
           onValueChange={(value) => onModeChange(value as TimetableViewMode)}
           dir="rtl"
@@ -105,9 +73,9 @@ export function WeeklyTimetableToolbar({
           </TabsList>
         </Tabs>
 
-        <div className="timetable-context-controls min-w-0">
+        <div className="timetable-context-controls min-w-0 xl:flex-1">
           {mode === "school" && (
-            <div className="timetable-toolbar-filters grid gap-2 sm:grid-cols-2 md:grid-cols-[auto_auto_minmax(11rem,1fr)_auto] md:items-center">
+            <div className="timetable-toolbar-filters grid gap-2 sm:grid-cols-2 md:grid-cols-[minmax(10rem,11rem)_minmax(12rem,13rem)_minmax(10rem,12rem)_auto] md:items-center">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Label
                   htmlFor="timetable-grade-filter"
@@ -119,7 +87,7 @@ export function WeeklyTimetableToolbar({
                   value={filters.gradeId}
                   onValueChange={(gradeId) => onFiltersChange({ ...filters, gradeId })}
                 >
-                  <SelectTrigger id="timetable-grade-filter" className="h-9 min-w-0 flex-1 md:w-32">
+                  <SelectTrigger id="timetable-grade-filter" className="h-9 min-w-0 flex-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -144,7 +112,7 @@ export function WeeklyTimetableToolbar({
                   value={filters.majorId}
                   onValueChange={(majorId) => onFiltersChange({ ...filters, majorId })}
                 >
-                  <SelectTrigger id="timetable-major-filter" className="h-9 min-w-0 flex-1 md:w-40">
+                  <SelectTrigger id="timetable-major-filter" className="h-9 min-w-0 flex-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -225,68 +193,6 @@ export function WeeklyTimetableToolbar({
               </Select>
             </div>
           )}
-        </div>
-
-        <div className="timetable-toolbar-actions grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            className="col-span-2 sm:col-auto"
-            onClick={onFullscreenToggle}
-          >
-            {fullscreen ? (
-              <Minimize2 className="me-2 h-4 w-4" />
-            ) : (
-              <Expand className="me-2 h-4 w-4" />
-            )}
-            <span className="timetable-action-label">
-              {fullscreen ? "خروج از تمام صفحه" : "نمایش تمام صفحه"}
-            </span>
-          </Button>
-          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={onPrint}>
-            <Printer className="me-2 h-4 w-4" />
-            <span className="timetable-action-label">چاپ برنامه</span>
-          </Button>
-          <DropdownMenu dir="rtl">
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={(pdfExportDisabled && excelExportDisabled) || exportPending !== null}
-              >
-                {exportPending ? (
-                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="me-2 h-4 w-4" />
-                )}
-                <span className="timetable-action-label">
-                  {exportPending ? "در حال آماده‌سازی..." : "دانلود"}
-                </span>
-                <ChevronDown className="ms-1 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
-              <DropdownMenuLabel>دانلود برنامه</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="min-h-10 cursor-pointer"
-                disabled={pdfExportDisabled || exportPending !== null}
-                onSelect={() => onExport("pdf")}
-              >
-                <FileText className="h-4 w-4" />
-                دانلود PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="min-h-10 cursor-pointer"
-                disabled={excelExportDisabled || exportPending !== null}
-                onSelect={() => onExport("excel")}
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                دانلود Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
     </div>

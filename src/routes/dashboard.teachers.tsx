@@ -2,9 +2,11 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDays,
+  Check,
   Edit,
   Filter,
   GraduationCap,
+  Minus,
   MoreHorizontal,
   Phone,
   Plus,
@@ -19,7 +21,6 @@ import {
   type TeacherDetailsInput,
 } from "@/components/teachers/teacher-details-dialog";
 import { TeacherCourseLabels } from "@/components/teachers/teacher-course-labels";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -100,6 +101,31 @@ function EmptyState({ onAddTeacher }: { onAddTeacher: () => void }) {
         افزودن معلم
       </Button>
     </Card>
+  );
+}
+
+function TeacherStatusIndicator({ teacher }: { teacher: Teacher }) {
+  const isActive = teacher.status === "active";
+  const statusLabel = isActive ? "فعال" : "غیرفعال";
+
+  return (
+    <span
+      role="img"
+      aria-label={`وضعیت ${teacher.name}: ${statusLabel}`}
+      title={statusLabel}
+      data-status={teacher.status}
+      className={
+        isActive
+          ? "inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-400"
+          : "inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-400"
+      }
+    >
+      {isActive ? (
+        <Check className="h-3 w-3 stroke-[3]" aria-hidden="true" />
+      ) : (
+        <Minus className="h-3 w-3 stroke-[3]" aria-hidden="true" />
+      )}
+    </span>
   );
 }
 
@@ -430,12 +456,9 @@ function TeachersPage() {
                             </p>
                           </div>
                         </div>
-                        <Badge
-                          variant={teacher.status === "active" ? "default" : "secondary"}
-                          className="shrink-0"
-                        >
-                          {teacher.status === "active" ? "فعال" : "غیرفعال"}
-                        </Badge>
+                        <div className="shrink-0 pt-1">
+                          <TeacherStatusIndicator teacher={teacher} />
+                        </div>
                       </div>
 
                       <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
@@ -564,12 +587,8 @@ function TeachersPage() {
                                 <CalendarDays className="h-5 w-5" />
                               </Button>
                             </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={teacher.status === "active" ? "default" : "secondary"}
-                              >
-                                {teacher.status === "active" ? "فعال" : "غیرفعال"}
-                              </Badge>
+                            <TableCell className="text-center">
+                              <TeacherStatusIndicator teacher={teacher} />
                             </TableCell>
                             <TableCell>
                               <DropdownMenu>

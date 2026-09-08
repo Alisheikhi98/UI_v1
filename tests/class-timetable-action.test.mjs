@@ -3,47 +3,25 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { QueryClient } from "@tanstack/react-query";
 
-import {
-  CLASS_TIMETABLE_FEEDBACK_DURATION_MS,
-  createClassTimetableFeedbackController,
-} from "../src/lib/class-timetable-feedback.ts";
 import { repositoryQueryKeys } from "../src/lib/repository-query-keys.ts";
+import { parseTimetableRouteSearch } from "../src/lib/timetable.ts";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("transient Class timetable feedback belongs to the clicked Class and replaces its timer", () => {
-  const changes = [];
-  const scheduled = new Map();
-  let nextTimerId = 0;
-  const controller = createClassTimetableFeedbackController((feedback) => changes.push(feedback), {
-    schedule(callback, delay) {
-      const id = ++nextTimerId;
-      scheduled.set(id, { callback, delay, cancelled: false });
-      return id;
-    },
-    cancel(id) {
-      scheduled.get(id).cancelled = true;
-    },
+test("Timetable search preserves a requested Class and rejects invalid modes", () => {
+  assert.deepEqual(parseTimetableRouteSearch({ mode: "class", classId: " 42 " }), {
+    mode: "class",
+    classId: "42",
+    teacherId: undefined,
   });
-
-  controller.show({ classId: "class-a", message: "برنامه هنوز آماده نیست." });
-  controller.show({ classId: "class-a", message: "برنامه هنوز آماده نیست." });
-
-  assert.equal(scheduled.size, 2);
-  assert.equal(scheduled.get(1).cancelled, true);
-  assert.equal(scheduled.get(2).delay, CLASS_TIMETABLE_FEEDBACK_DURATION_MS);
-  assert.equal(changes.at(-1).classId, "class-a");
-
-  scheduled.get(2).callback();
-  assert.equal(changes.at(-1), null);
-
-  controller.show({ classId: "class-b", message: "وضعیت برنامه قابل بررسی نیست." });
-  assert.equal(changes.at(-1).classId, "class-b");
-  controller.dispose();
-  assert.equal(scheduled.get(3).cancelled, true);
+  assert.deepEqual(parseTimetableRouteSearch({ mode: "invalid", classId: "" }), {
+    mode: undefined,
+    classId: undefined,
+    teacherId: undefined,
+  });
 });
 
-test("published Class schedule checks are school/Class scoped and reuse fresh React Query data", async () => {
+test("published Class schedule cache is school/Class scoped and reuses fresh data", async () => {
   const queryClient = new QueryClient();
   const queryKey = repositoryQueryKeys.publishedClassSchedule("9", "42");
   let requests = 0;
@@ -59,7 +37,7 @@ test("published Class schedule checks are school/Class scoped and reuse fresh Re
   assert.equal(requests, 1);
 });
 
-test("desktop and mobile Classes actions share the guarded published-timetable interaction", async () => {
+test("desktop and mobile Classes actions navigate directly to the requested Class timetable", async () => {
   const [route, queries] = await Promise.all([
     readSource("../src/routes/dashboard.classes.tsx"),
     readSource("../src/lib/timetable-queries.ts"),
@@ -67,16 +45,22 @@ test("desktop and mobile Classes actions share the guarded published-timetable i
 
   assert.match(route, /function ViewTimetableAction/);
   assert.equal((route.match(/<ViewTimetableAction/g) ?? []).length, 2);
-  assert.match(route, /feedback\?\.classId === classItem\.id/);
-  assert.match(route, /await publishedClassSchedule\.check\(classItem\.id\)/);
-  assert.match(route, /if \(!isPublished\)/);
-  assert.match(route, /برنامه هنوز آماده نیست\./);
-  assert.match(route, /وضعیت برنامه قابل بررسی نیست\./);
-  assert.match(route, /aria-live="polite"/);
-  assert.match(route, /motion-reduce:animate-none/);
-  assert.match(route, /disabled=\{isChecking\}/);
-  assert.doesNotMatch(route, /onClick=\{\(\) => navigate\(\{ to: "\/dashboard\/timetable" \}\)\}/);
-  assert.match(queries, /scheduleApi\.getClassSchedule\(schoolId, classId, \{ signal \}\)/);
-  assert.match(queries, /queryClient\.fetchQuery\(\{[\s\S]*publishedClassSchedule/);
+  assert.match(route, /to: "\/dashboard\/timetable"/);
+  assert.match(route, /search: \{ mode: "class", classId: classItem\.id \}/);
+  assert.doesNotMatch(route, /usePublishedClassScheduleCheck/);
+  assert.doesNotMatch(route, /checkingTimetableClassId|timetableFeedback/);
+  assert.match(queries, /repositoryQueryKeys\.publishedClassSchedule\(schoolId, classId\)/);
   assert.doesNotMatch(queries, /useQueries\([\s\S]*publishedClassSchedule/);
+});
+
+test("Weekly Timetable derives Class mode and selection from refresh-safe URL search", async () => {
+  const route = await readSource("../src/routes/dashboard.timetable.tsx");
+
+  assert.match(route, /validateSearch: parseTimetableRouteSearch/);
+  assert.match(route, /const search = Route\.useSearch\(\)/);
+  assert.match(route, /const mode = search\.mode \?\? "school"/);
+  assert.match(route, /const selectedClassId = search\.classId \?\? ""/);
+  assert.match(route, /search: \(previous\) => \(\{ \.\.\.previous, mode: "class", classId:/);
+  assert.match(route, /!selectedClassId \|\| !selectedClass/);
+  assert.doesNotMatch(route, /useState<TimetableViewMode>\("school"\)/);
 });
