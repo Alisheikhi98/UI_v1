@@ -1,22 +1,48 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, CreditCard, ExternalLink, Landmark, ShieldAlert } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { CalendarDays, CheckCircle2, CreditCard, Gauge, RefreshCw, Users } from "lucide-react";
 import { Header } from "@/components/header";
+import { PaymentDialog } from "@/components/subscription/payment-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSchoolSubscriptionQuery } from "@/lib/api/subscription-query";
+import type { SchoolSubscriptionDto } from "@/lib/api/dtos";
 import { withAppName } from "@/lib/branding";
-import { CONTACT_INFO } from "@/lib/contact-info";
-import { UPGRADE_PLANS, type PlanId } from "@/lib/plans";
+import { isPaidPlanId, PAID_PLANS, UPGRADE_PLANS } from "@/lib/plans";
+import {
+  formatSubscriptionDate,
+  formatSubscriptionUsage,
+  getSubscriptionPlanName,
+  getSubscriptionValidityLabel,
+  SUBSCRIPTION_STATUS_LABELS,
+} from "@/lib/subscription";
+
+interface SubscriptionSearch {
+  plan?: (typeof PAID_PLANS)[number]["id"];
+}
 
 export const Route = createFileRoute("/dashboard/subscription")({
+  validateSearch: (search: Record<string, unknown>): SubscriptionSearch => ({
+    plan: isPaidPlanId(search.plan) ? search.plan : undefined,
+  }),
   head: () => ({ meta: [{ title: withAppName("طرح و اشتراک") }] }),
   component: SubscriptionPage,
 });
 
 function SubscriptionPage() {
-  const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
-  const selectedPlan = UPGRADE_PLANS.find((plan) => plan.id === selectedPlanId) ?? null;
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const selectedPlan = PAID_PLANS.find((plan) => plan.id === search.plan) ?? null;
+  const subscriptionQuery = useSchoolSubscriptionQuery();
+
+  function selectPlan(planId: (typeof PAID_PLANS)[number]["id"]) {
+    void navigate({ search: { plan: planId } });
+  }
+
+  function closePaymentDialog() {
+    void navigate({ search: {}, replace: true });
+  }
 
   return (
     <div className="flex min-h-screen flex-col" dir="rtl">
@@ -28,39 +54,12 @@ function SubscriptionPage() {
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl space-y-6">
           <section aria-labelledby="current-plan-title">
-            <Card className="overflow-hidden border-amber-500/25 bg-amber-500/5">
-              <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <CardTitle id="current-plan-title" className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-primary" aria-hidden="true" />
-                      طرح فعلی
-                    </CardTitle>
-                    <CardDescription className="mt-2 max-w-2xl leading-6">
-                      سرویس فعلی هنوز اطلاعات طرح، اعتبار و محدودیت‌های حساب را ارائه نمی‌کند.
-                    </CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="w-fit border-amber-500/35 text-amber-700 dark:text-amber-300"
-                  >
-                    وضعیت در دسترس نیست
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-background/70 p-4 text-sm leading-6">
-                  <ShieldAlert
-                    className="mt-0.5 h-5 w-5 shrink-0 text-amber-600"
-                    aria-hidden="true"
-                  />
-                  <p>
-                    برای جلوگیری از نمایش اطلاعات نادرست، نام طرح، تاریخ انقضا، میزان مصرف و سقف‌ها
-                    تا زمان پشتیبانی سرویس نمایش داده نمی‌شوند.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <CurrentSubscriptionCard
+              subscription={subscriptionQuery.data}
+              isLoading={subscriptionQuery.isLoading}
+              hasError={subscriptionQuery.isError}
+              onRetry={() => void subscriptionQuery.refetch()}
+            />
           </section>
 
           <section aria-labelledby="upgrade-plans-title">
@@ -76,7 +75,7 @@ function SubscriptionPage() {
 
             <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
               {UPGRADE_PLANS.map((plan) => {
-                const isSelected = selectedPlanId === plan.id;
+                const isSelected = search.plan === plan.id;
                 return (
                   <Card
                     key={plan.id}
@@ -124,15 +123,21 @@ function SubscriptionPage() {
                         )}
                       </div>
 
-                      <Button
-                        type="button"
-                        className="mt-3 w-full"
-                        variant={plan.id === "advanced" ? "default" : "outline"}
-                        aria-pressed={isSelected}
-                        onClick={() => setSelectedPlanId(plan.id)}
-                      >
-                        {plan.id === "enterprise" ? "درخواست مشاوره" : "درخواست ارتقا"}
-                      </Button>
+                      {plan.price ? (
+                        <Button
+                          type="button"
+                          className="mt-3 w-full"
+                          variant={plan.id === "advanced" ? "default" : "outline"}
+                          aria-pressed={isSelected}
+                          onClick={() => selectPlan(plan.id)}
+                        >
+                          درخواست ارتقا
+                        </Button>
+                      ) : (
+                        <Button asChild type="button" className="mt-3 w-full" variant="outline">
+                          <Link to="/dashboard/contact">درخواست مشاوره</Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -140,66 +145,148 @@ function SubscriptionPage() {
             </div>
           </section>
 
-          {selectedPlan ? (
-            <section aria-labelledby="payment-information-title">
-              <Card className="border-primary/25">
-                <CardHeader>
-                  <CardTitle id="payment-information-title" className="flex items-center gap-2">
-                    <Landmark className="h-5 w-5 text-primary" aria-hidden="true" />
-                    اطلاعات پرداخت
-                  </CardTitle>
-                  <CardDescription className="leading-6">
-                    درخواست برای {selectedPlan.title}
-                    {selectedPlan.price
-                      ? ` به مبلغ ${selectedPlan.price} تومان`
-                      : " با قیمت توافقی"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ol className="grid gap-3 text-sm leading-6 sm:grid-cols-3">
-                    <li className="rounded-xl border bg-muted/25 p-4">
-                      <span className="font-semibold">۱. دریافت اطلاعات پرداخت</span>
-                      <p className="mt-1 text-muted-foreground">
-                        شماره کارت و اطلاعات مقصد را از پشتیبانی دریافت کنید.
-                      </p>
-                    </li>
-                    <li className="rounded-xl border bg-muted/25 p-4">
-                      <span className="font-semibold">۲. کارت‌به‌کارت</span>
-                      <p className="mt-1 text-muted-foreground">
-                        مبلغ اعلام‌شده را از طریق کارت‌به‌کارت پرداخت کنید.
-                      </p>
-                    </li>
-                    <li className="rounded-xl border bg-muted/25 p-4">
-                      <span className="font-semibold">۳. ارسال رسید</span>
-                      <p className="mt-1 text-muted-foreground">
-                        رسید یا کد پیگیری را برای بررسی و فعال‌سازی ارسال کنید.
-                      </p>
-                    </li>
-                  </ol>
-
-                  <div className="rounded-xl border border-dashed p-4 text-sm leading-6">
-                    پس از کارت‌به‌کارت، رسید یا کد پیگیری پرداخت را ارسال کنید تا طرح شما تأیید و
-                    فعال شود. ثبت درخواست و تأیید پرداخت در حال حاضر به‌صورت دستی از طریق پشتیبانی
-                    انجام می‌شود.
-                  </div>
-
-                  <Button asChild className="w-full sm:w-auto">
-                    <a
-                      href={CONTACT_INFO.primaryBaleUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`ارتباط با پشتیبانی در بله از طریق ${CONTACT_INFO.primaryBaleId} (باز شدن در زبانه جدید)`}
-                    >
-                      ارتباط با پشتیبانی در بله
-                      <ExternalLink className="ms-2 h-4 w-4" aria-hidden="true" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
+          <PaymentDialog
+            plan={selectedPlan}
+            onOpenChange={(open) => !open && closePaymentDialog()}
+          />
         </div>
       </main>
+    </div>
+  );
+}
+
+function CurrentSubscriptionCard({
+  subscription,
+  isLoading,
+  hasError,
+  onRetry,
+}: {
+  subscription?: SchoolSubscriptionDto;
+  isLoading: boolean;
+  hasError: boolean;
+  onRetry: () => void;
+}) {
+  if (isLoading) {
+    return (
+      <Card aria-label="در حال دریافت وضعیت اشتراک">
+        <CardHeader className="space-y-3">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-20 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (hasError || !subscription) {
+    return (
+      <Card className="border-destructive/25">
+        <CardHeader>
+          <CardTitle id="current-plan-title" className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" aria-hidden="true" />
+            طرح فعلی
+          </CardTitle>
+          <CardDescription>وضعیت اشتراک در دسترس نیست</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            تلاش مجدد
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const planName = getSubscriptionPlanName(subscription);
+  const limits = subscription.limits;
+
+  return (
+    <Card className="overflow-hidden border-primary/20 bg-primary/[0.025]">
+      <CardHeader>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle id="current-plan-title" className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" aria-hidden="true" />
+              {planName}
+            </CardTitle>
+            <CardDescription className="mt-2 leading-6">
+              {getSubscriptionValidityLabel(subscription)}؛ معتبر تا{" "}
+              {formatSubscriptionDate(subscription.expires_at)}
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="w-fit border-primary/30 text-primary">
+            {SUBSCRIPTION_STATUS_LABELS[subscription.status]}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <SubscriptionMetric
+            icon={Users}
+            label="معلمان فعال"
+            value={formatSubscriptionUsage(
+              subscription.active_teacher_count,
+              limits.max_active_teachers,
+            )}
+          />
+          <SubscriptionMetric
+            icon={Users}
+            label="کلاس‌های فعال"
+            value={formatSubscriptionUsage(
+              subscription.active_class_count,
+              limits.max_active_classes,
+            )}
+          />
+          <SubscriptionMetric
+            icon={Gauge}
+            label="تولید برنامه در دوره"
+            value={formatSubscriptionUsage(
+              subscription.total_generations_used,
+              limits.max_total_generations_per_user,
+            )}
+          />
+          <SubscriptionMetric
+            icon={Gauge}
+            label="تولید برنامه امروز"
+            value={formatSubscriptionUsage(
+              subscription.daily_generations_used,
+              limits.max_daily_generations_per_user,
+            )}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:text-sm">
+          <span className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" />
+            شروع: {formatSubscriptionDate(subscription.starts_at)}
+          </span>
+          <span>خروجی اکسل: {subscription.excel_watermark ? "با نشان چیدمان" : "بدون نشان"}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SubscriptionMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/75 p-3.5">
+      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        <span className="text-xs">{label}</span>
+      </div>
+      <p className="text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }

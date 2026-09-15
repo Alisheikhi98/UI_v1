@@ -9,23 +9,26 @@ export function TimetableCell({
 }) {
   if (!entry) {
     return (
-      <span className="select-none text-sm text-muted-foreground/35" aria-label="زنگ خالی">
-        —
-      </span>
+      <span
+        className="block min-h-11 w-full select-none rounded-xl border border-dashed border-border/55 bg-muted/20"
+        aria-label="زنگ خالی"
+      />
     );
   }
 
   return (
-    <div className="min-w-0 leading-tight">
-      <p
-        className="truncate text-xs font-semibold text-foreground sm:text-sm"
-        title={entry.courseName}
-      >
+    <div className="timetable-lesson-card min-w-0 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-center leading-tight text-slate-950 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <p className="truncate text-xs font-bold sm:text-sm" title={entry.courseName}>
         {entry.courseName}
       </p>
-      <p className="mt-1 truncate text-[11px] text-muted-foreground" title={secondaryText}>
-        {secondaryText ?? "—"}
-      </p>
+      {secondaryText ? (
+        <p
+          className="mt-1 truncate text-[10px] font-medium text-slate-600 sm:text-[11px]"
+          title={secondaryText}
+        >
+          {secondaryText}
+        </p>
+      ) : null}
     </div>
   );
 }

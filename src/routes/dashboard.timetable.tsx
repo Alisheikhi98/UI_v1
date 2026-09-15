@@ -188,16 +188,21 @@ function TimetablePage() {
 
   return (
     <div
-      className="weekly-timetable-page flex flex-col"
+      className="weekly-timetable-page flex min-h-full flex-col bg-muted/15"
       dir="rtl"
       aria-hidden={fullscreen || undefined}
       inert={fullscreen || undefined}
     >
       <Header title="برنامه هفتگی" description="برنامه نهایی و ثبت‌شده مدرسه" />
 
-      <main className="timetable-page-main p-4 sm:p-6">
+      <main className="timetable-page-main p-3 sm:p-6">
         <div className="mb-3 flex flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => setHistoryOpen(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl bg-background shadow-sm"
+            onClick={() => setHistoryOpen(true)}
+          >
             <History className="h-4 w-4" />
             تاریخچه برنامه‌ها
           </Button>
@@ -215,7 +220,7 @@ function TimetablePage() {
         </div>
         <section
           id="timetable-print-root"
-          className="isolate overflow-hidden border bg-background shadow-sm sm:rounded-xl"
+          className="isolate overflow-hidden border border-primary/10 bg-background shadow-lg shadow-primary/[0.04] sm:rounded-2xl"
           aria-label="برنامه هفتگی نهایی"
         >
           <div className="timetable-print-only mb-4 text-center">

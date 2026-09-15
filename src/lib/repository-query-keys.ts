@@ -28,6 +28,8 @@ export const repositoryQueryKeys = {
     ["schools", schoolId ?? "none", "classes", classId, "unavailable-slots"] as const,
   schoolStatistics: (schoolId: string | null) =>
     ["schools", schoolId ?? "none", "statistics"] as const,
+  schoolSubscription: (schoolId: string | null) =>
+    ["schools", schoolId ?? "none", "subscription"] as const,
   scheduleCandidates: (schoolId: string | null) =>
     ["schools", schoolId ?? "none", "schedule-candidates"] as const,
   scheduleCandidate: (schoolId: string | null, candidateId: string) =>

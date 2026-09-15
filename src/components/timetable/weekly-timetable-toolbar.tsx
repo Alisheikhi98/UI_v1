@@ -49,7 +49,7 @@ export function WeeklyTimetableToolbar({
 
   return (
     <div
-      className="timetable-toolbar print-hidden border-b bg-background p-3 sm:p-4"
+      className="timetable-toolbar print-hidden border-b bg-muted/25 p-3 sm:p-4"
       data-testid="timetable-toolbar"
     >
       <div className="timetable-toolbar-primary flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -60,22 +60,31 @@ export function WeeklyTimetableToolbar({
           dir="rtl"
           aria-label="نوع نمایش برنامه هفتگی"
         >
-          <TabsList className="grid h-10 w-full grid-cols-3 bg-muted/80 p-1 sm:w-64">
-            <TabsTrigger className="h-8" value="school">
+          <TabsList className="grid h-11 w-full grid-cols-3 rounded-xl border bg-background/80 p-1 shadow-sm sm:w-72">
+            <TabsTrigger
+              className="h-8.5 rounded-lg text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+              value="school"
+            >
               مدرسه
             </TabsTrigger>
-            <TabsTrigger className="h-8" value="class">
+            <TabsTrigger
+              className="h-8.5 rounded-lg text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+              value="class"
+            >
               کلاس
             </TabsTrigger>
-            <TabsTrigger className="h-8" value="teacher">
+            <TabsTrigger
+              className="h-8.5 rounded-lg text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+              value="teacher"
+            >
               معلم
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="timetable-context-controls min-w-0 xl:flex-1">
+        <div className="timetable-context-controls min-w-0 xl:flex xl:flex-1 xl:justify-center">
           {mode === "school" && (
-            <div className="timetable-toolbar-filters grid gap-2 sm:grid-cols-2 md:grid-cols-[minmax(10rem,11rem)_minmax(12rem,13rem)_minmax(10rem,12rem)_auto] md:items-center">
+            <div className="timetable-toolbar-filters mx-auto grid w-full max-w-3xl gap-2 sm:grid-cols-2 md:grid-cols-[minmax(10rem,11rem)_minmax(12rem,13rem)_minmax(10rem,12rem)_auto] md:items-center md:justify-center">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Label
                   htmlFor="timetable-grade-filter"
@@ -87,7 +96,10 @@ export function WeeklyTimetableToolbar({
                   value={filters.gradeId}
                   onValueChange={(gradeId) => onFiltersChange({ ...filters, gradeId })}
                 >
-                  <SelectTrigger id="timetable-grade-filter" className="h-9 min-w-0 flex-1">
+                  <SelectTrigger
+                    id="timetable-grade-filter"
+                    className="h-9 min-w-0 flex-1 bg-background shadow-xs [&>span]:w-full [&>span]:text-center"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -112,7 +124,10 @@ export function WeeklyTimetableToolbar({
                   value={filters.majorId}
                   onValueChange={(majorId) => onFiltersChange({ ...filters, majorId })}
                 >
-                  <SelectTrigger id="timetable-major-filter" className="h-9 min-w-0 flex-1">
+                  <SelectTrigger
+                    id="timetable-major-filter"
+                    className="h-9 min-w-0 flex-1 bg-background shadow-xs [&>span]:w-full [&>span]:text-center"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -133,7 +148,7 @@ export function WeeklyTimetableToolbar({
                 <SearchInput
                   id="timetable-class-search"
                   containerClassName="w-full"
-                  className="h-9"
+                  className="h-9 bg-background shadow-xs"
                   value={filters.search}
                   onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
                   placeholder="جستجوی کلاس"
@@ -155,12 +170,15 @@ export function WeeklyTimetableToolbar({
           )}
 
           {mode === "class" && (
-            <div className="flex max-w-md items-center gap-2">
+            <div className="mx-auto flex w-full max-w-xs items-center gap-2 rounded-xl border bg-background/80 p-1.5 shadow-sm">
               <Label htmlFor="timetable-class-select" className="shrink-0 text-sm">
                 کلاس:
               </Label>
               <Select value={selectedClassId} onValueChange={onClassChange}>
-                <SelectTrigger id="timetable-class-select" className="h-9 min-w-0 flex-1">
+                <SelectTrigger
+                  id="timetable-class-select"
+                  className="h-9 min-w-0 flex-1 bg-background [&>span]:w-full [&>span]:text-center"
+                >
                   <SelectValue placeholder="انتخاب کلاس" />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,12 +193,15 @@ export function WeeklyTimetableToolbar({
           )}
 
           {mode === "teacher" && (
-            <div className="flex max-w-md items-center gap-2">
+            <div className="mx-auto flex w-full max-w-xs items-center gap-2 rounded-xl border bg-background/80 p-1.5 shadow-sm">
               <Label htmlFor="timetable-teacher-select" className="shrink-0 text-sm">
                 معلم:
               </Label>
               <Select value={selectedTeacherId} onValueChange={onTeacherChange}>
-                <SelectTrigger id="timetable-teacher-select" className="h-9 min-w-0 flex-1">
+                <SelectTrigger
+                  id="timetable-teacher-select"
+                  className="h-9 min-w-0 flex-1 bg-background [&>span]:w-full [&>span]:text-center"
+                >
                   <SelectValue placeholder="انتخاب معلم" />
                 </SelectTrigger>
                 <SelectContent>

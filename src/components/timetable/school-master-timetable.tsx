@@ -3,6 +3,8 @@ import { TimetableCell } from "@/components/timetable/timetable-cell";
 import { getTimetableEntry, type NormalizedTimetable, type TimetableClass } from "@/lib/timetable";
 import { cn } from "@/lib/utils";
 
+const DAY_CONTEXT_TONES = ["bg-background", "bg-muted/55 dark:bg-muted/35"] as const;
+
 export function SchoolMasterTimetable({
   timetable,
   classes,
@@ -22,7 +24,7 @@ export function SchoolMasterTimetable({
       className={
         overview
           ? "fullscreen-master-timetable w-max overflow-visible"
-          : "timetable-scroll timetable-scroll-shell min-h-0 max-h-[calc(100dvh-15rem)] overflow-auto"
+          : "timetable-scroll timetable-scroll-shell min-h-0 max-h-[calc(100dvh-15rem)] overflow-auto bg-muted/10"
       }
       data-testid="school-master-scroll"
       dir="rtl"
@@ -35,7 +37,7 @@ export function SchoolMasterTimetable({
           <tr>
             <th
               className={cn(
-                "timetable-sticky-day w-[4.5rem] min-w-[4.5rem] border-b border-l bg-muted/95 px-1.5 py-3 text-center text-xs font-semibold whitespace-nowrap backdrop-blur",
+                "timetable-sticky-day w-[4.75rem] min-w-[4.75rem] border-b border-l bg-primary/[0.08] px-1.5 py-3 text-center text-xs font-bold text-primary whitespace-nowrap backdrop-blur",
                 stickyContext && "sticky right-0 top-0 z-40",
               )}
             >
@@ -43,8 +45,8 @@ export function SchoolMasterTimetable({
             </th>
             <th
               className={cn(
-                "timetable-sticky-period w-[3.25rem] min-w-[3.25rem] border-b border-l bg-muted/95 px-1 py-3 text-center text-xs font-semibold whitespace-nowrap backdrop-blur",
-                stickyContext && "sticky right-[4.5rem] top-0 z-40",
+                "timetable-sticky-period w-24 min-w-24 border-b border-l bg-muted/95 px-1.5 py-3 text-center text-xs font-bold whitespace-nowrap backdrop-blur",
+                stickyContext && "sticky right-[4.75rem] top-0 z-40",
               )}
             >
               زنگ
@@ -54,9 +56,9 @@ export function SchoolMasterTimetable({
                 key={classItem.id}
                 data-class-column={classItem.id}
                 className={cn(
-                  "min-w-40 border-b border-l bg-muted/95 px-3 py-2.5 text-center backdrop-blur transition-colors",
+                  "min-w-40 border-b border-l bg-primary/[0.055] px-3 py-2.5 text-center backdrop-blur transition-colors",
                   stickyContext && "sticky top-0 z-30",
-                  highlightedClassId === classItem.id && "bg-primary/10",
+                  highlightedClassId === classItem.id && "bg-primary/15",
                 )}
                 onMouseEnter={() => setHighlightedClassId(classItem.id)}
                 onMouseLeave={() => setHighlightedClassId(null)}
@@ -74,16 +76,16 @@ export function SchoolMasterTimetable({
             timetable.periods.map((period, periodIndex) => (
               <tr
                 key={`${day.id}-${period.id}`}
-                className={dayIndex % 2 === 0 ? "bg-background" : "bg-muted/20"}
+                className="bg-background"
                 data-day-start={periodIndex === 0}
               >
                 {periodIndex === 0 && (
                   <th
                     rowSpan={timetable.periods.length}
                     className={cn(
-                      "timetable-sticky-day w-[4.5rem] min-w-[4.5rem] border-b border-l border-s-2 border-s-primary/20 px-1.5 text-center text-xs align-middle font-semibold whitespace-nowrap",
+                      "timetable-sticky-day w-[4.75rem] min-w-[4.75rem] border-b border-l border-s-2 border-s-primary/30 px-1.5 text-center text-xs align-middle font-bold text-foreground whitespace-nowrap",
                       stickyContext && "sticky right-0 z-20",
-                      dayIndex % 2 === 0 ? "bg-background" : "bg-muted",
+                      DAY_CONTEXT_TONES[dayIndex % DAY_CONTEXT_TONES.length],
                     )}
                     data-testid={`day-group-${day.id}`}
                   >
@@ -92,16 +94,16 @@ export function SchoolMasterTimetable({
                 )}
                 <th
                   className={cn(
-                    "timetable-sticky-period w-[3.25rem] min-w-[3.25rem] border-b border-l px-1 py-3 text-center text-xs whitespace-nowrap",
-                    stickyContext && "sticky right-[4.5rem] z-20",
-                    dayIndex % 2 === 0 ? "bg-background" : "bg-muted",
+                    "timetable-sticky-period w-24 min-w-24 border-b border-l px-1.5 py-2 text-center text-xs whitespace-nowrap",
+                    stickyContext && "sticky right-[4.75rem] z-20",
+                    DAY_CONTEXT_TONES[dayIndex % DAY_CONTEXT_TONES.length],
                   )}
                   title={`${period.label}، ${period.time}`}
                 >
-                  <span className="block font-semibold">
-                    {period.slotNumber.toLocaleString("fa-IR")}
+                  <span className="block font-bold">{period.label}</span>
+                  <span className="mt-1 hidden text-[9px] font-normal text-muted-foreground sm:block">
+                    {period.time}
                   </span>
-                  <span className="sr-only">{period.time}</span>
                 </th>
                 {classes.map((classItem) => {
                   const entry = getTimetableEntry(timetable, day.id, period.id, classItem.id);
@@ -110,8 +112,8 @@ export function SchoolMasterTimetable({
                       key={classItem.id}
                       data-class-column={classItem.id}
                       className={cn(
-                        "h-16 min-w-40 border-b border-l px-3 py-2 text-center align-middle transition-colors hover:bg-accent/35",
-                        highlightedClassId === classItem.id && "bg-primary/5",
+                        "h-[4.75rem] min-w-40 border-b border-l bg-background/85 p-1.5 text-center align-middle transition-colors hover:bg-accent/25",
+                        highlightedClassId === classItem.id && "bg-primary/[0.045]",
                       )}
                     >
                       <TimetableCell

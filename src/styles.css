@@ -175,13 +175,29 @@
 }
 
 .timetable-scroll-shell {
+  background-color: color-mix(in oklch, var(--muted) 35%, var(--background));
   box-shadow:
     inset 12px 0 12px -16px color-mix(in oklch, var(--foreground) 30%, transparent),
     inset -12px 0 12px -16px color-mix(in oklch, var(--foreground) 30%, transparent);
 }
 
 .school-master-table tbody tr[data-day-start="true"] > * {
-  border-top: 2px solid color-mix(in oklch, var(--primary) 20%, var(--border));
+  border-top: 2px solid color-mix(in oklch, var(--primary) 28%, var(--border));
+}
+
+.timetable-lesson-card {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  td:hover > .timetable-lesson-card {
+    border-color: color-mix(in oklch, var(--primary) 28%, var(--border));
+    box-shadow: 0 6px 18px -12px color-mix(in oklch, var(--primary) 45%, transparent);
+    transform: translateY(-1px);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -220,6 +236,16 @@ html.timetable-fullscreen-active #mobile-dashboard-navigation {
     width: 3rem;
     min-width: 3rem;
     padding-inline: 0.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timetable-lesson-card {
+    transition: none;
+  }
+
+  td:hover > .timetable-lesson-card {
+    transform: none;
   }
 }
 

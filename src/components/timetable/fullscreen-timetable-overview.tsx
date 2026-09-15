@@ -126,9 +126,9 @@ export function FullscreenTimetableOverview({
       aria-label="نمای کلی برنامه هفتگی مدرسه"
       tabIndex={-1}
     >
-      <div className="fullscreen-timetable-toolbar print-hidden flex shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-2 py-2 backdrop-blur sm:px-3">
+      <div className="fullscreen-timetable-toolbar print-hidden flex shrink-0 items-center justify-between gap-2 border-b border-primary/10 bg-background px-2 py-2 shadow-sm sm:px-4 sm:py-3">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold sm:text-base">برنامه هفتگی مدرسه</h2>
+          <h2 className="truncate text-sm font-bold sm:text-lg">برنامه هفتگی مدرسه</h2>
           <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
             {timetable.schoolName}
           </p>
@@ -199,13 +199,13 @@ export function FullscreenTimetableOverview({
         </div>
       </div>
 
-      <p className="print-hidden border-b bg-muted/40 px-2 py-1 text-center text-[11px] text-muted-foreground sm:hidden">
+      <p className="print-hidden border-b border-primary/10 bg-primary/[0.04] px-2 py-1 text-center text-[11px] text-muted-foreground sm:hidden">
         برای مشاهده بهتر برنامه، گوشی را افقی کنید.
       </p>
 
       <div
         ref={viewportRef}
-        className="fullscreen-timetable-viewport timetable-scroll min-h-0 flex-1 overflow-auto overscroll-contain p-2 sm:p-3"
+        className="fullscreen-timetable-viewport timetable-scroll min-h-0 flex-1 overflow-auto overscroll-contain bg-background p-2 sm:p-4"
         data-testid="fullscreen-timetable-viewport"
       >
         <div
@@ -215,7 +215,7 @@ export function FullscreenTimetableOverview({
           <div
             ref={contentRef}
             id="timetable-fullscreen-print-root"
-            className="fullscreen-timetable-scaled absolute start-0 top-0 w-max origin-top-right"
+            className="fullscreen-timetable-scaled absolute start-0 top-0 w-max origin-top-right overflow-hidden border border-primary/10 bg-background"
             style={{ transform: `scale(${activeScale})` }}
           >
             <div className="timetable-print-only mb-4 text-center">

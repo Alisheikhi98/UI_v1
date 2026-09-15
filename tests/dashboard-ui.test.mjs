@@ -110,6 +110,15 @@ describe("Dashboard operational overview", () => {
     expect(source).toContain("sm:grid-cols-2 xl:grid-cols-4");
     expect(source).toContain("lg:grid-cols-2");
     expect(source).toContain("sm:grid-cols-2 lg:grid-cols-5");
-    expect(source).toContain('className="w-full sm:w-auto"');
+    expect(source).toContain("w-full self-start sm:w-auto");
+  });
+
+  test("readiness and timetable cards share equal-height desktop layout and aligned actions", async () => {
+    const source = await readSource("../src/routes/dashboard.index.tsx");
+
+    expect(source).toContain('className="grid items-stretch gap-4 lg:grid-cols-2"');
+    expect(source.match(/flex h-full flex-col/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(source.match(/mt-auto w-full self-start sm:w-auto/g)?.length).toBe(2);
+    expect(source).not.toContain("grid items-start gap-4 lg:grid-cols-2");
   });
 });

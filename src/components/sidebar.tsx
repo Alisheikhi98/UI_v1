@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Settings,
   CreditCard,
+  School,
   MessageCircle,
   LogOut,
   Menu,
@@ -20,7 +21,7 @@ import { APP_NAME } from "@/lib/branding";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
-  { name: "مدرسه", href: "/dashboard/schools", icon: LayoutDashboard },
+  { name: "مدرسه", href: "/dashboard/schools", icon: School },
   { name: "کلاس‌ها", href: "/dashboard/classes", icon: GraduationCap },
   { name: "معلمان", href: "/dashboard/teachers", icon: Users },
   { name: "تولید برنامه", href: "/dashboard/generator", icon: Sparkles },
@@ -89,7 +90,7 @@ export function Sidebar({
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5 pe-16 lg:px-6">
+          <div className="flex h-[4.5rem] shrink-0 items-center gap-2 border-b border-sidebar-border px-5 pe-16 lg:px-6">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <CalendarDays className="h-5 w-5 text-primary-foreground" />
             </div>

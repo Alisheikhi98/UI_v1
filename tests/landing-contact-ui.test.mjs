@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { describe, expect, test } from "bun:test";
 import { CONTACT_INFO } from "../src/lib/contact-info.ts";
 
@@ -13,9 +13,13 @@ describe("landing and dashboard contact experience", () => {
   test("renders the compact product-focused landing flow and canonical contact section", async () => {
     const source = await readSource("../src/routes/index.tsx");
 
-    expect(source).toContain("ساخت برنامه مدرسه");
+    expect(source).toContain("برنامه هفتگی مدرسه را");
+    expect(source).toContain("هوشمندانه بچینید");
     expect(source).toContain("از داده‌های مدرسه تا برنامه هفتگی");
     expect(source).toContain("چیدمان چگونه کار می‌کند؟");
+    expect(source).toContain("چرا ساخت برنامه هفتگی سخت می‌شود؟");
+    expect(source).toContain("قبل از نهایی‌کردن، برنامه را دقیق بررسی کنید");
+    expect(source).toContain("آماده‌اید برنامه هفتگی مدرسه را ساده‌تر بسازید؟");
     expect(source).toContain('<Link to="/auth/login">');
     expect(source).toContain('<Link to="/auth/register">');
     expect(source).toContain("{CONTACT_INFO.title}");
@@ -37,10 +41,14 @@ describe("landing and dashboard contact experience", () => {
   });
 
   test("copies only the selected Bale ID with a subtle localized status", async () => {
-    const source = await readSource("../src/components/contact-channels.tsx");
+    const [source, clipboard] = await Promise.all([
+      readSource("../src/components/contact-channels.tsx"),
+      readSource("../src/lib/copy-text.ts"),
+    ]);
 
-    expect(source).toContain("navigator.clipboard.writeText(value)");
-    expect(source).toContain('document.execCommand("copy")');
+    expect(source).toContain('import { copyText } from "@/lib/copy-text"');
+    expect(clipboard).toContain("navigator.clipboard.writeText(value)");
+    expect(clipboard).toContain('document.execCommand("copy")');
     expect(source).toContain("`${baleId} کپی شد`");
     expect(source).toContain('aria-live="polite"');
     expect(source).not.toContain("toast(");
@@ -53,8 +61,9 @@ describe("landing and dashboard contact experience", () => {
     ]);
 
     expect(landing).toContain("overflow-x-clip");
-    expect(landing).toContain("lg:grid-cols-[1.05fr_0.95fr]");
+    expect(landing).toContain("flex w-full max-w-7xl justify-center");
     expect(landing).toContain("md:grid-cols-3");
+    expect(landing).toContain("sm:grid-cols-2 lg:grid-cols-4");
     expect(header).toContain("max-w-44");
     expect(header).toContain("sm:max-w-56");
     expect(header).toContain("truncate");
@@ -66,11 +75,66 @@ describe("landing and dashboard contact experience", () => {
       ([, className]) => className,
     );
 
-    expect(containerClasses).toHaveLength(7);
+    expect(containerClasses.length).toBeGreaterThanOrEqual(9);
     expect(containerClasses.every((className) => className.includes("mx-auto"))).toBe(true);
     expect(containerClasses.every((className) => className.includes("w-full"))).toBe(true);
-    expect(source).toContain("mx-auto mt-9 grid w-full max-w-5xl");
-    expect(source).toContain("mx-auto grid w-full max-w-5xl");
+    expect(source).toContain("mx-auto mt-9 grid w-full max-w-6xl");
+    expect(source).toContain("mx-auto grid w-full max-w-4xl");
+  });
+
+  test("uses the requested RTL SaaS sections and real supported capabilities", async () => {
+    const source = await readSource("../src/routes/index.tsx");
+
+    for (const section of ['id="features"', 'id="workflow"', 'id="pricing"', 'id="contact"']) {
+      expect(source).toContain(section);
+    }
+
+    for (const capability of [
+      "مدیریت کلاس‌ها",
+      "مدیریت دبیران",
+      "محدودیت روزهای حضور",
+      "درس‌های هر کلاس",
+      "تولید با محدودیت‌ها",
+      "نمای مدرسه، کلاس و دبیر",
+      "خروجی اکسل",
+      "بررسی آمادگی",
+    ]) {
+      expect(source).toContain(capability);
+    }
+
+    expect(source).toContain("TimetableProductPreview");
+    expect(source).toContain('document.documentElement.style.scrollBehavior = "smooth"');
+    expect(source).toContain('aria-label="بخش‌های صفحه"');
+  });
+
+  test("uses only the local timetable product screenshot", async () => {
+    const source = await readSource("../src/routes/index.tsx");
+    const timetableImage = await stat(
+      new URL("../src/assets/landing/weekly-timetable-preview.png", import.meta.url),
+    );
+
+    expect(source).toContain(
+      'import weeklyTimetablePreviewImage from "@/assets/landing/weekly-timetable-preview.png"',
+    );
+    expect(source).not.toContain("teachersPreviewImage");
+    expect(source).not.toContain("نمای واقعی مدیریت دبیران");
+    expect(source).toContain('alt="نمای واقعی برنامه هفتگی مدرسه در چیدمان"');
+    expect(source).toContain('loading={priority ? "eager" : "lazy"}');
+    expect(source).toContain('fetchPriority={priority ? "high" : "auto"}');
+    expect(source).not.toContain("timetablePreviewRows");
+    expect(timetableImage.size).toBeGreaterThan(100_000);
+  });
+
+  test("keeps the landing workflow to three clear steps", async () => {
+    const source = await readSource("../src/routes/index.tsx");
+
+    expect(source).toContain('number: "۱"');
+    expect(source).toContain('number: "۲"');
+    expect(source).toContain('number: "۳"');
+    expect(source.match(/number: "[۱-۳]"/g)).toHaveLength(3);
+    expect(source).toContain("اطلاعات مدرسه را وارد کنید");
+    expect(source).toContain("کلاس‌ها، دبیران و درس‌ها را تنظیم کنید");
+    expect(source).toContain("برنامه را تولید و بررسی کنید");
   });
 
   test("renders four capability-based plans with only the approved paid-plan prices", async () => {
@@ -102,6 +166,7 @@ describe("landing and dashboard contact experience", () => {
     const source = await readSource("../src/routes/index.tsx");
 
     expect(source).toContain('<Link to="/auth/register">{plan.landingCta}</Link>');
+    expect(source).toContain("handlePaidPlanSelection(plan.id)");
     expect(source).toContain('<a href="#contact">{plan.landingCta}</a>');
     expect(source).toContain('id="contact"');
     expect(source).toContain("md:grid-cols-2 xl:grid-cols-4");

@@ -74,7 +74,7 @@ function DashboardPage() {
               onRetry={() => void overview.statistics.refetch()}
             />
 
-            <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="grid items-stretch gap-4 lg:grid-cols-2">
               <ReadinessSection
                 statistics={overview.statistics.data}
                 loading={overview.statistics.isPending}
@@ -201,7 +201,11 @@ function ReadinessSection({
   const firstBlocker = readiness.blockers[0];
 
   return (
-    <Card className={readiness.ready ? "border-emerald-500/25" : "border-amber-500/30"}>
+    <Card
+      className={`flex h-full flex-col ${
+        readiness.ready ? "border-emerald-500/25" : "border-amber-500/30"
+      }`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -228,7 +232,7 @@ function ReadinessSection({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-1 flex-col gap-4">
         {readiness.ready ? (
           <p className="text-xs text-muted-foreground">
             بررسی نهایی زمان حضور معلمان در صفحه تولید برنامه انجام می‌شود.
@@ -245,7 +249,7 @@ function ReadinessSection({
         )}
         <Button
           asChild
-          className="w-full sm:w-auto"
+          className="mt-auto w-full self-start sm:w-auto"
           variant={readiness.ready ? "default" : "outline"}
         >
           <Link to={readiness.ready ? "/dashboard/generator" : firstBlocker!.href}>
@@ -283,7 +287,7 @@ function TimetableStatusSection({
   const published = getPublishedSchedule(candidates);
 
   return (
-    <Card className={published ? "border-primary/25" : undefined}>
+    <Card className={`flex h-full flex-col ${published ? "border-primary/25" : ""}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -304,8 +308,12 @@ function TimetableStatusSection({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
-        <Button asChild className="w-full sm:w-auto" variant={published ? "outline" : "default"}>
+      <CardContent className="flex flex-1 flex-col justify-end">
+        <Button
+          asChild
+          className="mt-auto w-full self-start sm:w-auto"
+          variant={published ? "outline" : "default"}
+        >
           <Link to={published ? "/dashboard/timetable" : "/dashboard/generator"}>
             {published ? "مشاهده برنامه هفتگی" : "تولید برنامه"}
             <ArrowLeft className="h-4 w-4" />
@@ -374,11 +382,11 @@ function DashboardLoading() {
 
 function SectionSkeleton({ title }: { title: string }) {
   return (
-    <Card aria-label={`${title} در حال دریافت`}>
+    <Card className="flex h-full flex-col" aria-label={`${title} در حال دریافت`}>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex flex-1 flex-col gap-3">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-9 w-32" />
       </CardContent>
@@ -396,13 +404,13 @@ function SectionError({
   onRetry: () => void;
 }) {
   return (
-    <Card className="border-destructive/25">
-      <CardContent className="flex flex-col items-start gap-3 p-5">
+    <Card className="flex h-full flex-col border-destructive/25">
+      <CardContent className="flex flex-1 flex-col items-start gap-3 p-5">
         <div>
           <p className="font-medium">{title}</p>
           <p className="mt-1 text-sm text-muted-foreground">{message}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <Button className="mt-auto" variant="outline" size="sm" onClick={onRetry}>
           تلاش مجدد
         </Button>
       </CardContent>

@@ -185,6 +185,35 @@ export interface SchoolStatisticsDto {
   empty_weekly_slot_count: number;
 }
 
+export type SubscriptionPlanCodeDto = "basic" | "professional" | "advance" | "enterprise";
+
+export type SubscriptionStatusDto = "trial" | "active" | "cancelled" | "expired";
+
+export interface EffectiveSubscriptionLimitsDto {
+  max_active_teachers: number | null;
+  max_active_classes: number | null;
+  max_total_generations_per_user: number | null;
+  max_daily_generations_per_user: number | null;
+}
+
+export interface SchoolSubscriptionDto {
+  subscription_id: number;
+  school_id: number;
+  plan_code: SubscriptionPlanCodeDto;
+  plan_name: string;
+  status: SubscriptionStatusDto;
+  starts_at: string;
+  expires_at: string;
+  remaining_days: number;
+  usage_date: string;
+  active_teacher_count: number;
+  active_class_count: number;
+  total_generations_used: number;
+  daily_generations_used: number;
+  limits: EffectiveSubscriptionLimitsDto;
+  excel_watermark: boolean;
+}
+
 export interface ScheduleCandidateDetailDto extends ScheduleCandidateSummaryDto {
   lessons: ScheduledLessonDto[];
 }

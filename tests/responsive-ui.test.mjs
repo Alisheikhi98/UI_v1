@@ -45,9 +45,24 @@ test("desktop and mobile Sidebar share the Schools, Classes, Teachers navigation
   assert.match(source, /onClick=\{\(\) => setMobileMenuOpen\(false\)\}/);
 });
 
+test("Sidebar brand row aligns with page headers and School uses a dedicated icon", async () => {
+  const [sidebar, header] = await Promise.all([
+    readSource("../src/components/sidebar.tsx"),
+    readSource("../src/components/header.tsx"),
+  ]);
+
+  expect(sidebar).toContain("h-[4.5rem] shrink-0 items-center");
+  expect(header).toContain("min-h-[4.5rem] items-start");
+  expect(header).toContain("lg:h-[4.5rem] lg:min-h-0 lg:shrink-0");
+  expect(sidebar).toContain('{ name: "مدرسه", href: "/dashboard/schools", icon: School }');
+  expect(sidebar).not.toContain(
+    '{ name: "مدرسه", href: "/dashboard/schools", icon: LayoutDashboard }',
+  );
+});
+
 test("dashboard headers reserve mobile menu space and allow descriptions to grow", async () => {
   const source = await readSource("../src/components/header.tsx");
-  assert.match(source, /min-h-16/);
+  assert.match(source, /min-h-\[4\.5rem\]/);
   assert.match(source, /ps-16/);
   assert.match(source, /min-w-0 flex-1/);
   assert.doesNotMatch(source, /flex h-16 items-center/);
@@ -86,8 +101,8 @@ test("wide scheduling surfaces scroll locally and mobile controls wrap without s
   assert.match(master, /timetable-scroll[^"]*overflow-auto/);
   assert.match(entity, /timetable-scroll[^"]*overflow-auto/);
   assert.match(preview, /w-full overflow-auto/);
-  assert.match(actions, /grid grid-cols-2 gap-2 sm:flex/);
-  assert.match(actions, /col-span-2 sm:col-auto/);
+  assert.match(actions, /grid grid-cols-2 gap-1[^\"]*sm:flex/);
+  assert.match(actions, /col-span-2[^"]*sm:col-auto/);
 });
 
 test("mobile landscape gives the timetable one touch scroller and compact sticky context", async () => {
@@ -130,9 +145,10 @@ test("mobile landscape gives the timetable one touch scroller and compact sticky
 test("landing page keeps a readable responsive product flow without horizontal overflow", async () => {
   const source = await readSource("../src/routes/index.tsx");
   assert.match(source, /overflow-x-clip/);
-  assert.match(source, /text-4xl font-black[^"]*sm:text-5xl lg:text-6xl/);
+  assert.match(source, /text-4xl font-black[^"]*sm:text-5xl lg:text-\[3\.5rem\]/);
   assert.match(source, /py-14[^"]*sm:py-20[^"]*lg:py-24/);
-  assert.match(source, /grid w-full max-w-5xl gap-4 md:grid-cols-3/);
+  assert.match(source, /grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(source, /grid w-full max-w-7xl items-center gap-10[^"]*lg:grid-cols-/);
   assert.match(source, /flex flex-col gap-3 sm:flex-row/);
 });
 

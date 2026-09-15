@@ -29,6 +29,10 @@ test("filters precede compact Class search while page actions sit beside History
     source,
     /md:grid-cols-\[minmax\(10rem,11rem\)_minmax\(12rem,13rem\)_minmax\(10rem,12rem\)_auto\]/,
   );
+  assert.match(source, /timetable-context-controls[^\"]*xl:justify-center/);
+  assert.match(source, /timetable-toolbar-filters mx-auto[^\"]*max-w-3xl[^\"]*md:justify-center/);
+  assert.equal(source.match(/max-w-xs items-center/g)?.length, 2);
+  assert.equal(source.match(/\[&>span\]:text-center/g)?.length, 4);
   assert.ok(source.indexOf("timetable-grade-filter") < source.indexOf("timetable-major-filter"));
   assert.ok(source.indexOf("timetable-major-filter") < source.indexOf("timetable-class-search"));
   assert.doesNotMatch(source, /timetable-toolbar-actions|onFullscreenToggle|onExport/);

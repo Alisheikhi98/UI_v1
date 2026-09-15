@@ -146,10 +146,11 @@ describe("Weekly Timetable UI", () => {
     expect(source).toContain("overflow-auto");
     expect(source).toContain("sticky top-0");
     expect(source).toContain("sticky right-0");
-    expect(source).toContain("right-[4.5rem]");
-    expect(source).toContain('period.slotNumber.toLocaleString("fa-IR")');
-    expect(source).toContain("w-[4.5rem] min-w-[4.5rem]");
-    expect(source).toContain("w-[3.25rem] min-w-[3.25rem]");
+    expect(source).toContain("right-[4.75rem]");
+    expect(source).toContain("w-[4.75rem] min-w-[4.75rem]");
+    expect(source).toContain("w-24 min-w-24");
+    expect(source).toContain("{period.label}");
+    expect(source).toContain("{period.time}");
   });
 
   test("each occupied cell displays the course and its contextual teacher or class", async () => {
@@ -157,12 +158,17 @@ describe("Weekly Timetable UI", () => {
     expect(source).toContain("entry.courseName");
     expect(source).toContain("secondaryText");
     expect(source).toContain('aria-label="زنگ خالی"');
+    expect(source).toContain("timetable-lesson-card");
+    expect(source).toContain("border-slate-200 bg-white");
+    expect(source).not.toContain("timetable-course-tone");
+    expect(source).not.toContain("secondaryText ??");
   });
 
   test("toolbar keeps contextual School, Class, and Teacher controls in one responsive group", async () => {
     const source = await readSource("../src/components/timetable/weekly-timetable-toolbar.tsx");
     expect(source).toContain("timetable-toolbar-primary");
     expect(source).toContain("timetable-context-controls");
+    expect(source).toContain("data-[state=active]:bg-primary");
     expect(source).toContain('htmlFor="timetable-grade-filter"');
     expect(source).toContain('htmlFor="timetable-major-filter"');
     expect(source).toContain('htmlFor="timetable-class-select"');
@@ -191,8 +197,9 @@ describe("Weekly Timetable UI", () => {
     expect(summarySource).toContain("timetable.days.length");
     expect(summarySource).toContain("timetable.periods.length");
     expect(summarySource).toContain("جلسه برنامه‌ریزی‌شده");
-    expect(headingSource).toContain("برنامه جامع مدرسه");
-    expect(headingSource).toContain("برنامه کلاس");
+    expect(headingSource).toContain("نمای کلی برنامه مدرسه ${schoolName}");
+    expect(headingSource).not.toContain("{schoolName}</p>");
+    expect(headingSource).toContain("برنامه هفتگی کلاس");
     expect(headingSource).toContain("برنامه هفتگی");
   });
 
@@ -205,6 +212,8 @@ describe("Weekly Timetable UI", () => {
     expect(source).toContain("highlightedClassId");
     expect(source).toContain("data-class-column");
     expect(styles).toContain('.school-master-table tbody tr[data-day-start="true"]');
+    expect(source).toContain("DAY_CONTEXT_TONES[dayIndex % DAY_CONTEXT_TONES.length]");
+    expect(styles).not.toContain(".timetable-course-tone");
     expect(styles).toContain("@media (hover: hover) and (pointer: fine)");
   });
 
@@ -228,6 +237,10 @@ describe("Weekly Timetable UI", () => {
     expect(fullscreenSource).toContain("orientationchange");
     expect(fullscreenSource).toContain("classes={timetable.classes}");
     expect(fullscreenSource).toContain("<SchoolMasterTimetable");
+    expect(fullscreenSource).toContain("overflow-hidden bg-background");
+    expect(fullscreenSource).not.toContain("bg-muted/30");
+    expect(fullscreenSource).not.toContain("shadow-2xl shadow-primary/10");
+    expect(actionsSource).toContain('aria-label="عملیات برنامه هفتگی"');
     expect(actionsSource).toContain('onExport("pdf")');
     expect(actionsSource).toContain('onExport("excel")');
     expect(actionsSource).toContain("دانلود PDF");

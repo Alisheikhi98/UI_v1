@@ -33,7 +33,7 @@ export function TimetableSummary({
         return (
           <div
             key={metric.label}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border bg-background px-2.5 text-xs text-muted-foreground"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/10 bg-primary/[0.035] px-2.5 text-xs text-muted-foreground"
           >
             <Icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
             <span className="font-semibold text-foreground">

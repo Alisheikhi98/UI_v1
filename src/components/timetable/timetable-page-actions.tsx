@@ -36,11 +36,15 @@ export function TimetablePageActions({
   exportPending: "pdf" | "excel" | null;
 }) {
   return (
-    <div className="timetable-toolbar-actions grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+    <div
+      className="timetable-toolbar-actions grid grid-cols-2 gap-1 rounded-xl border bg-background/80 p-1 shadow-sm sm:flex sm:flex-wrap sm:items-center"
+      role="group"
+      aria-label="عملیات برنامه هفتگی"
+    >
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="col-span-2 sm:col-auto"
+        className="col-span-2 h-8.5 sm:col-auto"
         onClick={onFullscreenToggle}
       >
         {fullscreen ? <Minimize2 className="me-2 h-4 w-4" /> : <Expand className="me-2 h-4 w-4" />}
@@ -48,16 +52,16 @@ export function TimetablePageActions({
           {fullscreen ? "خروج از تمام صفحه" : "نمایش تمام صفحه"}
         </span>
       </Button>
-      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={onPrint}>
+      <Button variant="ghost" size="sm" className="h-8.5 w-full sm:w-auto" onClick={onPrint}>
         <Printer className="me-2 h-4 w-4" />
         <span className="timetable-action-label">چاپ برنامه</span>
       </Button>
       <DropdownMenu dir="rtl">
         <DropdownMenuTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="w-full sm:w-auto"
+            className="h-8.5 w-full sm:w-auto"
             disabled={(pdfExportDisabled && excelExportDisabled) || exportPending !== null}
           >
             {exportPending ? (

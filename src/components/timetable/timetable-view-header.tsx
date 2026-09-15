@@ -16,9 +16,9 @@ export function TimetableViewHeader({
 }) {
   const title =
     mode === "school"
-      ? "برنامه جامع مدرسه"
+      ? `نمای کلی برنامه مدرسه ${schoolName}`
       : mode === "class" && selectedClassName
-        ? `برنامه کلاس ${selectedClassName}`
+        ? `برنامه هفتگی کلاس ${selectedClassName}`
         : mode === "teacher" && selectedTeacherName
           ? `برنامه هفتگی ${selectedTeacherName}`
           : null;
@@ -27,12 +27,14 @@ export function TimetableViewHeader({
 
   return (
     <div
-      className="flex flex-col gap-2 border-b bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+      className="flex flex-col gap-3 border-b bg-background px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4"
       data-testid="timetable-view-header"
     >
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
-        {mode === "school" && <p className="mt-0.5 text-xs text-muted-foreground">{schoolName}</p>}
+        <p className="text-[10px] font-semibold tracking-wide text-primary">
+          برنامه نهایی منتشرشده
+        </p>
+        <h2 className="mt-0.5 text-sm font-bold text-foreground sm:text-base">{title}</h2>
       </div>
       {children}
     </div>

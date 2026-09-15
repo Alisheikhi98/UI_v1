@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CONTACT_INFO } from "@/lib/contact-info";
+import { copyText } from "@/lib/copy-text";
 import { cn } from "@/lib/utils";
 
 interface ContactChannelsProps {
@@ -69,26 +70,4 @@ export function ContactChannels({ className }: ContactChannelsProps) {
       })}
     </div>
   );
-}
-
-async function copyText(value: string) {
-  if (navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      // Fall back for browsers that expose Clipboard API without granting write access.
-    }
-  }
-
-  const textArea = document.createElement("textarea");
-  textArea.value = value;
-  textArea.setAttribute("readonly", "");
-  textArea.style.position = "fixed";
-  textArea.style.opacity = "0";
-  document.body.append(textArea);
-  textArea.select();
-  const copied = document.execCommand("copy");
-  textArea.remove();
-  return copied;
 }

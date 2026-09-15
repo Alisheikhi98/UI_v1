@@ -100,3 +100,13 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
 ] as const;
 
 export const UPGRADE_PLANS = PLAN_CATALOG.filter((plan) => plan.id !== "trial");
+
+export type PaidPlanDefinition = PlanDefinition & { price: string };
+
+export const PAID_PLANS = PLAN_CATALOG.filter(
+  (plan): plan is PaidPlanDefinition => typeof plan.price === "string",
+);
+
+export function isPaidPlanId(value: unknown): value is PlanId {
+  return typeof value === "string" && PAID_PLANS.some((plan) => plan.id === value);
+}
