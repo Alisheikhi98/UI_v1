@@ -40,7 +40,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     id: "professional",
     title: "پلن حرفه‌ای",
     description: "مناسب مدارس کوچک و استفاده روزمره",
-    price: "۱٬۵۰۰٬۰۰۰",
+    price: "۴٬۰۰۰٬۰۰۰",
     features: [
       "اعتبار یک‌ساله",
       "تا ۳۰ دبیر فعال",
@@ -61,7 +61,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     title: "پلن پیشرفته",
     description: "مناسب مدارس متوسط و مجموعه‌های آموزشی بزرگ‌تر",
     badge: "پیشنهاد ویژه",
-    price: "۲٬۵۰۰٬۰۰۰",
+    price: "۶٬۰۰۰٬۰۰۰",
     features: [
       "اعتبار یک‌ساله",
       "تا ۶۰ دبیر فعال",

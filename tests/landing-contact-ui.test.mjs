@@ -156,8 +156,8 @@ describe("landing and dashboard contact experience", () => {
     );
     expect(plans).toContain("پیشنهاد ویژه");
     expect(plans).toContain("تماس برای مشاوره");
-    expect(plans).toContain('price: "۱٬۵۰۰٬۰۰۰"');
-    expect(plans).toContain('price: "۲٬۵۰۰٬۰۰۰"');
+    expect(plans).toContain('price: "۴٬۰۰۰٬۰۰۰"');
+    expect(plans).toContain('price: "۶٬۰۰۰٬۰۰۰"');
     expect(plans.match(/price: "/g)).toHaveLength(2);
     expect(plans).not.toContain("ریال");
   });

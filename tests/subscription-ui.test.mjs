@@ -120,14 +120,14 @@ test("Landing, subscription, and payment dialog reuse canonical plan metadata", 
     PAID_PLANS.map(({ id }) => id),
     ["professional", "advanced"],
   );
-  assert.equal(PAID_PLANS[0]?.price, "۱٬۵۰۰٬۰۰۰");
-  assert.equal(PAID_PLANS[1]?.price, "۲٬۵۰۰٬۰۰۰");
+  assert.equal(PAID_PLANS[0]?.price, "۴٬۰۰۰٬۰۰۰");
+  assert.equal(PAID_PLANS[1]?.price, "۶٬۰۰۰٬۰۰۰");
   assert.match(landing, /PLAN_CATALOG\.map/);
   assert.match(subscription, /UPGRADE_PLANS\.map/);
   assert.match(subscription, /PAID_PLANS\.find/);
   assert.match(paymentDialog, /plan\.title/);
   assert.match(paymentDialog, /plan\.price/);
-  assert.doesNotMatch(paymentDialog, /۱٬۵۰۰٬۰۰۰|۲٬۵۰۰٬۰۰۰|پلن حرفه‌ای|پلن پیشرفته/);
+  assert.doesNotMatch(paymentDialog, /۴٬۰۰۰٬۰۰۰|۶٬۰۰۰٬۰۰۰|پلن حرفه‌ای|پلن پیشرفته/);
 });
 
 test("paid dashboard plan selection opens a URL-backed payment dialog", async () => {
