@@ -15,6 +15,7 @@ import {
   formatSubscriptionUsage,
   getSubscriptionPlanName,
   getSubscriptionValidityLabel,
+  isSubscriptionExpiredError,
   SUBSCRIPTION_STATUS_LABELS,
 } from "@/lib/subscription";
 
@@ -57,7 +58,7 @@ function SubscriptionPage() {
             <CurrentSubscriptionCard
               subscription={subscriptionQuery.data}
               isLoading={subscriptionQuery.isLoading}
-              hasError={subscriptionQuery.isError}
+              error={subscriptionQuery.error}
               onRetry={() => void subscriptionQuery.refetch()}
             />
           </section>
@@ -158,12 +159,12 @@ function SubscriptionPage() {
 function CurrentSubscriptionCard({
   subscription,
   isLoading,
-  hasError,
+  error,
   onRetry,
 }: {
   subscription?: SchoolSubscriptionDto;
   isLoading: boolean;
-  hasError: boolean;
+  error?: unknown;
   onRetry: () => void;
 }) {
   if (isLoading) {
@@ -182,7 +183,21 @@ function CurrentSubscriptionCard({
     );
   }
 
-  if (hasError || !subscription) {
+  if (isSubscriptionExpiredError(error)) {
+    return (
+      <Card className="border-amber-500/30 bg-amber-500/[0.035]">
+        <CardHeader>
+          <CardTitle id="current-plan-title" className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-amber-600" aria-hidden="true" />
+            اتمام پلن
+          </CardTitle>
+          <CardDescription>اعتبار طرح شما به پایان رسیده است.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (error || !subscription) {
     return (
       <Card className="border-destructive/25">
         <CardHeader>

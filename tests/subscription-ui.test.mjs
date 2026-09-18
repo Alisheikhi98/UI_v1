@@ -6,10 +6,10 @@ import { PAYMENT_DETAILS } from "../src/lib/payment-details.ts";
 import { PAID_PLANS, PLAN_CATALOG, UPGRADE_PLANS } from "../src/lib/plans.ts";
 import { repositoryQueryKeys } from "../src/lib/repository-query-keys.ts";
 import {
-  calculateSubscriptionRemainingDays,
   formatSubscriptionUsage,
   getSubscriptionPlanName,
   getSubscriptionValidityLabel,
+  isSubscriptionExpiredError,
 } from "../src/lib/subscription.ts";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -62,6 +62,33 @@ test("backend Trial is rendered as a real Trial rather than a missing subscripti
   assert.notEqual(getSubscriptionPlanName(trial), "وضعیت در دسترس نیست");
 });
 
+test("an expired backend subscription is rendered as plan completion", async () => {
+  const expiredError = {
+    status: 409,
+    details: {
+      error: "SubscriptionExpiredError",
+      detail: "The school subscription has expired.",
+    },
+  };
+
+  assert.equal(isSubscriptionExpiredError(expiredError), true);
+  assert.equal(
+    isSubscriptionExpiredError({ status: 409, details: { error: "OtherError" } }),
+    false,
+  );
+  assert.equal(isSubscriptionExpiredError({ status: 500 }), false);
+
+  const [route, header] = await Promise.all([
+    readSource("../src/routes/dashboard.subscription.tsx"),
+    readSource("../src/components/header.tsx"),
+  ]);
+  assert.match(route, /isSubscriptionExpiredError\(error\)/);
+  assert.match(header, /isSubscriptionExpiredError\(subscriptionQuery\.error\)/);
+  assert.match(route, /اتمام پلن/);
+  assert.match(header, /اتمام پلن/);
+  assert.doesNotMatch(`${route}\n${header}`, /The school subscription has expired/);
+});
+
 test("paid plan identity is derived from the backend response", () => {
   assert.equal(
     getSubscriptionPlanName(
@@ -77,26 +104,30 @@ test("paid plan identity is derived from the backend response", () => {
   );
 });
 
-test("remaining validity and usage use backend dates and effective limits", () => {
-  const trial = subscription();
+test("remaining validity and usage use backend values and effective limits", () => {
+  const trial = subscription({ expires_at: "2099-01-01T00:00:00Z", remaining_days: 4 });
+  assert.equal(getSubscriptionValidityLabel(trial), "۴ روز باقی‌مانده");
   assert.equal(
-    calculateSubscriptionRemainingDays(trial.expires_at, new Date("2026-09-11T00:00:00Z")),
-    4,
-  );
-  assert.equal(
-    getSubscriptionValidityLabel(trial, new Date("2026-09-11T00:00:00Z")),
-    "۴ روز باقی‌مانده",
+    getSubscriptionValidityLabel(subscription({ remaining_days: 0 })),
+    "اعتبار به پایان رسیده",
   );
   assert.equal(formatSubscriptionUsage(3, 20), "۳ از ۲۰");
   assert.equal(formatSubscriptionUsage(3, null), "۳ (بدون محدودیت)");
 });
 
-test("header and page share one school-scoped cache key and expose safe loading/error states", async () => {
-  const [route, header] = await Promise.all([
+test("dashboard header and page share one school-scoped query without duplicate API functions", async () => {
+  const [route, header, dashboard, query] = await Promise.all([
     readSource("../src/routes/dashboard.subscription.tsx"),
     readSource("../src/components/header.tsx"),
+    readSource("../src/routes/dashboard.index.tsx"),
+    readSource("../src/lib/api/subscription-query.ts"),
   ]);
   assert.deepEqual(repositoryQueryKeys.schoolSubscription("7"), ["schools", "7", "subscription"]);
+  assert.match(dashboard, /<Header title="داشبورد"/);
+  assert.match(route, /useSchoolSubscriptionQuery\(\)/);
+  assert.match(header, /useSchoolSubscriptionQuery\(\)/);
+  assert.equal(query.match(/apiRequest<SchoolSubscriptionDto>/g)?.length, 1);
+  assert.doesNotMatch(`${route}\n${header}`, /apiRequest|getSchoolSubscription/);
   assert.match(route, /در حال دریافت وضعیت اشتراک/);
   assert.match(header, /در حال دریافت وضعیت اشتراک/);
   assert.match(route, /وضعیت اشتراک در دسترس نیست/);

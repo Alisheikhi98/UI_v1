@@ -14,18 +14,20 @@ export const SUBSCRIPTION_STATUS_LABELS = {
   expired: "منقضی",
 } as const;
 
+export function isSubscriptionExpiredError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const candidate = error as { status?: unknown; details?: unknown };
+  if (candidate.status !== 409 || !candidate.details || typeof candidate.details !== "object") {
+    return false;
+  }
+
+  return (candidate.details as { error?: unknown }).error === "SubscriptionExpiredError";
+}
+
 export function getSubscriptionPlanName(subscription: SchoolSubscriptionDto): string {
   if (subscription.status === "trial") return "پلن آزمایشی";
   return PERSIAN_PLAN_NAMES[subscription.plan_code] ?? subscription.plan_name;
-}
-
-export function calculateSubscriptionRemainingDays(
-  expiresAt: string,
-  now: Date = new Date(),
-): number {
-  const expiry = new Date(expiresAt);
-  if (Number.isNaN(expiry.getTime())) return 0;
-  return Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000));
 }
 
 export function formatSubscriptionDate(value: string): string {
@@ -49,11 +51,8 @@ export function formatSubscriptionUsage(used: number, limit: number | null): str
     : `${localizedUsage} از ${formatSubscriptionLimit(limit)}`;
 }
 
-export function getSubscriptionValidityLabel(
-  subscription: SchoolSubscriptionDto,
-  now: Date = new Date(),
-): string {
-  const remainingDays = calculateSubscriptionRemainingDays(subscription.expires_at, now);
+export function getSubscriptionValidityLabel(subscription: SchoolSubscriptionDto): string {
+  const remainingDays = Math.max(0, subscription.remaining_days);
   return remainingDays > 0
     ? `${remainingDays.toLocaleString("fa-IR")} روز باقی‌مانده`
     : "اعتبار به پایان رسیده";

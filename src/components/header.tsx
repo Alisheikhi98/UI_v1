@@ -2,7 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSchoolSubscriptionQuery } from "@/lib/api/subscription-query";
-import { getSubscriptionPlanName, getSubscriptionValidityLabel } from "@/lib/subscription";
+import {
+  getSubscriptionPlanName,
+  getSubscriptionValidityLabel,
+  isSubscriptionExpiredError,
+} from "@/lib/subscription";
 
 interface HeaderProps {
   title: string;
@@ -11,6 +15,7 @@ interface HeaderProps {
 
 export function Header({ title, description }: HeaderProps) {
   const subscriptionQuery = useSchoolSubscriptionQuery();
+  const isExpired = isSubscriptionExpiredError(subscriptionQuery.error);
 
   return (
     <header className="sticky top-0 z-30 flex min-h-[4.5rem] items-start justify-between gap-2 border-b border-border bg-background/95 py-3 ps-16 pe-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:items-center sm:px-6 lg:h-[4.5rem] lg:min-h-0 lg:shrink-0 lg:py-[0.6875rem]">
@@ -35,6 +40,15 @@ export function Header({ title, description }: HeaderProps) {
               <Skeleton className="h-3.5 w-20" />
               <Skeleton className="h-3 w-24" />
             </span>
+          ) : isExpired ? (
+            <>
+              <span className="block truncate text-xs font-semibold text-foreground sm:text-sm">
+                اتمام پلن
+              </span>
+              <span className="block truncate text-[10px] leading-4 text-muted-foreground sm:text-xs">
+                اعتبار طرح به پایان رسیده است
+              </span>
+            </>
           ) : subscriptionQuery.isError || !subscriptionQuery.data ? (
             <>
               <span className="block truncate text-xs font-semibold text-foreground sm:text-sm">
